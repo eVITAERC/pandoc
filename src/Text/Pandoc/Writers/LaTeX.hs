@@ -470,9 +470,13 @@ tableRowToLaTeX header aligns widths cols = do
                   AlignRight   -> "\\raggedleft"
                   AlignCenter  -> "\\centering"
                   AlignDefault -> "\\raggedright"
+  -- scale factor compensates for extra space between columns
+  -- so the whole table isn't larger than columnwidth
+  let scaleFactor = 0.97 ** fromIntegral (length aligns)
   let toCell 0 _ c = c
       toCell w a c = "\\begin{minipage}" <> valign <>
-                     braces (text (printf "%.2f\\columnwidth" w)) <>
+                     braces (text (printf "%.2f\\columnwidth"
+                                    (w * scaleFactor))) <>
                      (halign a <> cr <> c <> cr) <> "\\end{minipage}"
   let cells = zipWith3 toCell widths aligns renderedCells
   return $ hsep (intersperse "&" cells) $$ "\\\\\\noalign{\\medskip}"
@@ -498,14 +502,15 @@ sectionHeader unnumbered ref level lst = do
   let noNote (Note _) = Str ""
       noNote x        = x
   let lstNoNotes = walk noNote lst
+  txtNoNotes <- inlineListToLaTeX lstNoNotes
   let star = if unnumbered then text "*" else empty
-  -- footnotes in sections don't work unless you specify an optional
-  -- argument:  \section[mysec]{mysec\footnote{blah}}
-  optional <- if lstNoNotes == lst
+  -- footnotes in sections don't work (except for starred variants)
+  -- unless you specify an optional argument:
+  -- \section[mysec]{mysec\footnote{blah}}
+  optional <- if unnumbered || lstNoNotes == lst
                  then return empty
                  else do
-                   res <- inlineListToLaTeX lstNoNotes
-                   return $ char '[' <> res <> char ']'
+                   return $ brackets txtNoNotes
   let stuffing = star <> optional <> braces txt
   book <- gets stBook
   opts <- gets stOptions
@@ -536,7 +541,7 @@ sectionHeader unnumbered ref level lst = do
                    $$ if unnumbered
                          then "\\addcontentsline{toc}" <>
                                 braces (text sectionType) <>
-                                braces txt
+                                braces txtNoNotes
                          else empty
 
 -- | Convert list of inline elements to LaTeX.

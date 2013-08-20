@@ -315,12 +315,14 @@ authors = try $ do
   addMeta "authors" (map trimInlines auths)
 
 section :: Attr -> Int -> LP Blocks
-section attr lvl = do
+section (ident, classes, kvs) lvl = do
   hasChapters <- stateHasChapters `fmap` getState
   let lvl' = if hasChapters then lvl + 1 else lvl
   skipopts
   contents <- grouped inline
-  return $ headerWith attr lvl' contents
+  lab <- option ident $ try $ spaces >> controlSeq "label" >>
+           spaces >> braced
+  return $ headerWith (lab, classes, kvs) lvl' contents
 
 inlineCommand :: LP Inlines
 inlineCommand = try $ do
@@ -402,6 +404,8 @@ inlineCommands = M.fromList $
   , ("l", lit "ł")
   , ("ae", lit "æ")
   , ("AE", lit "Æ")
+  , ("oe", lit "œ")
+  , ("OE", lit "Œ")
   , ("pounds", lit "£")
   , ("euro", lit "€")
   , ("copyright", lit "©")
@@ -416,6 +420,7 @@ inlineCommands = M.fromList $
   , ("=", option (str "=") $ try $ tok >>= accent macron)
   , ("c", option (str "c") $ try $ tok >>= accent cedilla)
   , ("v", option (str "v") $ try $ tok >>= accent hacek)
+  , ("u", option (str "u") $ try $ tok >>= accent breve)
   , ("i", lit "i")
   , ("\\", linebreak <$ (optional (bracketed inline) *> optional sp))
   , (",", pure mempty)
@@ -707,6 +712,21 @@ hacek 'u' = 'ǔ'
 hacek 'Z' = 'Ž'
 hacek 'z' = 'ž'
 hacek c   = c
+
+breve :: Char -> Char
+breve 'A' = 'Ă'
+breve 'a' = 'ă'
+breve 'E' = 'Ĕ'
+breve 'e' = 'ĕ'
+breve 'G' = 'Ğ'
+breve 'g' = 'ğ'
+breve 'I' = 'Ĭ'
+breve 'i' = 'ĭ'
+breve 'O' = 'Ŏ'
+breve 'o' = 'ŏ'
+breve 'U' = 'Ŭ'
+breve 'u' = 'ŭ'
+breve c   = c
 
 tok :: LP Inlines
 tok = try $ grouped inline <|> inlineCommand <|> str <$> (count 1 $ inlineChar)

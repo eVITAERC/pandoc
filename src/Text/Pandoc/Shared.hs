@@ -384,8 +384,10 @@ consolidateInlines (x : xs) = x : consolidateInlines xs
 consolidateInlines [] = []
 
 -- | Convert list of inlines to a string with formatting removed.
+-- Footnotes are skipped (since we don't want their contents in link
+-- labels).
 stringify :: [Inline] -> String
-stringify = query go
+stringify = query go . walk deNote
   where go :: Inline -> [Char]
         go Space = " "
         go (Str x) = x
@@ -393,6 +395,8 @@ stringify = query go
         go (Math _ x) = x
         go LineBreak = " "
         go _ = ""
+        deNote (Note _) = Str ""
+        deNote x = x
 
 -- | Change final list item from @Para@ to @Plain@ if the list contains
 -- no other @Para@ blocks.
@@ -583,8 +587,7 @@ readDefaultDataFile :: FilePath -> IO BS.ByteString
 readDefaultDataFile fname =
 #ifdef EMBED_DATA_FILES
   case lookup (makeCanonical fname) dataFiles of
-    Nothing       -> ioError $ userError
-                             $ "Data file `" ++ fname ++ "' does not exist"
+    Nothing       -> err 97 $ "Could not find data file " ++ fname
     Just contents -> return contents
   where makeCanonical = joinPath . transformPathParts . splitDirectories
         transformPathParts = reverse . foldl go []
@@ -592,7 +595,12 @@ readDefaultDataFile fname =
         go (_:as) ".." = as
         go as     x    = x : as
 #else
-  getDataFileName ("data" </> fname) >>= BS.readFile
+  getDataFileName ("data" </> fname) >>= checkExistence >>= BS.readFile
+   where checkExistence fn = do
+           exists <- doesFileExist fn
+           if exists
+              then return fn
+              else err 97 ("Could not find data file " ++ fname)
 #endif
 
 -- | Read file from specified user data directory or, if not found there, from

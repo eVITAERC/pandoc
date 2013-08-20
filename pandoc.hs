@@ -33,8 +33,8 @@ module Main where
 import Text.Pandoc
 import Text.Pandoc.PDF (makePDF)
 import Text.Pandoc.Readers.LaTeX (handleIncludes)
-import Text.Pandoc.Shared ( tabFilter, readDataFileUTF8, safeRead,
-                            headerShift, normalize, err, warn )
+import Text.Pandoc.Shared ( tabFilter, readDataFileUTF8, readDataFile,
+                            safeRead, headerShift, normalize, err, warn )
 import Text.Pandoc.XML ( toEntities, fromEntities )
 import Text.Pandoc.SelfContained ( makeSelfContained )
 import Text.Pandoc.Process (pipeProcess)
@@ -47,7 +47,7 @@ import System.Console.GetOpt
 import Data.Char ( toLower )
 import Data.List ( intercalate, isPrefixOf, sort )
 import System.Directory ( getAppUserDataDirectory, doesFileExist, findExecutable )
-import System.IO ( stdout )
+import System.IO ( stdout, stderr )
 import System.IO.Error ( isDoesNotExistError )
 import qualified Control.Exception as E
 import Control.Exception.Extensible ( throwIO )
@@ -58,6 +58,7 @@ import Data.Foldable (foldrM)
 import Network.HTTP (simpleHTTP, mkRequest, getResponseBody, RequestMethod(..))
 import Network.URI (parseURI, isURI, URI(..))
 import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString as BS
 import Text.CSL.Reference (Reference(..))
 import Data.Aeson (eitherDecode', encode)
 
@@ -90,14 +91,16 @@ isTextFormat :: String -> Bool
 isTextFormat s = takeWhile (`notElem` "+-") s `notElem` ["odt","docx","epub","epub3"]
 
 externalFilter :: FilePath -> [String] -> Pandoc -> IO Pandoc
-externalFilter f args' d = E.catch
-  (do (exitcode, outbs, errbs) <- pipeProcess Nothing f args' $ encode d
+externalFilter f args' d = E.handle filterException $
+   do (exitcode, outbs, errbs) <- pipeProcess Nothing f args' $ encode d
+      when (not $ B.null errbs) $ B.hPutStr stderr errbs
       case exitcode of
            ExitSuccess    -> return $ either error id $ eitherDecode' outbs
-           ExitFailure _  -> err 83 $ "Error running filter `" ++ UTF8.toStringLazy outbs ++
-                                          UTF8.toStringLazy errbs ++  "'")
-  (\e -> let _ = (e :: E.SomeException)
-         in err 83 $ "Error running filter `" ++ f ++ "'")
+           ExitFailure _  -> err 83 $ "Error running filter " ++ f ++ "\n" ++
+                                          UTF8.toStringLazy outbs
+ where filterException :: E.SomeException -> IO Pandoc
+       filterException e = err 83 $ "Error running filter " ++ f ++
+                                     "\n" ++ show e
 
 -- | Data structure for command line options.
 data Opt = Opt
@@ -347,13 +350,13 @@ options =
                   "FORMAT")
                  "" -- "Print default template for FORMAT"
 
-    , Option "" ["print-sample-lua-writer"]
-                 (NoArg
-                  (\_ -> do
-                    sample <- readDataFileUTF8 Nothing "sample.lua"
-                    UTF8.hPutStr stdout sample
-                    exitWith ExitSuccess))
-                  "" -- "Print sample lua custom writer"
+    , Option "" ["print-default-data-file"]
+                 (ReqArg
+                  (\arg _ -> do
+                     readDataFile Nothing arg >>= BS.hPutStr stdout
+                     exitWith ExitSuccess)
+                  "FILE")
+                  "" -- "Print default data file"
 
     , Option "" ["no-wrap"]
                  (NoArg
