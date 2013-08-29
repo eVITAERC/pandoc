@@ -132,6 +132,9 @@ tests = [ testGroup "inline code"
           , "with attribute space" =:
             "`*` {.haskell .special x=\"7\"}"
             =?> para (codeWith ("",["haskell","special"],[("x","7")]) "*")
+          , "double-backtick is inline math" =:
+            "what part of ``\\mathbf{x_s}_\\frac{\\omega}{x \\delta}`` don't you understand?"
+            =?> para ( "what part of " <> math "\\mathbf{x_s}_\\frac{\\omega}{x \\delta}" <> " don't you understand?" )
           ]
         , testGroup "raw LaTeX"
           [ "in URL" =:
