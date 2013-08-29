@@ -68,6 +68,7 @@ data Extension =
     | Ext_tex_math_dollars    -- ^ TeX math between $..$ or $$..$$
     | Ext_tex_math_single_backslash  -- ^ TeX math btw \(..\) \[..\]
     | Ext_tex_math_double_backslash  -- ^ TeX math btw \\(..\\) \\[..\\]
+    | Ext_tex_math_double_backtick -- ^ TeX math btw ``..`` (overrides `` codeblock unless surrounded by whitespace)
     | Ext_latex_macros        -- ^ Parse LaTeX macro definitions (for math only)
     | Ext_fenced_code_blocks  -- ^ Parse fenced code blocks
     | Ext_fenced_code_attributes  -- ^ Allow attributes on fenced code blocks
