@@ -1351,7 +1351,7 @@ inline = choice [ whitespace
                 , cite
                 , link
                 , image
-                , math
+                , math -- after code to accomodate backtick delimiter
                 , strikeout
                 , subscript
                 , superscript
