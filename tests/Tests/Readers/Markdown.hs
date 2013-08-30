@@ -135,8 +135,18 @@ tests = [ testGroup "inline code"
           , test (readMarkdown def{ readerExtensions = Set.insert
                        Ext_tex_math_double_backtick $ readerExtensions def })
             "double-backtick is inline math" $
-            "what part of ``\\mathbf{x_s}_\\frac{\\omega}{x \\delta}`` don't you understand?"
-            =?> para ( "what part of " <> math "\\mathbf{x_s}_\\frac{\\omega}{x \\delta}" <> " don't you understand?" )
+            "what part of ``\\mathbf{x_s}_\\frac{\\omega}{x \\delta}`` don't you understand? Also there's ``(V * \\rho)`` and ``y = Ax`` as well"
+            =?> para ( "what part of " <> math "\\mathbf{x_s}_\\frac{\\omega}{x \\delta}" <> " don't you understand? Also there's " <> math "(V * \\rho)" <> " and " <> math "y = Ax" <> " as well")
+          , test (readMarkdown def{ readerExtensions = Set.insert
+                       Ext_tex_math_double_backtick $ readerExtensions def })
+            "double-backtick is inline math except followed by whitespace" $
+            "what part of `` \\mathbf{x_s}_\\frac{\\omega}{x \\delta}   `` don't you understand?"
+            =?> para ( "what part of " <> codeWith ([],[],[]) "\\mathbf{x_s}_\\frac{\\omega}{x \\delta}" <> " don't you understand?" )
+          , test (readMarkdown def{ readerExtensions = Set.insert
+                       Ext_tex_math_double_backtick $ readerExtensions def })
+            "long backticks with Ext_tex_math_double_backtick enabled" $
+            "what part of ````\\mathbf{x_s}_\\frac{\\omega}{x \\delta}  ```` don't you understand?"
+            =?> para ( "what part of " <> codeWith ([],[],[]) "\\mathbf{x_s}_\\frac{\\omega}{x \\delta}" <> " don't you understand?" )
           ]
         , testGroup "raw LaTeX"
           [ "in URL" =:

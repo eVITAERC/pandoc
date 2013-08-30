@@ -1411,9 +1411,10 @@ symbol = do
   return $ return $ B.str [result]
 
 -- parses inline code, between n `s and n `s
+-- but ignores exactly 2 `s AND NOT followed by whitespace if Ext_tex_math_double_backtick
 code :: MarkdownParser (F Inlines)
 code = try $ do
-  starts <- many1 (char '`')
+  starts <- inlineCodeDelimiter
   skipSpaces
   result <- many1Till (many1 (noneOf "`\n") <|> many1 (char '`') <|>
                        (char '\n' >> notFollowedBy' blankline >> return " "))
@@ -1422,6 +1423,19 @@ code = try $ do
   attr <- option ([],[],[]) (try $ guardEnabled Ext_inline_code_attributes >>
                                    optional whitespace >> attributes)
   return $ return $ B.codeWith attr $ trim $ concat result
+  
+inlineCodeDelimiter :: MarkdownParser String
+inlineCodeDelimiter =
+      -- for Ext_tex_math_double_backtick, ignore two occurances of ``s NOT followed by whitespace
+      (guardEnabled Ext_tex_math_double_backtick >> 
+        (
+         try (do{ x <- count 3 (char '`'); xs <- many (char '`'); return (x++xs)}) -- 3 or more backticks
+         <|> try (count 2 (char '`') >> (spaceChar <|> newline) >> return "``") -- 2 backtick + whitespace
+         <|> try (string ['`'] >> notFollowedBy (string ['`']) >> return "`") -- single backtick
+        ))
+  <|> (guardDisabled Ext_tex_math_double_backtick >> 
+       many1 (char '`'))
+  
 
 math :: MarkdownParser (F Inlines)
 math =  (return . B.displayMath <$> (mathDisplay >>= applyMacros'))
@@ -1447,6 +1461,8 @@ mathInline =
        mathInlineWith "\\(" "\\)")
   <|> (guardEnabled Ext_tex_math_double_backslash >>
        mathInlineWith "\\\\(" "\\\\)")
+  <|> (guardEnabled Ext_tex_math_double_backtick >>
+       mathDisplayWith "``" "``")
 
 mathInlineWith :: String -> String -> MarkdownParser String
 mathInlineWith op cl = try $ do
