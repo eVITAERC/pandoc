@@ -699,7 +699,7 @@ inlineToMarkdown opts (Math InlineMath str)
   | isEnabled Ext_tex_math_double_backtick opts =
       return $ "``" <> text (trim str) <> "``"
   | otherwise = inlineListToMarkdown opts $ readTeXMath str
-inlineToMarkdown opts (Math DisplayMath str)
+inlineToMarkdown opts (Math (DisplayMath _) str)
   | isEnabled Ext_tex_math_dollars opts =
       return $ "$$" <> text str <> "$$"
   | isEnabled Ext_tex_math_single_backslash opts =
