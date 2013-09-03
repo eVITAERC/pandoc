@@ -646,12 +646,12 @@ inlineToHtml opts inline =
                                   return $ H.span ! A.class_ "LaTeX" $
                                          case t of
                                            InlineMath  -> toHtml ("$" ++ str ++ "$")
-                                           DisplayMath -> toHtml ("$$" ++ str ++ "$$")
+                                           (DisplayMath _) -> toHtml ("$$" ++ str ++ "$$")
                                JsMath _ -> do
                                   let m = preEscapedString str
                                   return $ case t of
                                            InlineMath -> H.span ! A.class_ "math" $ m
-                                           DisplayMath -> H.div ! A.class_ "math" $ m
+                                           (DisplayMath _) -> H.div ! A.class_ "math" $ m
                                WebTeX url -> do
                                   let imtag = if writerHtml5 opts then H5.img else H.img
                                   let m = imtag ! A.style "vertical-align:middle"
@@ -661,11 +661,11 @@ inlineToHtml opts inline =
                                   let brtag = if writerHtml5 opts then H5.br else H.br
                                   return $ case t of
                                             InlineMath  -> m
-                                            DisplayMath -> brtag >> m >> brtag
+                                            (DisplayMath _) -> brtag >> m >> brtag
                                GladTeX ->
                                   return $ case t of
                                              InlineMath -> preEscapedString $ "<EQ ENV=\"math\">" ++ str ++ "</EQ>"
-                                             DisplayMath -> preEscapedString $ "<EQ ENV=\"displaymath\">" ++ str ++ "</EQ>"
+                                             (DisplayMath _) -> preEscapedString $ "<EQ ENV=\"displaymath\">" ++ str ++ "</EQ>"
                                MathML _ -> do
                                   let dt = if t == InlineMath
                                               then DisplayInline
@@ -681,14 +681,14 @@ inlineToHtml opts inline =
                                MathJax _ -> return $ H.span ! A.class_ "math" $ toHtml $
                                   case t of
                                     InlineMath  -> "\\(" ++ str ++ "\\)"
-                                    DisplayMath -> "\\[" ++ str ++ "\\]"
+                                    (DisplayMath _) -> "\\[" ++ str ++ "\\]"
                                PlainMath -> do
                                   x <- inlineListToHtml opts (readTeXMath str)
                                   let m = H.span ! A.class_ "math" $ x
                                   let brtag = if writerHtml5 opts then H5.br else H.br
                                   return  $ case t of
                                              InlineMath  -> m
-                                             DisplayMath -> brtag >> m >> brtag )
+                                             (DisplayMath _) -> brtag >> m >> brtag )
     (RawInline f str)
       | f == Format "latex" ->
                           case writerHTMLMathMethod opts of

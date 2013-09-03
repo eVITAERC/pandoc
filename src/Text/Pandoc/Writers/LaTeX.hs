@@ -642,7 +642,7 @@ inlineToLaTeX (Quoted qt lst) = do
 inlineToLaTeX (Str str) = liftM text $ stringToLaTeX TextString str
 inlineToLaTeX (Math InlineMath str) =
   return $ char '$' <> text str <> char '$'
-inlineToLaTeX (Math DisplayMath str) =
+inlineToLaTeX (Math (DisplayMath _) str) =
   return $ "\\[" <> text str <> "\\]"
 inlineToLaTeX (RawInline f str)
   | f == Format "latex" || f == Format "tex"

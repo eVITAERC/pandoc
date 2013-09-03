@@ -285,7 +285,7 @@ inlineToDocbook opts (Math t str)
   | otherwise = inlinesToDocbook opts $ readTeXMath str
      where (dt, tagtype) = case t of
                             InlineMath  -> (DisplayInline,"inlineequation")
-                            DisplayMath -> (DisplayBlock,"informalequation")
+                            DisplayMath _ -> (DisplayBlock,"informalequation")
            conf = Xml.useShortEmptyTags (const False) Xml.defaultConfigPP
            removeAttr e = e{ Xml.elAttribs = [] }
            fixNS' qname = qname{ Xml.qPrefix = Just "mml" }

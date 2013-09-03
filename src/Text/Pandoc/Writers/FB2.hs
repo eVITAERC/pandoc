@@ -315,7 +315,7 @@ linkID i = "l" ++ (show i)
 -- | Convert a block-level Pandoc's element to FictionBook XML representation.
 blockToXml :: Block -> FBM [Content]
 blockToXml (Plain ss) = cMapM toXml ss  -- FIXME: can lead to malformed FB2
-blockToXml (Para [Math DisplayMath formula]) = insertMath NormalImage formula
+blockToXml (Para [Math (DisplayMath _) formula]) = insertMath NormalImage formula
 -- title beginning with fig: indicates that the image is a figure
 blockToXml (Para [Image alt (src,'f':'i':'g':':':tit)]) =
   insertImage NormalImage (Image alt (src,tit))

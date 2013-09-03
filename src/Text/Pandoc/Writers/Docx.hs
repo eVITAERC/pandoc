@@ -458,7 +458,7 @@ blockToOpenXML opts (Para [Image alt (src,'f':'i':'g':':':tit)]) = do
 blockToOpenXML _ (Para []) = return []
 blockToOpenXML opts (Para lst) = do
     paraProps <- getParaProps $ case lst of
-                                     [Math DisplayMath _] -> True
+                                     [Math (DisplayMath _) _] -> True
                                      _                    -> False
     contents <- inlinesToOpenXML opts lst
     return [mknode "w:p" [] (paraProps ++ contents)]
@@ -664,9 +664,9 @@ inlineToOpenXML opts (Quoted quoteType lst) =
                             SingleQuote -> ("\x2018", "\x2019")
                             DoubleQuote -> ("\x201C", "\x201D")
 inlineToOpenXML opts (Math mathType str) = do
-  let displayType = if mathType == DisplayMath
-                       then DisplayBlock
-                       else DisplayInline
+  let displayType = case mathType of
+                      DisplayMath _ -> DisplayBlock
+                      InlineMath    -> DisplayInline
   case texMathToOMML displayType str of
         Right r -> return [r]
         Left  _ -> inlinesToOpenXML opts (readTeXMath str)
@@ -804,7 +804,7 @@ parseXml refArchive relpath =
        Nothing -> fail $ relpath ++ " missing in reference docx"
 
 isDisplayMath :: Inline -> Bool
-isDisplayMath (Math DisplayMath _) = True
+isDisplayMath (Math (DisplayMath _) _) = True
 isDisplayMath _                    = False
 
 stripLeadingTrailingSpace :: [Inline] -> [Inline]

@@ -230,7 +230,7 @@ inlineToCustom lua (Cite _  lst) = callfunc lua "Cite" lst
 inlineToCustom lua (Code attr str) =
   callfunc lua "Code" (fromString str) (attrToMap attr)
 
-inlineToCustom lua (Math DisplayMath str) =
+inlineToCustom lua (Math (DisplayMath _) str) =
   callfunc lua "DisplayMath" (fromString str)
 
 inlineToCustom lua (Math InlineMath str) =

@@ -331,7 +331,7 @@ inlineToMan _ (Code _ str) =
   return $ text $ "\\f[C]" ++ escapeCode str ++ "\\f[]"
 inlineToMan _ (Str str) = return $ text $ escapeString str
 inlineToMan opts (Math InlineMath str) = inlineListToMan opts $ readTeXMath str
-inlineToMan opts (Math DisplayMath str) = do
+inlineToMan opts (Math (DisplayMath _) str) = do
   contents <- inlineListToMan opts $ readTeXMath str
   return $ cr <> text ".RS" $$ contents $$ text ".RE"
 inlineToMan _ (RawInline f str)
