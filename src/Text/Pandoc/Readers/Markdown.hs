@@ -31,7 +31,7 @@ Conversion of markdown-formatted plain text to 'Pandoc' document.
 module Text.Pandoc.Readers.Markdown ( readMarkdown,
                                       readMarkdownWithWarnings ) where
 
-import Data.List ( transpose, sortBy, findIndex, intersperse, intercalate )
+import Data.List ( transpose, sortBy, findIndex, intersperse, intercalate, isPrefixOf )
 import qualified Data.Map as M
 import Data.Ord ( comparing )
 import Data.Char ( isAlphaNum, toLower )
@@ -603,6 +603,7 @@ codeBlockFenced = try $ do
   attr <- option ([],[],[]) $
             try (guardEnabled Ext_fenced_code_attributes >> attributes)
            <|> ((\x -> ("",[x],[])) <$> identifier)
+  guard $ not (classIsMath attr)
   blankline
   contents <- manyTill anyLine (blockDelimiter (== c) (Just size))
   blanklines
@@ -1323,6 +1324,7 @@ inline = choice [ whitespace
                 , str
                 , endline
                 , code
+                , mathDisplayFenced
                 , strongOrEmph
                 , note
                 , cite
@@ -1391,7 +1393,8 @@ symbol = do
 -- but ignores exactly 2 `s AND NOT followed by whitespace if Ext_tex_math_double_backtick
 code :: MarkdownParser (F Inlines)
 code = try $ do
-  starts <- inlineCodeDelimiter
+  starts <- inlineCodeDelimiter 
+  notFollowedBy (string "math")
   skipSpaces
   result <- many1Till (many1 (noneOf "`\n") <|> many1 (char '`') <|>
                        (char '\n' >> notFollowedBy' blankline >> return " "))
@@ -1413,7 +1416,7 @@ inlineCodeDelimiter =
   <|> (guardDisabled Ext_tex_math_double_backtick >> 
        many1 (char '`'))
   
-
+-- Parses plain inline or display math without additional attributes
 math :: MarkdownParser (F Inlines)
 math =  (return . B.displayMath <$> (mathDisplay >>= applyMacros'))
      <|> (return . B.math <$> (mathInline >>= applyMacros'))
@@ -1452,6 +1455,26 @@ mathInlineWith op cl = try $ do
               (try $ string cl)
   notFollowedBy digit  -- to prevent capture of $5
   return $ concat words'
+
+-- only match if class of fenced code block starts with math
+mathDisplayFenced :: MarkdownParser (F Inlines)
+mathDisplayFenced = try $ do
+  guardEnabled Ext_tex_math_fenced_display
+  c <- try (guardEnabled Ext_fenced_code_blocks >> lookAhead (char '~'))
+     <|> (guardEnabled Ext_backtick_code_blocks >> lookAhead (char '`'))
+  size <- blockDelimiter (== c) Nothing
+  skipMany spaceChar
+  attr <- option ([],[],[]) $
+            try (guardEnabled Ext_fenced_code_attributes >> attributes)
+           <|> ((\x -> ("",[x],[])) <$> identifier)
+  guard $ classIsMath attr
+  blankline
+  contents <- manyTill anyLine (blockDelimiter (== c) (Just size))
+  return $ return $ B.displayMathWith attr $ intercalate "\n" contents
+
+-- true only if some element of classes start with "math"
+classIsMath :: Attr -> Bool
+classIsMath (_,classes,_) = any ("math" `isPrefixOf`) classes
 
 -- Parses material enclosed in *s, **s, _s, or __s.
 -- Designed to avoid backtracking.
