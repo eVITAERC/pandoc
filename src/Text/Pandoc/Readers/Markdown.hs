@@ -1393,8 +1393,9 @@ symbol = do
 -- but ignores exactly 2 `s AND NOT followed by whitespace if Ext_tex_math_double_backtick
 code :: MarkdownParser (F Inlines)
 code = try $ do
-  starts <- inlineCodeDelimiter 
-  notFollowedBy (string "math")
+  starts <- inlineCodeDelimiter
+  (notFollowedBy (string "math" <|> string " {")
+    <|> guardDisabled Ext_tex_math_fenced_display) -- avoid fenced-codeBlock style displayMath
   skipSpaces
   result <- many1Till (many1 (noneOf "`\n") <|> many1 (char '`') <|>
                        (char '\n' >> notFollowedBy' blankline >> return " "))
