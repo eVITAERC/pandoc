@@ -1,9 +1,11 @@
 @echo off
 cd ..
-rem cabal update
+cabal update
 cabal-dev clean
 if %errorlevel% neq 0 exit /b %errorlevel%
-cabal-dev install --reinstall --force-reinstall --flags="embed_data_files"
+cabal-dev install hsb2hs
+cabal-dev install --only-dependencies --force --reinstall --flags="embed_data_files"
+cabal-dev install --reinstall --flags="embed_data_files"
 if %errorlevel% neq 0 exit /b %errorlevel%
 strip cabal-dev\bin\pandoc.exe
 cabal-dev\bin\pandoc.exe -s --template data\templates\default.html -S README -o README.html
