@@ -277,12 +277,18 @@ Reader options
 
     Filters may be written in any language.  `Text.Pandoc.JSON`
     exports `toJSONFilter` to facilitate writing filters in Haskell.
-    Those who would prefer to write filters in pandoc can use the
+    Those who would prefer to write filters in python can use the
     module `pandoc.py`:  see <http://github.com/jgm/pandoc-filters-python>
     for the module and several examples.  Note that the *EXECUTABLE*
     will be sought in the user's `PATH`, and not in the working directory,
     if no directory is provided.  If you want to run a script in the
     working directory, preface the filename with `./`.
+
+`-M` *KEY[=VAL]*, `--metadata=`*KEY[:VAL]*
+:   Set the metadata field *KEY* to the value *VAL* after
+    parsing.  A value specified on the command line overrides a value
+    specified in the document.  Values will be interpreted as raw strings.
+    If no value is specified, the value will be treated as Boolean true.
 
 `--normalize`
 :   Normalize the document after reading:  merge adjacent
@@ -342,7 +348,7 @@ General writer options
 :   Include an automatically generated table of contents (or, in
     the case of `latex`, `context`, and `rst`, an instruction to create
     one) in the output document. This option has no effect on `man`,
-    `docbook`, `slidy`, `slideous`, or `s5` output.
+    `docbook`, `slidy`, `slideous`, `s5`, `docx`, or `odt` output.
 
 `--toc-depth=`*NUMBER*
 :   Specify the number of section levels to include in the table
@@ -597,6 +603,23 @@ Options affecting specific writers
 
 Citation rendering
 ------------------
+
+`--bibliography=`*FILE*
+:   Set the `bibliography` field in the document's metadata to *FILE*,
+    overriding any value set in the metadata, and tell pandoc to
+    use the `pandoc-citeproc` filter.  (This is equivalent to the
+    combination `--metadata bibliography=FILE --filter pandoc-citeproc`.)
+    Note that an error will result unless `pandoc-citeproc` is installed.
+
+`--csl=`*FILE*
+:   Set the `csl` field in the document's metadata to *FILE*,
+    overriding any value set in the metadata.  (This is equivalent to
+    `--metadata csl=FILE`.)
+
+`--citation-abbreviations=`*FILE*
+:   Set the `citation-abbreviations` field in the document's metadata to
+    *FILE*, overriding any value set in the metadata.  (This is equivalent to
+    `--metadata citation-abbreviations=FILE`.)
 
 `--natbib`
 :   Use natbib for citations in LaTeX output.
