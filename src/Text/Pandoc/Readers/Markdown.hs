@@ -49,7 +49,6 @@ import Text.Pandoc.Builder (Inlines, Blocks, trimInlines, (<>))
 import Text.Pandoc.Options
 import Text.Pandoc.Shared
 import Text.Pandoc.XML (fromEntities)
-import Text.Pandoc.Asciify (toAsciiChar)
 import Text.Pandoc.Parsing hiding (tableWith)
 import Text.Pandoc.Readers.LaTeX ( rawLaTeXInline, rawLaTeXBlock )
 import Text.Pandoc.Readers.HTML ( htmlTag, htmlInBalanced, isInlineTag, isBlockTag,
@@ -471,31 +470,6 @@ block = choice [ mempty <$ blanklines
 header :: MarkdownParser (F Blocks)
 header = setextHeader <|> atxHeader <?> "header"
 
---  returns unique identifier
-addToHeaderList :: Attr -> F Inlines -> MarkdownParser Attr
-addToHeaderList (ident,classes,kvs) text = do
-  let header' = runF text defaultParserState
-  exts <- getOption readerExtensions
-  let insert' = M.insertWith (\_new old -> old)
-  if null ident && Ext_auto_identifiers `Set.member` exts
-     then do
-       ids <- stateIdentifiers `fmap` getState
-       let id' = uniqueIdent (B.toList header') ids
-       let id'' = if Ext_ascii_identifiers `Set.member` exts
-                     then catMaybes $ map toAsciiChar id'
-                     else id'
-       updateState $ \st -> st{
-              stateIdentifiers = if id' == id''
-                                    then id' : ids
-                                    else id' : id'' : ids,
-              stateHeaders = insert' header' id' $ stateHeaders st }
-       return (id'',classes,kvs)
-     else do
-        unless (null ident) $
-          updateState $ \st -> st{
-               stateHeaders = insert' header' ident $ stateHeaders st }
-        return (ident,classes,kvs)
-
 atxHeader :: MarkdownParser (F Blocks)
 atxHeader = try $ do
   level <- many1 (char '#') >>= return . length
@@ -504,7 +478,7 @@ atxHeader = try $ do
   skipSpaces
   text <- trimInlinesF . mconcat <$> many (notFollowedBy atxClosing >> inline)
   attr <- atxClosing
-  attr' <- addToHeaderList attr text
+  attr' <- registerHeader attr (runF text defaultParserState)
   return $ B.headerWith attr' level <$> text
 
 atxClosing :: MarkdownParser Attr
@@ -543,7 +517,7 @@ setextHeader = try $ do
   many (char underlineChar)
   blanklines
   let level = (fromMaybe 0 $ findIndex (== underlineChar) setextHChars) + 1
-  attr' <- addToHeaderList attr text
+  attr' <- registerHeader attr (runF text defaultParserState)
   return $ B.headerWith attr' level <$> text
 
 --
@@ -897,8 +871,11 @@ para = try $ do
     $ try $ do
             newline
             (blanklines >> return mempty)
-              <|> (guardDisabled Ext_blank_before_blockquote >> lookAhead blockQuote)
-              <|> (guardDisabled Ext_blank_before_header >> lookAhead header)
+              <|> (guardDisabled Ext_blank_before_blockquote >> () <$ lookAhead blockQuote)
+              <|> (guardEnabled Ext_backtick_code_blocks >> () <$ lookAhead codeBlockFenced)
+              <|> (guardDisabled Ext_blank_before_header >> () <$ lookAhead header)
+              <|> (guardEnabled Ext_lists_without_preceding_blankline >>
+                       () <$ lookAhead listStart)
             return $ do
               result' <- result
               case B.toList result' of
@@ -1585,8 +1562,11 @@ endline :: MarkdownParser (F Inlines)
 endline = try $ do
   newline
   notFollowedBy blankline
+  guardDisabled Ext_lists_without_preceding_blankline <|> notFollowedBy listStart
   guardEnabled Ext_blank_before_blockquote <|> notFollowedBy emailBlockQuoteStart
   guardEnabled Ext_blank_before_header <|> notFollowedBy (char '#') -- atx header
+  guardEnabled Ext_backtick_code_blocks >>
+     notFollowedBy (() <$ (lookAhead (char '`') >> codeBlockFenced))
   -- parse potential list-starts differently if in a list:
   st <- getState
   when (stateParserContext st == ListItemState) $ do
@@ -1688,6 +1668,7 @@ bareURL :: MarkdownParser (F Inlines)
 bareURL = try $ do
   guardEnabled Ext_autolink_bare_uris
   (orig, src) <- uri <|> emailAddress
+  notFollowedBy $ try $ spaces >> htmlTag (~== TagClose "a")
   return $ return $ B.link src "" (B.str orig)
 
 autoLink :: MarkdownParser (F Inlines)
@@ -1842,6 +1823,11 @@ normalCite = try $ do
 
 citeKey :: MarkdownParser (Bool, String)
 citeKey = try $ do
+  -- make sure we're not right after an alphanumeric,
+  -- since foo@bar.baz is probably an email address
+  lastStrPos <- stateLastStrPos <$> getState
+  pos <- getPosition
+  guard $ lastStrPos /= Just pos
   suppress_author <- option False (char '-' >> return True)
   char '@'
   first <- letter

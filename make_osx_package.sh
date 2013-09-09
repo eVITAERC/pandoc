@@ -1,29 +1,36 @@
 #!/bin/sh -e
 
-DIST=osx_package
+DIST=`pwd`/osx_package
 VERSION=$(grep -e '^Version' pandoc.cabal | awk '{print $2}')
 RESOURCES=$DIST/Resources
 ROOT=$DIST/pandoc
 SCRIPTS=osx-resources
 BASE=pandoc-$VERSION
+ICU=/usr/local/Cellar/icu4c/51.1
 ME=jgm
 CODESIGNID="Developer ID Application: John Macfarlane"
-PACKAGEMAKER=/Developer/Applications/Utilities/PackageMaker.app/Contents/MacOS/PackageMaker
+PACKAGEMAKER=/Applications/PackageMaker.app/Contents/MacOS/PackageMaker
 
 echo Removing old files...
 rm -rf $DIST
 mkdir -p $RESOURCES
 
-echo Building pandoc...
-cabal-dev install-deps
-cabal-dev configure --prefix=/usr/local --datasubdir=$BASE --docdir=/usr/local/doc/$BASE
-cabal-dev build
-cabal-dev copy --destdir=$ROOT
-# remove library files
-rm -r $ROOT/usr/local/lib
-chown -R $ME:staff $DIST
+# echo Updating database
+# cabal update
 
-gzip $ROOT/usr/local/share/man/man?/*.*
+echo Building pandoc...
+cabal-dev install hsb2hs
+
+cabal-dev install --reinstall -v1 --prefix $ROOT/tmp  --flags="embed_data_files unicode_collation" --extra-lib-dirs=$ICU/lib --extra-include-dirs=$ICU/include pandoc-citeproc
+cabal-dev install -v1 --prefix $ROOT/tmp --flags="embed_data_files"
+
+mkdir -p $ROOT/usr/local/share
+cp -r $ROOT/tmp/bin $ROOT/usr/local/
+cp -r $ROOT/tmp/share/man $ROOT/usr/local/share/
+rm -rf $ROOT/tmp
+
+chown -R $ME:staff $DIST
+# gzip $ROOT/usr/local/share/man/man?/*.*
 # cabal gives man pages the wrong permissions
 chmod +r $ROOT/usr/local/share/man/man?/*.*
 
@@ -43,9 +50,10 @@ sudo $PACKAGEMAKER \
     --id net.johnmacfarlane.pandoc \
     --resources $RESOURCES \
     --version $VERSION \
-    --no-relocate \
     --scripts $SCRIPTS \
     --out $BASE.pkg
+
+    # --no-relocate
 
 echo Signing package...
 
