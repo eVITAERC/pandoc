@@ -202,8 +202,9 @@ inlines = mconcat <$> many (notFollowedBy (char '}') *> inline)
 block :: LP Blocks
 block = (mempty <$ comment)
     <|> (mempty <$ ((spaceChar <|> newline) *> spaces))
-    <|> environment
+    <|> preamble
     <|> macro
+    <|> environment
     <|> blockCommand
     <|> paragraph
     <|> grouped block
@@ -278,7 +279,6 @@ blockCommands = M.fromList $
   , ("hrule", pure horizontalRule)
   , ("rule", skipopts *> tok *> tok *> pure horizontalRule)
   , ("item", skipopts *> loose_item)
-  , ("documentclass", skipopts *> braced *> preamble)
   , ("centerline", (para . trimInlines) <$> (skipopts *> tok))
   ] ++ map ignoreBlocks
   -- these commands will be ignored unless --parse-raw is specified,
@@ -1028,7 +1028,11 @@ paragraph = do
      else return $ para x
 
 preamble :: LP Blocks
-preamble = mempty <$> manyTill preambleBlock beginDoc
+preamble = try $ do
+  controlSeq "documentclass" *> skipopts *> braced *> preamble'
+  
+preamble' :: LP Blocks
+preamble' = mempty <$> manyTill preambleBlock beginDoc
   where beginDoc = lookAhead $ controlSeq "begin" *> string "{document}"
         preambleBlock =  (mempty <$ comment)
                      <|> (mempty <$ sp)
