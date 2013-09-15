@@ -803,6 +803,16 @@ Here is a movie \includegraphics{movie.jpg} icon.
 
 \begin{center}\rule{3in}{0.4pt}\end{center}
 
+\section{Macros}
+
+\newcommand{\BEQ}{\begin{equation}}
+\newcommand{\EEQ}{\end{equation}}
+\newcommand{\exsquared}{x^2}
+
+\BEQ
+y=\exsquared
+\EEQ
+
 \section{Footnotes}
 
 Here is a footnote
