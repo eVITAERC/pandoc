@@ -805,12 +805,13 @@ Here is a movie \includegraphics{movie.jpg} icon.
 
 \section{Macros}
 
-\newcommand{\BEQ}{\begin{equation}}
+\newcommand{\EQTN}{equation}
+\newcommand{\BEQ}{\begin{\EQTN}}
 \newcommand{\EEQ}{\end{equation}}
 \newcommand{\exsquared}{x^2}
 
 \BEQ
-y=\exsquared
+y=\exsquared \text{ is in an equation environment delimited by macros.}
 \EEQ
 
 \section{Footnotes}
