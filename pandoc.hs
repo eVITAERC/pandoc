@@ -33,7 +33,7 @@ module Main where
 import Text.Pandoc
 import Text.Pandoc.Builder (setMeta)
 import Text.Pandoc.PDF (makePDF)
-import Text.Pandoc.Readers.LaTeX (handleIncludes)
+import Text.Pandoc.Readers.LaTeX ( handleIncludes, handleMacros )
 import Text.Pandoc.Shared ( tabFilter, readDataFileUTF8, readDataFile,
                             safeRead, headerShift, normalize, err, warn )
 import Text.Pandoc.XML ( toEntities )
@@ -1104,8 +1104,13 @@ main = do
                            then handleIncludes
                            else return
 
+  let handleMacros' = if readerName' == "latex" || readerName' == "latex+lhs"
+                           then handleMacros readerOpts
+                           else return
+
   doc <- readSources sources >>=
            handleIncludes' . convertTabs . intercalate "\n" >>=
+           handleMacros' >>=
            reader readerOpts
 
 

@@ -442,7 +442,7 @@ block :: MarkdownParser (F Blocks)
 block = choice [ mempty <$ blanklines
                , codeBlockFenced
                , yamlMetaBlock
-               , guardEnabled Ext_latex_macros *> (macro >>= return . return)
+               , guardEnabled Ext_latex_macros *> (macroBlock >>= return . return)
                , header
                , lhsCodeBlock
                , rawTeXBlock

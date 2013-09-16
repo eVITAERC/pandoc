@@ -87,6 +87,7 @@ module Text.Pandoc.Parsing ( (>>~),
                              dash,
                              nested,
                              macro,
+                             macroBlock,
                              applyMacros',
                              Parser,
                              F(..),
@@ -1060,7 +1061,7 @@ nested p = do
 --
 
 -- | Parse a \newcommand or \renewcommand macro definition.
-macro :: Parser [Char] ParserState Blocks
+macro :: Parser [Char] ParserState String
 macro = do
   apply <- getOption readerApplyMacros
   inp <- getInput
@@ -1072,7 +1073,14 @@ macro = do
                              updateState $ \st ->
                                st { stateMacros = ms ++ stateMacros st }
                              return mempty
-                           else return $ rawBlock "latex" def'
+                           else return def'
+
+macroBlock :: Parser [Char] ParserState Blocks
+macroBlock = do
+  result <- macro
+  case result of
+    "" -> return mempty
+    x  -> return $ rawBlock "latex" x
 
 -- | Apply current macros to string.
 applyMacros' :: String -> Parser [Char] ParserState String

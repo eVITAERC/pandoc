@@ -31,6 +31,7 @@ Conversion of LaTeX to 'Pandoc' document.
 module Text.Pandoc.Readers.LaTeX ( readLaTeX,
                                    rawLaTeXInline,
                                    rawLaTeXBlock,
+                                   handleMacros,
                                    handleIncludes
                                  ) where
 
@@ -40,6 +41,7 @@ import Text.Pandoc.Shared
 import Text.Pandoc.Options
 import Text.Pandoc.Parsing hiding ((<|>), many, optional, space)
 import qualified Text.Pandoc.UTF8 as UTF8
+import Text.TeXMath.Macros (applyMacros)
 import Data.Char ( chr, ord )
 import Control.Monad
 import Text.Pandoc.Builder
@@ -152,10 +154,10 @@ bracketed :: Monoid a => LP a -> LP a
 bracketed parser = try $ char '[' *> (mconcat <$> manyTill parser (char ']'))
 
 mathDisplay :: LP String -> LP Inlines
-mathDisplay p = displayMath <$> (try p >>= applyMacros' . trim)
+mathDisplay p = displayMath <$> (liftM trim (try p))
 
 mathInline :: LP String -> LP Inlines
-mathInline p = math <$> (try p >>= applyMacros')
+mathInline p = math <$> (try p)
 
 mathChars :: LP String
 mathChars = concat <$>
@@ -203,7 +205,6 @@ block :: LP Blocks
 block = (mempty <$ comment)
     <|> (mempty <$ ((spaceChar <|> newline) *> spaces))
     <|> preamble
-    <|> macro
     <|> environment
     <|> blockCommand
     <|> paragraph
@@ -333,12 +334,9 @@ inlineCommand = try $ do
   let raw = do
         rawargs <- withRaw (skipopts *> option "" dimenarg *> many braced)
         let rawcommand = '\\' : name ++ star ++ snd rawargs
-        transformed <- applyMacros' rawcommand
-        if transformed /= rawcommand
-           then parseFromString inlines transformed
-           else if parseRaw
-                   then return $ rawInline "latex" rawcommand
-                   else return mempty
+        if parseRaw
+           then return $ rawInline "latex" rawcommand
+           else return mempty
   case M.lookup name' inlineCommands of
        Just p      -> p <|> raw
        Nothing     -> case M.lookup name inlineCommands of
@@ -763,8 +761,25 @@ rawEnv name = do
   parseRaw <- getOption readerParseRaw
   if parseRaw
      then (rawBlock "latex" . addBegin) <$>
-            (withRaw (env name blocks) >>= applyMacros' . snd)
+            (withRaw (env name blocks) >>= return . snd)
      else env name blocks
+
+-- | Process all LaTeX macro definitions and expand them
+handleMacros :: ReaderOptions -> String -> IO String
+handleMacros opts input = do
+  expandedString <- readWith handleMacros' def{ stateOptions = opts } input
+  return expandedString
+
+handleMacros' :: LP (IO String)
+handleMacros' = do
+  remainingStrings <- many macroToken
+  macros <- liftM stateMacros getState
+  return . return $ applyMacros macros $ concat remainingStrings
+  where macroToken = try $ do
+                skipMany comment
+                choice [ macro
+                       , try $ string "\\%" -- avoid `comment` from consuming literal %
+                       , count 1 anyChar ]
 
 -- | Replace "include" commands with file contents.
 handleIncludes :: String -> IO String
@@ -865,7 +880,7 @@ rawLaTeXBlock = snd <$> try (withRaw (environment <|> blockCommand))
 rawLaTeXInline :: Parser [Char] ParserState Inline
 rawLaTeXInline = do
   raw <- (snd <$> withRaw inlineCommand) <|> (snd <$> withRaw blockCommand)
-  RawInline "latex" <$> applyMacros' raw
+  RawInline "latex" <$> return raw
 
 environments :: M.Map String (LP Blocks)
 environments = M.fromList
