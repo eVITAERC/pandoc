@@ -1,5 +1,5 @@
 Name:            pandoc
-Version:         1.12
+Version:         1.12.0.2
 Cabal-Version:   >= 1.10
 Build-Type:      Custom
 License:         GPL
@@ -116,9 +116,9 @@ Extra-Source-Files:
                  tests/docbook-reader.native
                  tests/html-reader.html,
                  tests/html-reader.native,
-                 tests/opml-reader.html,
+                 tests/opml-reader.opml,
                  tests/opml-reader.native,
-                 tests/haddock-reader.html,
+                 tests/haddock-reader.haddock,
                  tests/haddock-reader.native,
                  tests/insert,
                  tests/lalune.jpg,
@@ -242,7 +242,7 @@ Library
                  xml >= 1.3.12 && < 1.4,
                  random >= 1 && < 1.1,
                  extensible-exceptions >= 0.1 && < 0.2,
-                 pandoc-types >= 1.12 && < 1.13,
+                 pandoc-types >= 1.12.2 && < 1.13,
                  aeson >= 0.6 && < 0.7,
                  tagsoup >= 0.12.5 && < 0.14,
                  base64-bytestring >= 0.1 && < 1.1,
@@ -253,17 +253,17 @@ Library
                  blaze-html >= 0.5 && < 0.7,
                  blaze-markup >= 0.5.1 && < 0.6,
                  attoparsec >= 0.10 && < 0.11,
-                 stringable >= 0.1 && < 0.2,
                  yaml >= 0.8.3 && < 0.9,
                  vector >= 0.10 && < 0.11,
                  hslua >= 0.3 && < 0.4
+  Build-Tools:   alex, happy
   if flag(http-conduit)
      Build-Depends: http-conduit >= 1.9 && < 1.10,
                     http-types >= 0.8 && < 0.9
      cpp-options:   -DHTTP_CONDUIT
   if flag(embed_data_files)
      cpp-options:   -DEMBED_DATA_FILES
-     -- build-tools:   hsb2hs
+     -- Build-Tools:   hsb2hs -- not yet recognized by cabal
      other-modules: Text.Pandoc.Data
   Ghc-Options:   -rtsopts -Wall -fno-warn-unused-do-bind
   Ghc-Prof-Options: -auto-all -caf-all -rtsopts
@@ -334,7 +334,7 @@ Library
 
 Executable pandoc
   Build-Depends: pandoc,
-                 pandoc-types >= 1.12 && < 1.13,
+                 pandoc-types >= 1.12.2 && < 1.13,
                  base >= 4.2 && <5,
                  directory >= 1 && < 1.3,
                  filepath >= 1.1 && < 1.4,
@@ -344,6 +344,9 @@ Executable pandoc
                  extensible-exceptions >= 0.1 && < 0.2,
                  highlighting-kate >= 0.5.5 && < 0.6,
                  aeson >= 0.6 && < 0.7,
+                 text >= 0.11 && < 0.12,
+                 yaml >= 0.8.3 && < 0.9,
+                 containers >= 0.1 && < 0.6,
                  HTTP >= 4000.0.5 && < 4000.3
   Ghc-Options:   -rtsopts -with-rtsopts=-K16m -Wall -fno-warn-unused-do-bind
   Ghc-Prof-Options: -auto-all -caf-all -rtsopts -with-rtsopts=-K16m
@@ -377,7 +380,7 @@ Test-Suite test-pandoc
   Build-Depends:  base >= 4.2 && < 5,
                   syb >= 0.1 && < 0.5,
                   pandoc,
-                  pandoc-types >= 1.12 && < 1.13,
+                  pandoc-types >= 1.12.2 && < 1.13,
                   bytestring >= 0.9 && < 0.11,
                   text >= 0.11 && < 0.12,
                   directory >= 1 && < 1.3,

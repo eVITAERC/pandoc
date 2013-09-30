@@ -1,6 +1,63 @@
-[pending release 1.12]
+pandoc (1.12.0.2)
+
+  * Removed `stringable` dependency.
+
+pandoc (1.12.0.1)
+
+  * Allow `--metadata` to be repeated for the same key to form a list.
+    This also has the effect that `--bibliography` can be repeated,
+    as before.
+
+  * Handle boolean values in `--metadata`.  Note that anything not parseable
+    as a YAML boolean or string is treated as a literal string.
+    You can get a string value with "yes", or any of the strings interpretable
+    as booleans, by quoting it:
+
+        -M boolvalue=yes -M stringvalue='"yes"'
+
+  * LaTeX writer: Don't print references if `--natbib` or `--biblatex`
+    option used.
+
+  * DOCX writer: Add `settings.xml` to the zip container.  Fixes a bug
+    in which docx files could not be read by some versions of Word
+    and LibreOffice (#990).
+
+  * Fixed a regression involving slide shows with bibliographies.
+    The Div container around references messed up the procedure for carving
+    a document into slides.  So we now remove the surrounding Div in
+    `prepSlides`.
+
+  * More informative error message when a filter is not found in path.
+
+  * Depend on pandoc-types 1.12.1.  This provide `ToJSONFilter`
+    instances for `Data a => a -> [a]` and `Data a => a -> IO [a]`.
+
+  * Don't use unicode_collation in building OSX package:
+    it adds something like 50MB of dependencies to the package.
+
+  * Declare alex and happy as build-tools (#986).
+
+pandoc (1.12)
 
   [new features]
+
+  * Much more flexible metadata, including arbitrary fields and structured
+    values.  Metadata can be specified flexibly in pandoc markdown using
+    YAML metadata blocks, which may occur anywhere in the document:
+
+        ---
+        title: Here is my title.
+        abstract: |
+          This is the abstract.
+
+          1. It can contain
+          2. block content
+             and *inline markup*
+
+        tags: [cat, dog, animal]
+        ...
+
+    Metadata fields automatically populate template variables.
 
   * Added `opml` (OPML) as input and output format.  The `_note` attribute,
     used in OmniOutliner and supported by multimarkdown, is supported.
@@ -26,7 +83,7 @@
     (Pandoc AST transformations that operate on JSON serializations).
     Filters are always passed the name of the output format, so their
     behavior can be tailored to it.  The repository
-    <https://github.com/jgm/pandoc-filters-python> contains
+    <https://github.com/jgm/pandocfilters> contains
     a python module for writing pandoc filters in python, with
     a number of examples.
 
@@ -45,7 +102,7 @@
 
         . . .
 
-        a pause.
+        me pause.
 
   * New markdown extensions:
 
@@ -78,6 +135,20 @@
     `csl`, and `citation-abbreviations` from the metadata, though it
     may still be specified on the command line as before.
 
+  * A `Cite` element is now created in parsing markdown whether or not
+    there is a matching reference.
+
+  * The `pandoc-citeproc` script will put the bibliography at the
+    end of the document, as before.  However, it will be put inside a `Div`
+    element with class "references", allowing users some control
+    over the styling of references.  A final header, if any, will
+    be included in the `Div`.
+
+  * The markdown writer will not print a bibliography if the
+    `citations` extension is enabled.  (If the citations are formatted
+    as markdown citations, it is redundant to have a bibliography,
+    since one will be generated automatically.)
+
   * Previously we used to store the directory of the first input file,
     even if it was local, and used this as a base directory for finding
     images in ODT, EPUB, Docx, and PDF.  This has been confusing to many
@@ -97,6 +168,13 @@
   * Parse `\(..\)` and `\[..\]` as math in MediaWiki reader.
     Parse `:<math>...</math>` as display math.  These notations are used with
     the MathJax MediaWiki extension.
+
+  * All writers: template variables are set automatically from metadata
+    fields.  However, variables specified on the command line with
+    `--variable` will completely shadow metadata fields.
+
+  * If `--variable` is used to set many variables with the same name,
+    a list is created.
 
   * Man writer:  The `title`, `section`, `header`, and `footer` can now
     all be set individually in metadata.  The `description` variable has been
@@ -123,11 +201,37 @@
       and all tables will render as grid tables.
     + Support YAML title block (render fields in alphabetical order
       to make output predictable).
-  
+
   [API changes]
+
+  * `Meta` in `Text.Pandoc.Definition` has been changed to allow
+    structured metadata.  (Note:  existing code that pattern-matches
+    on `Meta` will have to be revised.)  Metadata can now contain
+    indefinitely many fields, with content that can be a string,
+    a Boolean, a list of `Inline` elements, a list of `Block`
+    elements, or a map or list of these.
+
+  * A new generic block container (`Div`) has been added to `Block`,
+    and a generic inline container (`Span`) has been added to `Inline`.
+    These can take attributes.  They will render in HTML, Textile,
+    MediaWiki, Org, RST and and Markdown (with `markdown_in_html`
+    extension) as HTML `<div>` and `<span>` elements; in other formats
+    they will simply pass through their contents.  But they can be
+    targeted by scripts.
 
   * `Format` is now a newtype, not an alias for String.
     Equality comparisons are case-insensitive.
+
+  * Added `Text.Pandoc.Walk`, which exports hand-written tree-walking
+    functions that are much faster than the SYB functions from
+    `Text.Pandoc.Generic`.  These functions are now used where possible
+    in pandoc's code.  (`Tests.Walk` verifies that `walk` and `query`
+    match the generic traversals `bottomUp` and `queryWith`.)
+
+  * Added `Text.Pandoc.JSON`, which provides `ToJSON` and `FromJSON`
+    instances for the basic pandoc types. They use GHC generics and
+    should be faster than the old JSON serialization using
+    `Data.Aeson.Generic`.
 
   * Added `Text.Pandoc.Process`, exporting `pipeProcess`.
     This is a souped-up version of `readProcessWithErrorcode` that
@@ -145,9 +249,9 @@
 
   * In `Text.Pandoc.Shared`, `openURL` and `fetchItem` now return an
     Either, for better error handling.
-  
+
   * Made `stringify` polymorphic in `Text.Pandoc.Shared`.
-  
+
   * Removed `stripTags` from `Text.Pandoc.XML`.
 
   * `Text.Pandoc.Templates`:
@@ -177,10 +281,18 @@
     + Added `Ext_lists_without_preceding_blankline`,
       `Ext_ascii_identifiers`, `Ext_ignore_line_breaks`,
       `Ext_yaml_metadataBlock` to `Extension`.
-    + Changed `writerSourceDir` to `writerSourceURL` and changed the type to
-      a `Maybe`.  `writerSourceURL` is set to 'Just url' when the first
-      command-line argument is an absolute URL.  (So, relative links will be
-      resolved in relation to the first page.)  Otherwise, 'Nothing'.
+    + Changed `writerSourceDirectory` to `writerSourceURL` and changed the
+      type to a `Maybe`.  `writerSourceURL` is set to 'Just url' when the
+      first command-line argument is an absolute URL.  (So, relative links
+      will be resolved in relation to the first page.)  Otherwise, 'Nothing'.
+    + All bibliography-related fields have been removed from
+      `ReaderOptions` and `WriterOptions`: `writerBiblioFiles`,
+      `readerReferences`, `readerCitationStyle`.
+
+  * The `Text.Pandoc.Biblio` module has been removed.  Users of the
+    pandoc library who want citation support will need to use
+    `Text.CSL.Pandoc` from `pandoc-citeproc`.
+ 
 
   [bug fixes]
 
@@ -223,7 +335,7 @@
      with CSS files that include web fonts using the method described here:
       <http://paulirish.com/2009/bulletproof-font-face-implementation-syntax/>
       (#739).  Handle `src` in `embed`, `audio`, `source`, `input` tags.
-  
+
   * `Text.Pandoc.Parsing`: `uri` parser no longer treats punctuation before
     percent-encoding, or a `+` character, as final punctuation.
 
@@ -252,7 +364,7 @@
     + Improved handling of `<pre>` blocks (#927). Remove internal HTML tags
       in code blocks, rather than printing them verbatim. Parse attributes
       on `<pre>` tag for code blocks.
-  
+
   * HTML reader: Handle non-simple tables (#893).  Column widths are read from
     `col` tags if present, otherwise divided equally.
 
@@ -296,6 +408,7 @@
       rows had attributes, now we ignore them.
     + Ignore attributes on headers.
     + Allow `Image:` for images (#971).
+    + Parse an image with caption in a paragraph by itself as a figure.
 
   * LaTeX writer
 
@@ -316,9 +429,9 @@
   * Beamer writer: when creating beamer slides, add `allowframebreaks` option
       to the slide if it is one of the header classes.  It is recommended
       that your bibliography slide have this attribute:
-    
+
         # References {.allowframebreaks}
-    
+
     This causes multiple slides to be created if necessary, depending
     on the length of the bibliography.
 
@@ -331,6 +444,7 @@
 
     + Fixed `--no-highlight` (Alexander Kondratskiy).
     + Don't convert to lowercase in email obfuscation (#839).
+    + Ensure proper escaping in `<title>` and `<meta>` fields.
 
   * AsciiDoc writer:
 
@@ -398,7 +512,7 @@
       as new authors.
 
   * `Text.Pandoc.Templates`:
-  
+
     + Fixed bug retrieving default template for markdown variants.
     + Templates can now contain "record lookups" in variables;
       for example, `author.institution` will retrieve the `institution`
@@ -408,8 +522,31 @@
       So if `foo` resolves to "", no output should be produced.
       See pandoc-templates#39.
 
+  * Citation processing improvements (now part of pandoc-citeproc):
+
+    + Fixed `endWithPunct` The new version correctly sees a sentence
+      ending in '.)' as ending with punctuation.  This fixes a bug which
+      led such sentences to receive an extra period at the end: '.).'.
+      Thanks to Steve Petersen for reporting.
+    + Don't interfere with Notes that aren't citation notes.
+      This fixes a bug in which notes not generated from citations were
+      being altered (e.g. first letter capitalized) (#898).
+    + Only capitalize footnote citations when they have a prefix.
+    + Changes in suffix parsing.  A suffix beginning with a digit gets 'p'
+      inserted before it before passing to citeproc-hs, so that bare numbers
+      are treated as page numbers by default.  A suffix not beginning with
+      punctuation has a space added at the beginning (rather than a comma and
+      space, as was done before for not-author-in-text citations).
+      The result is that `\citep[23]{item1}` in LaTeX will be interpreted
+      properly, with '23' treated as a locator of type 'page'.
+    + Many improvements to citation rendering, due to fixes in citeproc-hs
+      (thanks to Andrea Rossato).
+    + Warnings are issued for undefined citations, which are rendered
+      as `???`.
+    + Fixed hanging behavior when locale files cannot be found.
+
   [template changes]
-   
+
   * DocBook:  Use DocBook 4.5 doctype.
 
   * Org: '#+TITLE:' is inserted before the title.
@@ -477,7 +614,7 @@
   * `Text.Pandoc.UTF8`: use strict bytestrings in reading.  The use of lazy
      bytestrings seemed to cause problems using pandoc on 64-bit Windows
      7/8 (#874).
-    
+
   * Factored out `registerHeader` from markdown reader, added to
     `Text.Pandoc.Parsing`.
 
@@ -503,93 +640,12 @@
 
   * Various small documentation improvements.
     Thanks to achalddave and drothlis for patches.
-    
+
   * Removed comment that chokes recent versions of CPP (#933).
-    
+
   * Removed support for GHC version < 7.2, since pandoc-types now
     requires at least GHC 7.2 for GHC generics.
 
-
-------------------
-
-  * citeproc support has been removed from core pandoc (API changes).
-
-    + The `Text.Pandoc.Biblio` module has been removed (API change),
-    and the Markdown
-      and LaTeX readers no longer process citations.  Users of the
-      pandoc library who want citation support will need to use
-      `Text.CSL.Pandoc` from `pandoc-citations`.
-
-    + All bibliography-related fields have been removed from
-      `ReaderOptions` and `WriterOptions`: `writerBiblioFiles`,
-      `readerReferences`, `readerCitationStyle`. (API change)
-
-    + Note that a Cite element is now created in parsing markdown whether
-      or not there is a matching reference (indeed, pandoc has no way of
-      knowing, since the `--bibliography` option has been removed).
-      By default citations will print as `???`. (behavior change)
-
-    + The `pandoc-citeproc` script will put the bibliography at the
-      end of the document, as before.  However, it will be put inside a Div
-      element with class "references", allowing users some control
-      over the styling of references.  A final header, if any, will
-      be included in the Div. (behavior change)
-
-    * The markdown writer will not print a bibliography if the
-      `citations` extension is enabled.  (If the citations are formatted
-      as markdown citations, it is redundant to have a bibliography,
-      since one will be generated automatically.) (behavior change)
- 
-  * Use new flexible metadata type.
-
-    + Depend on `pandoc-types` 1.12.  This changes the type of
-      `Meta` to allow structured metadata.  (API change:  existing
-      code that pattern-matches on `Meta` will have to be revised.)
-    + Revised readers and writers to use the new `Meta` type.
-    + Variables completely shadow metadata.
-      If many variables with the same name are set, a list is created.
-
-  * New generic block container (`Div`) and inline container
-    (`Span`) elements have been added. These can take attributes.
-    They will render in HTML, Textile, MediaWiki, Org, RST and
-    and Markdown (with `markdown_in_html` extension) as HTML `<div>`
-    and `<span>` elements; in other formats they will simply pass through
-    their contents.  But they can be targeted by scripts.
-
-  * Added `Text.Pandoc.Walk` (in `pandoc-types`), which exports
-    hand-written tree-walking functions that are orders of magnitude
-    faster than the SYB functions from `Text.Pandoc.Generic`.
-    These functions are now used where possible in pandoc's code.
-    Added `Tests.Walk` to verify that `walk` and `query` match
-    the generic traversals `bottomUp` and `queryWith`.
-    (API change.)
-
-  * New module `Text.Pandoc.JSON` in pandoc-types.
-
-    + This provides `ToJSON` and `FromJSON` instances for the basic
-      pandoc types.  They use GHC generics and should be faster than the
-      old JSON serialization using `Data.Aeson.Generic`.
-
-  
-  * Citation processing improvements (now part of pandoc-citeproc):
-    (bug fixes)
-
-    + Fixed `endWithPunct` The new version correctly sees a sentence
-      ending in '.)' as ending with punctuation.  This fixes a bug which
-      led such sentences to receive an extra period at the end: '.).'.
-      Thanks to Steve Petersen for reporting.
-    + Don't interfere with Notes that aren't citation notes.
-      This fixes a bug in which notes not generated from citations were
-      being altered (e.g. first letter capitalized) (#898).
-    + Only capitalize footnote citations when they have a prefix.
-    + Changes in suffix parsing.  A suffix beginning with a digit gets 'p'
-      inserted before it before passing to citeproc-hs, so that bare numbers
-      are treated as page numbers by default.  A suffix not beginning with
-      punctuation has a space added at the beginning (rather than a comma and
-      space, as was done before for not-author-in-text citations).
-      The result of these changes (and the last commit) is that
-      `\citep[23]{item1}` in LaTeX will be interpreted properly,
-      with '23' treated as a locator of type 'page'.
 
 pandoc (1.11.1)
 
@@ -603,7 +659,7 @@ pandoc (1.11.1)
       paragraphs.  The unmatched quotes now get turned into literal
       left double quotes. (No `Quoted` inline is generated, however.)
       Closes #99 (again).
-    
+
   * HTML writer: Fixed numbering mismatch between TOC and sections.
     `--number-offset` now affects TOC numbering as well
     as section numbering, as it should have all along.  Closes #789.
@@ -638,7 +694,7 @@ pandoc (1.11)
   * Added `--number-offset` option.  (See README for description.)
 
   * Added `--default-image-extension` option.  (See README for description.)
-  
+
   * `--number-sections` behavior change: headers with class `unnumbered`
     will not be numbered.
 
@@ -689,7 +745,7 @@ pandoc (1.11)
     + Better support for Verbatim and minted environments.  Closes #763.
 
   * Markdown reader:
-  
+
     + `-` in an attribute context = `.unnumbered`.  The point of this
       is to provide a way to specify unnumbered headers in non-English
       documents.
@@ -715,7 +771,7 @@ pandoc (1.11)
       Closes #723.
 
   * Textile reader:
-  
+
     + Handle attributes on headers.
 
   * LaTeX reader:
@@ -748,7 +804,7 @@ pandoc (1.11)
       `unnumbered` class.
 
   * Textile writer:
-  
+
     + Support header attributes.
 
   * Markdown writer:
@@ -762,11 +818,11 @@ pandoc (1.11)
       use `pandoc -t markdown-citations`.
 
   * RST writer:
-  
+
     + Support `:number-lines:` in code blocks.
 
   * Docx writer:
-  
+
     + Better treatment of display math.  Display math inside a
       paragraph is now put in a separate paragraph, so it will render
       properly (centered and without extra blank lines around it).
@@ -784,7 +840,7 @@ pandoc (1.11)
       edited.  Closes #414.
 
   * EPUB writer:
-  
+
     + Fix section numbering.  Previously the numbering restarted from 1
       in each chapter (with `--number-sections`), though the numbers in
       the table of contents were correct.
@@ -807,7 +863,7 @@ pandoc (1.11)
     section number.
 
   * `Text.Pandoc.Pretty`:
-  
+
     + Fixed `chomp` so it works inside `Prefixed` elements.
     + Changed `Show` instance so it is better for debugging.
 
@@ -877,7 +933,7 @@ pandoc (1.10.1)
     Thanks to Nick Bart for the suggestion of using @{}.
 
   * `Text.Pandoc.Parsing`:
-  
+
     + More efficient version of `anyLine`.
     + Type of `macro` has changed; the parser now returns `Blocks`
       instead of `Block`.
@@ -900,7 +956,7 @@ pandoc (1.10.0.5)
     Thanks to Andrew Lee for pointing out the bug.
 
   * Markdown reader: Fixed regressions in fenced code blocks. Closes #722.
-    
+
     + Tilde code fences can again take a bare language string
       (`~~~ haskell`), not just curly-bracketed attributes
       (`~~~ {.haskell}`).
@@ -931,7 +987,7 @@ pandoc (1.10.0.5)
     `hsb2hs`.
 
   * Changes to `make-windows-installer.bat`.
-    
+
     + Exit batch file if any of the cabal-dev installs fail.
     + There's no longer any need to reinstall `highlighting-kate`.
     + Don't start with a `cabal update`; leave that to the user.
@@ -1683,19 +1739,19 @@ pandoc (1.9.4.2)
     checks for the base version that intelligibly enable encoding/decoding
     when needed. Fixes a bug with multilingual filenames when pandoc was
     compiled with ghc 7.4 (#540).
-    
+
   * Don't generate an empty H1 after hrule slide breaks.
     We now use a slide-level header with contents `[Str "\0"]` to mark
     an hrule break.  This avoids creation of an empty H1 in these
     contexts.  Closes #484.
-    
+
   * Docbook reader: Added support for "bold" emphasis.  Thanks to mb21.
-  
+
   * In make_osx_package.sh, ensure citeproc-hs is built with the
     embed_data_files flag.
-    
+
   * MediaWiki writer: Avoid extra blank lines after sublists (Gavin Beatty).
-    
+
   * ConTeXt writer: Don't escape `&`, `^`, `<`, `>`, `_`,
     simplified escapes for `}` and `{` to `\{` and `\}` (Aditya Mahajan).
 
@@ -1706,7 +1762,7 @@ pandoc (1.9.4.2)
 
   * Added some missing exports and tests to the cabal file
     (Alexander V Vershilov).
-    
+
   * Compile with `-rtsopts` and `-threaded` by default.
 
 pandoc (1.9.4.1)
@@ -1724,7 +1780,7 @@ pandoc (1.9.4.1)
     + Use microtype if available.
 
   * Biblio:
-  
+
     + Add comma to beginning of bare suffix, e.g. `@item1 [50]`.
       Motivation: `@item1 [50]` should be as close as possible to
       `[@item1, 50]`.
@@ -2028,12 +2084,12 @@ pandoc (1.9.1.1)
 pandoc (1.9.1)
 
   * LaTeX reader:
-  
+
     + Fixed regression in 1.9; properly handle escaped $ in latex math.
     + Put LaTeX verse environments in blockquotes.
 
   * Markdown reader:
-  
+
     + Limit nesting of strong/emph.  This avoids exponential lookahead
       in parasitic cases, like `a**a*a**a*a**a*a**a*a**a*a**a*a**a*a**`.
     + Improved attributes syntax (inn code blocks/spans):
@@ -2252,7 +2308,7 @@ pandoc (1.9)
         </sidebar>
 
     will not be wrapped in `<para>` tags.
-  
+
   * The LaTeX parser has been completely rewritten; it is now much more
     accurate, robust, and extensible. However, there are two important
     changes in how it treats unknown LaTeX. (1) Previously, unknown
@@ -4670,7 +4726,7 @@ pandoc (0.46) unstable; urgency=low
       HTML reader now uses rawHtmlBlock', which excludes </html> and </body>,
       since these are handled in parseHtml.  (Resolves Issue #38.)
 
-    + Fixed bug (emph parser was looking for <IT> tag, not <I>).
+    + Fixed bug (emph parser was looking for `<IT>` tag, not `<I>`).
 
     + Don't interpret contents of style tags as markdown.
       (Resolves Issue #40.)
@@ -4755,15 +4811,15 @@ pandoc (0.45) unstable; urgency=low
     + readTeXMath is now used for default HTML output in HTML, S5, RTF,
       and Docbook, if no other method for displaying math in HTML is
       specified.  Enclosing $'s are no longer printed by default.
-    + By default, math is put inside <span class="math">. This way it can be
+    + By default, math is put inside `<span class="math">`. This way it can be
       distinguished from the surrounding text, e.g. put in a different
       font.
 
   * New --gladtex and --mimetex options for display of math in HTML:
 
-    + If --gladtex is specified, math is output between <eq> tags, so
+    + If --gladtex is specified, math is output between `<eq>` tags, so
       it can be processed by gladTeX.
-    + If --mimetex is specified, math is put in <img> tags with a link
+    + If --mimetex is specified, math is put in `<img>` tags with a link
       to the mimetex CGI script (or any other script that takes TeX math
       as input and outputs an image).  The URL of the script may be
       specified, but defaults to /cgi-bin/mimetex.cgi.
@@ -4777,13 +4833,13 @@ pandoc (0.45) unstable; urgency=low
     + Fixed bug: parser for minimized attributes should not swallow
       trailing spaces.
     + Simplified HTML attribute parsing.
-    + Changed parsing of code blocks in HTML reader:  <code> tag is no
-      longer needed. <pre> suffices. All HTML tags in the code block
+    + Changed parsing of code blocks in HTML reader:  `<code>` tag is no
+      longer needed. `<pre>` suffices. All HTML tags in the code block
       (e.g. for syntax highlighting) are skipped, because they are not
-      portable to other output formats. A <code>...</code> block not
-      surrounded by <pre> now counts as inline HTML, not a code block.
+      portable to other output formats. A `<code>...</code>` block not
+      surrounded by `<pre>` now counts as inline HTML, not a code block.
     + Remove just one leading and one trailing newline from contents of
-      <pre>...</pre> in codeBlock parser.
+      `<pre>...</pre>` in codeBlock parser.
 
   * Markdown reader:
 
@@ -5105,8 +5161,8 @@ pandoc (0.43) unstable; urgency=low
       end code block with a nonindented line.)
     + Changed definition of 'emph': italics with '_' must not
       be followed by an alphanumeric character. This is to help
-      prevent interpretation of e.g. [LC_TYPE]: my_type as
-      '[LC<em>TYPE]:my</em>type'.
+      prevent interpretation of e.g. `[LC_TYPE]: my_type` as
+      `[LC<em>TYPE]:my</em>type`.
     + Improved Markdown.pl-compatibility in referenceLink: the two parts
       of a reference-style link may be separated by one space, but not
       more... [a] [link], [not]    [a link].
@@ -5114,7 +5170,7 @@ pandoc (0.43) unstable; urgency=low
       Markdown.pl: the marker for the end of the code section is a clump
       of the same number of `'s with which the section began, followed
       by a non-` character. So, for example,
-         ` h ``` i ` -> <code>h ``` i</code>.
+         ` h ``` i ` -> `<code>h ``` i</code>`.
     + Split 'title' into 'linkTitle' and 'referenceTitle', since the
       rules are slightly different.
     + Rewrote 'para' for greater efficiency.
@@ -5221,7 +5277,7 @@ pandoc (0.41) unstable; urgency=low
   [ John MacFarlane ]
 
   * Fixed bugs in HTML reader:
-    + Skip material at end *only if* </html> is present (previously,
+    + Skip material at end *only if* `</html>` is present (previously,
       only part of the document would be parsed if an error was
       found; now a proper error message is given).
     + Added new constant eitherBlockOrInline with elements that may
@@ -5430,9 +5486,9 @@ pandoc (0.4) unstable; urgency=low
       may cause documents to be parsed differently. Users should take
       care in upgrading.
     + Changed autoLink parsing to conform better to Markdown.pl's
-      behavior. <google.com> is not treated as a link, but
-      <http://google.com>, <ftp://google.com>, and <mailto:google@google.com>
-      are.
+      behavior. `<google.com>` is not treated as a link, but
+      `<http://google.com>`, `<ftp://google.com>`, and
+      `<mailto:google@google.com>` are.
     + Cleaned up handling of embedded quotes in link titles.  Now these are
       stored as a '"' character, not as '&quot;'.
     + Use lookAhead parser for the 'first pass' (looking for reference keys),
@@ -5496,7 +5552,7 @@ pandoc (0.4) unstable; urgency=low
       been removed, since they are written programatically. This change
       introduces a new dependency on the xhtml package.
     + Fixed two bugs in email obfuscation involving improper escaping
-      of '&' in the <noscript> section and in --strict mode. Resolves
+      of '&' in the `<noscript>` section and in `--strict` mode. Resolves
       Issue #9.
     + Fixed another bug in email obfuscation: If the text to be obfuscated
       contains an entity, this needs to be decoded before obfuscation.
@@ -5528,8 +5584,8 @@ pandoc (0.4) unstable; urgency=low
     + Links in markdown output are now printed as inline links by default,
       rather than reference links.  A --reference-links option has been added
       that forces links to be printed as reference links.  Resolves Issue #4.
-    + Use autolinks when possible.  Instead of [site.com](site.com),
-      use <site.com>.
+    + Use autolinks when possible.  Instead of `[site.com](site.com)`,
+      use `<site.com>`.
 
   * LaTeX writer:
 
@@ -5745,7 +5801,7 @@ pandoc (0.3) unstable; urgency=low
       only non-alphanumeric characters can be escaped.  Strict mode
       follows Markdown.pl in only allowing a select group of punctuation
       characters to be escaped.
-    + Modified HTML reader to skip a newline following a <br> tag.
+    + Modified HTML reader to skip a newline following a `<br>` tag.
       Otherwise the newline will be treated as a space at the beginning
       of the next line.
 
@@ -5775,7 +5831,7 @@ pandoc (0.3) unstable; urgency=low
   * Moved handling of "smart typography" from the writers to the Markdown
     and LaTeX readers.  This allows great simplification of the writers
     and more accurate smart quotes, dashes, and ellipses.  DocBook can
-    now use '<quote>'.  The '--smart' option now toggles an option in
+    now use `<quote>`.  The '--smart' option now toggles an option in
     the parser state rather than a writer option.  Several new kinds
     of inline elements have been added: Quoted, Ellipses, Apostrophe,
     EmDash, EnDash.
