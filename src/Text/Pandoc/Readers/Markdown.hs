@@ -872,8 +872,11 @@ para = try $ do
     $ try $ do
             newline
             (blanklines >> return mempty)
-              <|> (guardDisabled Ext_blank_before_blockquote >> lookAhead blockQuote)
-              <|> (guardDisabled Ext_blank_before_header >> lookAhead header)
+              <|> (guardDisabled Ext_blank_before_blockquote >> () <$ lookAhead blockQuote)
+              <|> (guardEnabled Ext_backtick_code_blocks >> () <$ lookAhead codeBlockFenced)
+              <|> (guardDisabled Ext_blank_before_header >> () <$ lookAhead header)
+              <|> (guardEnabled Ext_lists_without_preceding_blankline >>
+                       () <$ lookAhead listStart)
             return $ do
               result' <- result
               case B.toList result' of
@@ -1599,8 +1602,11 @@ endline :: MarkdownParser (F Inlines)
 endline = try $ do
   newline
   notFollowedBy blankline
+  guardDisabled Ext_lists_without_preceding_blankline <|> notFollowedBy listStart
   guardEnabled Ext_blank_before_blockquote <|> notFollowedBy emailBlockQuoteStart
   guardEnabled Ext_blank_before_header <|> notFollowedBy (char '#') -- atx header
+  guardEnabled Ext_backtick_code_blocks >>
+     notFollowedBy (() <$ (lookAhead (char '`') >> codeBlockFenced))
   -- parse potential list-starts differently if in a list:
   st <- getState
   when (stateParserContext st == ListItemState) $ do
@@ -1808,11 +1814,10 @@ rawHtmlInline = do
 cite :: MarkdownParser (F Inlines)
 cite = do
   guardEnabled Ext_citations
-  citations <- textualCite <|> (fmap (flip B.cite unknownC) <$> normalCite)
+  citations <- textualCite
+            <|> do (cs, raw) <- withRaw normalCite
+                   return $ (flip B.cite (B.text raw)) <$> cs
   return citations
-
-unknownC :: Inlines
-unknownC = B.str "???"
 
 textualCite :: MarkdownParser (F Inlines)
 textualCite = try $ do
@@ -1824,14 +1829,18 @@ textualCite = try $ do
                       , citationNoteNum = 0
                       , citationHash    = 0
                       }
-  mbrest <- option Nothing $ try $ spnl >> Just <$> normalCite
+  mbrest <- option Nothing $ try $ spnl >> Just <$> withRaw normalCite
   case mbrest of
-       Just rest -> return $ (flip B.cite unknownC . (first:)) <$> rest
-       Nothing   -> (fmap (flip B.cite unknownC) <$> bareloc first) <|>
-                    return (do st <- askF
-                               return $ case M.lookup key (stateExamples st) of
-                                              Just n -> B.str (show n)
-                                              _      -> B.cite [first] unknownC)
+       Just (rest, raw) ->
+         return $ (flip B.cite (B.text $ '@':key ++ " " ++ raw) . (first:))
+               <$> rest
+       Nothing   ->
+         (do (cs, raw) <- withRaw $ bareloc first
+             return $ (flip B.cite (B.text $ '@':key ++ " " ++ raw)) <$> cs)
+         <|> return (do st <- askF
+                        return $ case M.lookup key (stateExamples st) of
+                                 Just n -> B.str (show n)
+                                 _      -> B.cite [first] $ B.str $ '@':key)
 
 bareloc :: Citation -> MarkdownParser (F [Citation])
 bareloc c = try $ do
@@ -1857,6 +1866,11 @@ normalCite = try $ do
 
 citeKey :: MarkdownParser (Bool, String)
 citeKey = try $ do
+  -- make sure we're not right after an alphanumeric,
+  -- since foo@bar.baz is probably an email address
+  lastStrPos <- stateLastStrPos <$> getState
+  pos <- getPosition
+  guard $ lastStrPos /= Just pos
   suppress_author <- option False (char '-' >> return True)
   char '@'
   first <- letter

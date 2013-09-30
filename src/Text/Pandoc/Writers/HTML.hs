@@ -39,7 +39,7 @@ import Text.Pandoc.Readers.TeXMath
 import Text.Pandoc.Slides
 import Text.Pandoc.Highlighting ( highlight, styleToCss,
                                   formatHtmlInline, formatHtmlBlock )
-import Text.Pandoc.XML (fromEntities)
+import Text.Pandoc.XML (fromEntities, escapeStringForXML)
 import Network.HTTP ( urlEncode )
 import Numeric ( showHex )
 import Data.Char ( ord, toLower )
@@ -115,8 +115,9 @@ pandocToHtml opts (Pandoc meta blocks) = do
               (fmap renderHtml . blockListToHtml opts)
               (fmap renderHtml . inlineListToHtml opts)
               meta
-  let authsMeta = map stringify $ docAuthors meta
-  let dateMeta  = stringify $ docDate meta
+  let stringifyHTML = escapeStringForXML . stringify
+  let authsMeta = map stringifyHTML $ docAuthors meta
+  let dateMeta  = stringifyHTML $ docDate meta
   let slideLevel = maybe (getSlideLevel blocks) id $ writerSlideLevel opts
   let sects = hierarchicalize $
               if writerSlideVariant opts == NoSlides
@@ -168,7 +169,7 @@ pandocToHtml opts (Pandoc meta blocks) = do
                   maybe id (defField "toc" . renderHtml) toc $
                   defField "author-meta" authsMeta $
                   maybe id (defField "date-meta") (normalizeDate dateMeta) $
-                  defField "pagetitle" (stringify $ docTitle meta) $
+                  defField "pagetitle" (stringifyHTML $ docTitle meta) $
                   defField "idprefix" (writerIdentifierPrefix opts) $
                   -- these should maybe be set in pandoc.hs
                   defField "slidy-url"
@@ -268,11 +269,24 @@ elementToHtml slideLevel opts (Sec level num (id',classes,keyvals) title' elemen
                 else blockToHtml opts (Header level' (id',classes,keyvals) title')
   let isSec (Sec _ _ _ _ _) = True
       isSec (Blk _)         = False
+  let isPause (Blk x) = x == Para [Str ".",Space,Str ".",Space,Str "."]
+      isPause _       = False
+  let fragmentClass = case writerSlideVariant opts of
+                           RevealJsSlides  -> "fragment"
+                           _               -> "incremental"
+  let inDiv xs = Blk (RawBlock (Format "html") ("<div class=\""
+                       ++ fragmentClass ++ "\">")) :
+                   (xs ++ [Blk (RawBlock (Format "html") "</div>")])
   innerContents <- mapM (elementToHtml slideLevel opts)
                    $ if titleSlide
                         -- title slides have no content of their own
                         then filter isSec elements
-                        else elements
+                        else if slide
+                                then case splitBy isPause elements of
+                                          []   -> []
+                                          [x]  -> x
+                                          xs   -> concatMap inDiv xs
+                                else elements
   let inNl x = mconcat $ nl opts : intersperse (nl opts) x ++ [nl opts]
   let classes' = ["titleslide" | titleSlide] ++ ["slide" | slide] ++
                   ["section" | (slide || writerSectionDivs opts) &&
@@ -401,10 +415,6 @@ blockToHtml opts (Para [Image txt (s,'f':'i':'g':':':tit)]) = do
                     [nl opts, img, capt, nl opts]
               else H.div ! A.class_ "figure" $ mconcat
                     [nl opts, img, capt, nl opts]
--- . . . indicates a pause in a slideshow
-blockToHtml opts (Para [Str ".",Space,Str ".",Space,Str "."])
-  | writerSlideVariant opts == RevealJsSlides =
-  blockToHtml opts (RawBlock "html" "<div class=\"fragment\" />")
 blockToHtml opts (Para lst) = do
   contents <- inlineListToHtml opts lst
   return $ H.p contents
@@ -580,8 +590,7 @@ toListItem opts item = nl opts >> H.li item
 
 blockListToHtml :: WriterOptions -> [Block] -> State WriterState Html
 blockListToHtml opts lst =
-  mapM (blockToHtml opts) lst >>=
-  return . mconcat . intersperse (nl opts)
+  fmap (mconcat . intersperse (nl opts)) $ mapM (blockToHtml opts) lst
 
 -- | Convert list of Pandoc inline elements to HTML.
 inlineListToHtml :: WriterOptions -> [Inline] -> State WriterState Html

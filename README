@@ -278,17 +278,22 @@ Reader options
     Filters may be written in any language.  `Text.Pandoc.JSON`
     exports `toJSONFilter` to facilitate writing filters in Haskell.
     Those who would prefer to write filters in python can use the
-    module `pandoc.py`:  see <http://github.com/jgm/pandoc-filters-python>
-    for the module and several examples.  Note that the *EXECUTABLE*
-    will be sought in the user's `PATH`, and not in the working directory,
-    if no directory is provided.  If you want to run a script in the
-    working directory, preface the filename with `./`.
+    module `pandocfilters`, installable from PyPI. See
+    <http://github.com/jgm/pandocfilters> for the module and several
+    examples.  Note that the *EXECUTABLE* will be sought in the user's
+    `PATH`, and not in the working directory, if no directory is
+    provided.  If you want to run a script in the working directory,
+    preface the filename with `./`.
 
 `-M` *KEY[=VAL]*, `--metadata=`*KEY[:VAL]*
-:   Set the metadata field *KEY* to the value *VAL* after
-    parsing.  A value specified on the command line overrides a value
-    specified in the document.  Values will be interpreted as raw strings.
-    If no value is specified, the value will be treated as Boolean true.
+:   Set the metadata field *KEY* to the value *VAL*.  A value specified
+    on the command line overrides a value specified in the document.
+    Values will be parsed as YAML boolean or string values. If no value is
+    specified, the value will be treated as Boolean true.  Like
+    `--variable`, `--metadata` causes template variables to be set.
+    But unlike `--variable`, `--metadata` affects the metadata of the
+    underlying document (which is accessible from filters and may be
+    printed in some output formats).
 
 `--normalize`
 :   Normalize the document after reading:  merge adjacent
@@ -606,10 +611,9 @@ Citation rendering
 
 `--bibliography=`*FILE*
 :   Set the `bibliography` field in the document's metadata to *FILE*,
-    overriding any value set in the metadata, and tell pandoc to
-    use the `pandoc-citeproc` filter.  (This is equivalent to the
-    combination `--metadata bibliography=FILE --filter pandoc-citeproc`.)
-    Note that an error will result unless `pandoc-citeproc` is installed.
+    overriding any value set in the metadata, and process citations
+    using `pandoc-citeproc`. (This is equivalent to
+    `--metadata bibliography=FILE --filter pandoc-citeproc`.)
 
 `--csl=`*FILE*
 :   Set the `csl` field in the document's metadata to *FILE*,
@@ -2454,6 +2458,10 @@ in pandoc, but may be enabled by adding `+EXTENSION` to the format
 name, where `EXTENSION` is the name of the extension.  Thus, for
 example, `markdown+hard_line_breaks` is markdown with hard line breaks.
 
+**Extension:  `lists_without_preceding_blankline`**\
+Allow a list to occur right after a paragraph, with no intervening
+blank space.
+
 **Extension:  `hard_line_breaks`**\
 Causes all newlines within a paragraph to be interpreted as hard line
 breaks instead of spaces.
@@ -2676,9 +2684,8 @@ a single document.
 Inserting pauses
 ----------------
 
-In reveal.js and beamer slide shows, you can add "pauses" within
-a slide by including a paragraph containing three dots, separated
-by spaces:
+You can add "pauses" within a slide by including a paragraph containing
+three dots, separated by spaces:
 
     # Slide with a pause
 
@@ -2834,5 +2841,5 @@ Jamie F. Olson.
 [PDF]: http://www.adobe.com/pdf/
 [reveal.js]: http://lab.hakim.se/reveal-js/
 [FictionBook2]: http://www.fictionbook.org/index.php/Eng:XML_Schema_Fictionbook_2.1
-[lua]: TODO
+[lua]: http://www.lua.org
 
