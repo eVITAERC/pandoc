@@ -286,10 +286,14 @@ Reader options
     preface the filename with `./`.
 
 `-M` *KEY[=VAL]*, `--metadata=`*KEY[:VAL]*
-:   Set the metadata field *KEY* to the value *VAL* after
-    parsing.  A value specified on the command line overrides a value
-    specified in the document.  Values will be interpreted as raw strings.
-    If no value is specified, the value will be treated as Boolean true.
+:   Set the metadata field *KEY* to the value *VAL*.  A value specified
+    on the command line overrides a value specified in the document.
+    Values will be parsed as YAML boolean or string values. If no value is
+    specified, the value will be treated as Boolean true.  Like
+    `--variable`, `--metadata` causes template variables to be set.
+    But unlike `--variable`, `--metadata` affects the metadata of the
+    underlying document (which is accessible from filters and may be
+    printed in some output formats).
 
 `--normalize`
 :   Normalize the document after reading:  merge adjacent

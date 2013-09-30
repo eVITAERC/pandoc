@@ -178,7 +178,7 @@ inline = (mempty <$ comment)
      <|> (space  <$ sp)
      <|> inlineText
      <|> inlineCommand
-     <|> grouped inline
+     <|> inlineGroup
      <|> (char '-' *> option (str "-")
            ((char '-') *> option (str "–") (str "—" <$ char '-')))
      <|> double_quote
@@ -200,6 +200,15 @@ inline = (mempty <$ comment)
 
 inlines :: LP Inlines
 inlines = mconcat <$> many (notFollowedBy (char '}') *> inline)
+
+inlineGroup :: LP Inlines
+inlineGroup = do
+  ils <- grouped inline
+  if isNull ils
+     then return mempty
+     else return $ spanWith nullAttr ils
+          -- we need the span so we can detitlecase bibtex entries;
+          -- we need to know when something is {C}apitalized
 
 block :: LP Blocks
 block = (mempty <$ comment)

@@ -60,6 +60,12 @@ import Network.URI (parseURI, isURI, URI(..))
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString as BS
 import Data.Aeson (eitherDecode', encode)
+import qualified Data.Map as M
+import System.IO.Error(ioeGetErrorType)
+import GHC.IO.Exception (IOErrorType(ResourceVanished))
+import Data.Yaml (decode)
+import qualified Data.Yaml as Yaml
+import qualified Data.Text as T
 
 copyrightMessage :: String
 copyrightMessage = "\nCopyright (C) 2006-2013 John MacFarlane\n" ++
@@ -98,8 +104,11 @@ externalFilter f args' d = do
            ExitSuccess    -> return $ either error id $ eitherDecode' outbs
            ExitFailure _  -> err 83 $ "Error running filter " ++ f
  where filterException :: E.SomeException -> IO a
-       filterException e = err 83 $ "Error running filter " ++ f ++
-                                     "\n" ++ show e
+       filterException e = err 83 $ "Error running filter " ++ f ++ "\n" ++
+                                  if ioeGetErrorType `fmap` E.fromException e ==
+                                          Just ResourceVanished
+                                     then f ++ " not found in path"
+                                     else show e
 
 -- | Data structure for command line options.
 data Opt = Opt
@@ -113,7 +122,7 @@ data Opt = Opt
     , optTransforms        :: [Pandoc -> Pandoc]  -- ^ Doc transforms to apply
     , optTemplate          :: Maybe FilePath  -- ^ Custom template
     , optVariables         :: [(String,String)] -- ^ Template variables to set
-    , optMetadata          :: [(String,MetaValue)] -- ^ Metadata fields to set
+    , optMetadata          :: M.Map String MetaValue -- ^ Metadata fields to set
     , optOutputFile        :: String  -- ^ Name of output file
     , optNumberSections    :: Bool    -- ^ Number sections in LaTeX
     , optNumberOffset      :: [Int]   -- ^ Starting number for sections
@@ -168,7 +177,7 @@ defaultOpts = Opt
     , optTransforms            = []
     , optTemplate              = Nothing
     , optVariables             = []
-    , optMetadata              = []
+    , optMetadata              = M.empty
     , optOutputFile            = "-"    -- "-" means stdout
     , optNumberSections        = False
     , optNumberOffset          = [0,0,0,0,0,0]
@@ -327,9 +336,10 @@ options =
                  (ReqArg
                   (\arg opt -> do
                      let (key,val) = case break (`elem` ":=") arg of
-                                       (k,_:v) -> (k, MetaString v)
+                                       (k,_:v) -> (k, readMetaValue v)
                                        (k,_)   -> (k, MetaBool True)
-                     return opt{ optMetadata = (key,val) : optMetadata opt })
+                     return opt{ optMetadata = addMetadata key val
+                                             $ optMetadata opt })
                   "KEY[:VALUE]")
                  ""
 
@@ -656,27 +666,29 @@ options =
 
     , Option "" ["bibliography"]
                  (ReqArg
-                  (\arg opt ->
-                     return opt{ optMetadata = ("bibliography",MetaString arg) :
-                                 optMetadata opt
-                               })
+                  (\arg opt -> return opt{ optMetadata = addMetadata
+                                             "bibliography" (readMetaValue arg)
+                                             $ optMetadata opt
+                                         })
                    "FILE")
                  ""
 
      , Option "" ["csl"]
                  (ReqArg
                   (\arg opt ->
-                     return opt{ optMetadata = ("csl", MetaString arg) :
-                                 optMetadata opt })
+                     return opt{ optMetadata = addMetadata "csl"
+                                               (readMetaValue arg)
+                                               $ optMetadata opt })
                    "FILE")
                  ""
 
      , Option "" ["citation-abbreviations"]
                  (ReqArg
                   (\arg opt ->
-                     return opt{ optMetadata = ("citation-abbreviations",
-                                                MetaString arg) :
-                                 optMetadata opt })
+                     return opt{ optMetadata = addMetadata
+                                               "citation-abbreviations"
+                                               (readMetaValue arg)
+                                               $ optMetadata opt })
                    "FILE")
                  ""
 
@@ -775,6 +787,20 @@ options =
                  "" -- "Show help"
 
     ]
+
+addMetadata :: String -> MetaValue -> M.Map String MetaValue
+            -> M.Map String MetaValue
+addMetadata k v m = case M.lookup k m of
+                         Nothing -> M.insert k v m
+                         Just (MetaList xs) -> M.insert k
+                                              (MetaList (xs ++ [v])) m
+                         Just x -> M.insert k (MetaList [v, x]) m
+
+readMetaValue :: String -> MetaValue
+readMetaValue s = case decode (UTF8.fromString s) of
+                       Just (Yaml.String t) -> MetaString $ T.unpack t
+                       Just (Yaml.Bool b)   -> MetaBool b
+                       _                    -> MetaString s
 
 -- Returns usage message
 usageMessage :: String -> [OptDescr (Opt -> IO Opt)] -> String
@@ -933,7 +959,7 @@ main = do
        exitWith ExitSuccess
 
   -- --bibliography implies -F pandoc-citeproc for backwards compatibility:
-  let filters' = case lookup "bibliography" metadata of
+  let filters' = case M.lookup "bibliography" metadata of
                        Just _ | all (\f -> takeBaseName f /= "pandoc-citeproc")
                                 filters -> "pandoc-citeproc" : filters
                        _                -> filters
@@ -1114,7 +1140,7 @@ main = do
            reader readerOpts
 
 
-  let doc0 = foldr (\(k,v) -> setMeta k v) doc metadata
+  let doc0 = M.foldWithKey setMeta doc metadata
   let doc1 = foldr ($) doc0 transforms
   doc2 <- foldrM ($) doc1 $ map ($ [writerName']) plugins
 
