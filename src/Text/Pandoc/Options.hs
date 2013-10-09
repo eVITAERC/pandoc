@@ -34,6 +34,7 @@ module Text.Pandoc.Options ( Extension(..)
                            , phpMarkdownExtraExtensions
                            , githubMarkdownExtensions
                            , multimarkdownExtensions
+                           , scholarlyMarkdownExtensions
                            , ReaderOptions(..)
                            , HTMLMathMethod (..)
                            , CiteMethod (..)
@@ -63,13 +64,14 @@ data Extension =
     | Ext_grid_tables         -- ^ Grid tables (pandoc, reST)
     | Ext_pipe_tables         -- ^ Pipe tables (as in PHP markdown extra)
     | Ext_citations           -- ^ Pandoc/citeproc citations
+    | Ext_numbered_references -- ^ Scholarly markdown numbered references
     | Ext_raw_tex             -- ^ Allow raw TeX (other than math)
     | Ext_raw_html            -- ^ Allow raw HTML
     | Ext_tex_math_dollars    -- ^ TeX math between $..$ or $$..$$
     | Ext_tex_math_single_backslash  -- ^ TeX math btw \(..\) \[..\]
     | Ext_tex_math_double_backslash  -- ^ TeX math btw \\(..\\) \\[..\\]
-    | Ext_tex_math_double_backtick   -- ^ TeX math btw ``..`` (overrides `` codeblock unless surrounded by whitespace)
-    | Ext_tex_math_fenced_display    -- ^ TeX display math in a fenced block when language is math
+    | Ext_tex_math_double_backtick   -- ^ TeX math btw ``..`` (overrides `` codeblock unless surrounded by whitespace, used in Scholarly)
+    | Ext_tex_math_fenced_display    -- ^ TeX display math in a fenced block when language is math (Scholarly)
     | Ext_latex_macros        -- ^ Parse LaTeX macro definitions (for math only)
     | Ext_fenced_code_blocks  -- ^ Parse fenced code blocks
     | Ext_fenced_code_attributes  -- ^ Allow attributes on fenced code blocks
@@ -191,6 +193,49 @@ multimarkdownExtensions = Set.fromList
   , Ext_implicit_header_references
   , Ext_auto_identifiers
   , Ext_mmd_header_identifiers
+  ]
+
+scholarlyMarkdownExtensions :: Set Extension
+scholarlyMarkdownExtensions = Set.fromList
+  [ Ext_footnotes
+  , Ext_inline_notes
+  , Ext_pandoc_title_block
+  , Ext_yaml_metadata_block
+  , Ext_table_captions
+  , Ext_implicit_figures
+  , Ext_simple_tables
+  , Ext_multiline_tables
+  , Ext_grid_tables
+  , Ext_pipe_tables
+  , Ext_citations
+  , Ext_raw_tex
+  , Ext_raw_html
+  , Ext_tex_math_dollars
+  , Ext_latex_macros
+  , Ext_fenced_code_blocks
+  , Ext_fenced_code_attributes
+  , Ext_backtick_code_blocks
+  , Ext_inline_code_attributes
+  , Ext_markdown_in_html_blocks
+  , Ext_escaped_line_breaks
+  , Ext_fancy_lists
+  , Ext_startnum
+  , Ext_definition_lists
+  , Ext_example_lists
+  , Ext_all_symbols_escapable
+  , Ext_intraword_underscores
+  , Ext_blank_before_blockquote
+  , Ext_blank_before_header
+  , Ext_strikeout
+  , Ext_superscript
+  , Ext_subscript
+  , Ext_auto_identifiers
+  , Ext_header_attributes
+  , Ext_implicit_header_references
+  , Ext_line_blocks
+  , Ext_tex_math_double_backtick
+  , Ext_tex_math_fenced_display
+  , Ext_numbered_references
   ]
 
 strictExtensions :: Set Extension
