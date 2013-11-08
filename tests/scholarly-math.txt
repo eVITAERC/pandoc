@@ -1,3 +1,13 @@
+---
+title:  'Scholarly Markdown: a Markdown-compatible format for academic communication'
+author:
+- name: First Author
+  affiliation: Technical U
+- name: Second Author
+  affiliation: U of Technical
+tags: [test, markdown, scholarly]
+---
+
 # Scholarly Markdown math support
 
 ## Math as (fenced) code blocks
