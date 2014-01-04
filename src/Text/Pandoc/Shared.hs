@@ -91,7 +91,7 @@ import Data.Char ( toLower, isLower, isUpper, isAlpha,
                    isLetter, isDigit, isSpace )
 import Data.List ( find, isPrefixOf, intercalate )
 import qualified Data.Map as M
-import Network.URI ( escapeURIString, isAbsoluteURI, unEscapeString )
+import Network.URI ( escapeURIString, isURI, unEscapeString )
 import System.Directory
 import Text.Pandoc.MIME (getMimeType)
 import System.FilePath ( (</>), takeExtension, dropExtension )
@@ -108,6 +108,7 @@ import Text.HTML.TagSoup (renderTagsOptions, RenderOptions(..), Tag(..),
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as B8
 import Text.Pandoc.Compat.Monoid
+import Data.ByteString.Base64 (decodeLenient)
 
 #ifdef EMBED_DATA_FILES
 import Text.Pandoc.Data (dataFiles)
@@ -120,6 +121,7 @@ import Data.ByteString.Lazy (toChunks)
 import Network.HTTP.Conduit (httpLbs, parseUrl, withManager,
                              responseBody, responseHeaders)
 import Network.HTTP.Types.Header ( hContentType)
+import Network (withSocketsDo)
 #else
 import Network.URI (parseURI)
 import Network.HTTP (findHeader, rspBody,
@@ -269,7 +271,7 @@ normalizeDate s = fmap (formatTime defaultTimeLocale "%F")
   (msum $ map (\fs -> parsetimeWith fs s) formats :: Maybe Day)
    where parsetimeWith = parseTime defaultTimeLocale
          formats = ["%x","%m/%d/%Y", "%D","%F", "%d %b %Y",
-                    "%d %B %Y", "%b. %d, %Y", "%B %d, %Y"]
+                    "%d %B %Y", "%b. %d, %Y", "%B %d, %Y", "%Y"]
 
 --
 -- Pandoc block and inline list processing
@@ -530,7 +532,7 @@ headerShift n = walk shift
 
 -- | Detect if a list is tight.
 isTightList :: [[Block]] -> Bool
-isTightList = and . map firstIsPlain
+isTightList = all firstIsPlain
   where firstIsPlain (Plain _ : _) = True
         firstIsPlain _             = False
 
@@ -562,14 +564,10 @@ makeMeta title authors date =
 -- | Render HTML tags.
 renderTags' :: [Tag String] -> String
 renderTags' = renderTagsOptions
-               renderOptions{ optMinimize = \x ->
-                                    let y = map toLower x
-                                    in  y == "hr" || y == "br" ||
-                                        y == "img" || y == "meta" ||
-                                        y == "link"
-                            , optRawTag = \x ->
-                                    let y = map toLower x
-                                    in  y == "script" || y == "style" }
+               renderOptions{ optMinimize = matchTags ["hr", "br", "img",
+                                                       "meta", "link"]
+                            , optRawTag   = matchTags ["script", "style"] }
+              where matchTags = \tags -> flip elem tags . map toLower
 
 --
 -- File handling
@@ -624,7 +622,7 @@ readDataFileUTF8 userDir fname =
 fetchItem :: Maybe String -> String
           -> IO (Either E.SomeException (BS.ByteString, Maybe String))
 fetchItem sourceURL s
-  | isAbsoluteURI s = openURL s
+  | isURI s         = openURL s
   | otherwise       = case sourceURL of
                            Just u  -> openURL (u ++ "/" ++ s)
                            Nothing -> E.try readLocalFile
@@ -641,9 +639,9 @@ openURL u
   | "data:" `isPrefixOf` u =
     let mime     = takeWhile (/=',') $ drop 5 u
         contents = B8.pack $ unEscapeString $ drop 1 $ dropWhile (/=',') u
-    in  return $ Right (contents, Just mime)
+    in  return $ Right (decodeLenient contents, Just mime)
 #ifdef HTTP_CONDUIT
-  | otherwise = E.try $ do
+  | otherwise = withSocketsDo $ E.try $ do
      req <- parseUrl u
      resp <- withManager $ httpLbs req
      return (BS.concat $ toChunks $ responseBody resp,

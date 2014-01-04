@@ -269,7 +269,10 @@ getDefaultExtensions "markdown_phpextra" = phpMarkdownExtraExtensions
 getDefaultExtensions "markdown_mmd" = multimarkdownExtensions
 getDefaultExtensions "markdown_github" = githubMarkdownExtensions
 getDefaultExtensions "markdown_scholarly" = scholarlyMarkdownExtensions
-getDefaultExtensions _        = pandocExtensions
+getDefaultExtensions "markdown"        = pandocExtensions
+getDefaultExtensions "plain"           = pandocExtensions
+getDefaultExtensions "textile"         = Set.fromList [Ext_auto_identifiers, Ext_raw_tex]
+getDefaultExtensions _                 = Set.fromList [Ext_auto_identifiers]
 
 -- | Retrieve reader based on formatSpec (format+extensions).
 getReader :: String -> Either String (ReaderOptions -> String -> IO Pandoc)

@@ -38,12 +38,13 @@ import Text.Pandoc.Definition
 import Text.Pandoc.Walk
 import Text.Pandoc.Shared
 import Text.Pandoc.Options
-import Text.Pandoc.Parsing hiding ((<|>), many, optional, space)
+import Text.Pandoc.Parsing hiding ((<|>), many, optional, space,
+                                   mathDisplay, mathInline)
 import qualified Text.Pandoc.UTF8 as UTF8
 import Data.Char ( chr, ord )
 import Control.Monad
 import Text.Pandoc.Builder
-import Data.Char (isLetter)
+import Data.Char (isLetter, isAlphaNum)
 import Control.Applicative
 import Data.Monoid
 import Data.Maybe (fromMaybe)
@@ -163,13 +164,25 @@ mathChars = concat <$>
       <|> (\c -> ['\\',c]) <$> (try $ char '\\' *> anyChar)
        )
 
+quoted' :: (Inlines -> Inlines) -> LP String -> LP () -> LP Inlines
+quoted' f starter ender = do
+  startchs <- starter
+  try ((f . mconcat) <$> manyTill inline ender) <|> lit startchs
+
 double_quote :: LP Inlines
-double_quote = (doubleQuoted . mconcat) <$>
-  (try $ string "``" *> manyTill inline (try $ string "''"))
+double_quote =
+  (   quoted' doubleQuoted (try $ string "``") (void $ try $ string "''")
+  <|> quoted' doubleQuoted (string "“")        (void $ char '”')
+  -- the following is used by babel for localized quotes:
+  <|> quoted' doubleQuoted (try $ string "\"`") (void $ try $ string "\"'")
+  <|> quoted' doubleQuoted (string "\"")       (void $ char '"')
+  )
 
 single_quote :: LP Inlines
-single_quote = (singleQuoted . mconcat) <$>
-  (try $ char '`' *> manyTill inline (try $ char '\'' >> notFollowedBy letter))
+single_quote =
+  (  quoted' singleQuoted (string "`") (try $ char '\'' >> notFollowedBy letter)
+  <|> quoted' singleQuoted (string "‘") (try $ char '’' >> notFollowedBy letter)
+  )
 
 inline :: LP Inlines
 inline = (mempty <$ comment)
@@ -181,10 +194,10 @@ inline = (mempty <$ comment)
            ((char '-') *> option (str "–") (str "—" <$ char '-')))
      <|> double_quote
      <|> single_quote
-     <|> (str "“" <$ try (string "``"))  -- nb. {``} won't be caught by double_quote
      <|> (str "”" <$ try (string "''"))
-     <|> (str "‘" <$ char '`')           -- nb. {`} won't be caught by single_quote
+     <|> (str "”" <$ char '”')
      <|> (str "’" <$ char '\'')
+     <|> (str "’" <$ char '’')
      <|> (str "\160" <$ char '~')
      <|> (mathDisplay $ string "$$" *> mathChars <* string "$$")
      <|> (mathInline  $ char '$' *> mathChars <* char '$')
@@ -373,6 +386,7 @@ inlineCommands = M.fromList $
   , ("backslash", lit "\\")
   , ("slash", lit "/")
   , ("textbf", strong <$> tok)
+  , ("textnormal", spanWith ("",["nodecor"],[]) <$> tok)
   , ("ldots", lit "…")
   , ("dots", lit "…")
   , ("mdots", lit "…")
@@ -443,6 +457,7 @@ inlineCommands = M.fromList $
   , ("footnote", (note . mconcat) <$> (char '{' *> manyTill block (char '}')))
   , ("verb", doverb)
   , ("lstinline", doverb)
+  , ("Verb", doverb)
   , ("texttt", (code . stringify . toList) <$> tok)
   , ("url", (unescapeURL <$> braced) >>= \url ->
        pure (link url "" (str url)))
@@ -527,9 +542,7 @@ inNote ils =
 
 unescapeURL :: String -> String
 unescapeURL ('\\':x:xs) | isEscapable x = x:unescapeURL xs
-  where isEscapable '%' = True
-        isEscapable '#' = True
-        isEscapable _   = False
+  where isEscapable c = c `elem` "#$%&~_^\\{}"
 unescapeURL (x:xs) = x:unescapeURL xs
 unescapeURL [] = ""
 
@@ -756,7 +769,7 @@ inlineText :: LP Inlines
 inlineText = str <$> many1 inlineChar
 
 inlineChar :: LP Char
-inlineChar = noneOf "\\$%^_&~#{}^'`-[] \t\n"
+inlineChar = noneOf "\\$%^_&~#{}^'`\"‘’“”-[] \t\n"
 
 environment :: LP Blocks
 environment = do
@@ -861,9 +874,8 @@ verbatimEnv = do
   (_,r) <- withRaw $ do
              controlSeq "begin"
              name <- braced
-             guard $ name == "verbatim" || name == "Verbatim" ||
-                     name == "lstlisting" || name == "minted" ||
-                     name == "alltt"
+             guard $ name `elem` ["verbatim", "Verbatim", "lstlisting",
+                                  "minted", "alltt"]
              verbEnv name
   rest <- getInput
   return (r,rest)
@@ -1039,14 +1051,14 @@ paragraph = do
 preamble :: LP Blocks
 preamble = mempty <$> manyTill preambleBlock beginDoc
   where beginDoc = lookAhead $ controlSeq "begin" *> string "{document}"
-        preambleBlock =  (mempty <$ comment)
-                     <|> (mempty <$ sp)
-                     <|> (mempty <$ blanklines)
-                     <|> (mempty <$ macro)
-                     <|> blockCommand
-                     <|> (mempty <$ anyControlSeq)
-                     <|> (mempty <$ braced)
-                     <|> (mempty <$ anyChar)
+        preambleBlock =  (void comment)
+                     <|> (void sp)
+                     <|> (void blanklines)
+                     <|> (void macro)
+                     <|> (void blockCommand)
+                     <|> (void anyControlSeq)
+                     <|> (void braced)
+                     <|> (void anyChar)
 
 -------
 
@@ -1067,6 +1079,7 @@ simpleCiteArgs = try $ do
   first  <- optionMaybe $ toList <$> opt
   second <- optionMaybe $ toList <$> opt
   char '{'
+  optional sp
   keys <- manyTill citationLabel (char '}')
   let (pre, suf) = case (first  , second ) of
         (Just s , Nothing) -> (mempty, s )
@@ -1082,18 +1095,24 @@ simpleCiteArgs = try $ do
   return $ addPrefix pre $ addSuffix suf $ map conv keys
 
 citationLabel :: LP String
-citationLabel  = trim <$>
-  (many1 (satisfy $ \c -> c /=',' && c /='}') <* optional (char ',') <* optional sp)
+citationLabel  = optional sp *>
+  (many1 (satisfy isBibtexKeyChar)
+          <* optional sp
+          <* optional (char ',')
+          <* optional sp)
+  where isBibtexKeyChar c = isAlphaNum c || c `elem` ".:;?!`'()/*@_+=-[]*"
 
 cites :: CitationMode -> Bool -> LP [Citation]
 cites mode multi = try $ do
   cits <- if multi
              then many1 simpleCiteArgs
              else count 1 simpleCiteArgs
-  let (c:cs) = concat cits
+  let cs = concat cits
   return $ case mode of
-        AuthorInText   -> c {citationMode = mode} : cs
-        _              -> map (\a -> a {citationMode = mode}) (c:cs)
+        AuthorInText -> case cs of
+                             (c:rest) -> c {citationMode = mode} : rest
+                             []       -> []
+        _            -> map (\a -> a {citationMode = mode}) cs
 
 citation :: String -> CitationMode -> Bool -> LP Inlines
 citation name mode multi = do

@@ -1,4 +1,5 @@
-{-# LANGUAGE RelaxedPolyRec #-} -- needed for inlinesBetween on GHC < 7
+{-# LANGUAGE RelaxedPolyRec, FlexibleInstances, TypeSynonymInstances #-}
+-- RelaxedPolyRec needed for inlinesBetween on GHC < 7
 {-
   Copyright (C) 2012 John MacFarlane <jgm@berkeley.edu>
 
@@ -43,7 +44,7 @@ import Text.Pandoc.Readers.HTML ( htmlTag, isBlockTag, isCommentTag )
 import Text.Pandoc.XML ( fromEntities )
 import Text.Pandoc.Parsing hiding ( nested )
 import Text.Pandoc.Walk ( walk )
-import Text.Pandoc.Shared ( stripTrailingNewlines, safeRead, stringify )
+import Text.Pandoc.Shared ( stripTrailingNewlines, safeRead, stringify, trim )
 import Data.Monoid (mconcat, mempty)
 import Control.Applicative ((<$>), (<*), (*>), (<$))
 import Control.Monad
@@ -51,7 +52,9 @@ import Data.List (intersperse, intercalate, isPrefixOf )
 import Text.HTML.TagSoup
 import Data.Sequence (viewl, ViewL(..), (<|))
 import qualified Data.Foldable as F
+import qualified Data.Map as M
 import Data.Char (isDigit, isSpace)
+import Data.Maybe (fromMaybe)
 
 -- | Read mediawiki from an input string and return a Pandoc document.
 readMediaWiki :: ReaderOptions -- ^ Reader options
@@ -62,6 +65,8 @@ readMediaWiki opts s =
                                        , mwMaxNestingLevel = 4
                                        , mwNextLinkNumber  = 1
                                        , mwCategoryLinks = []
+                                       , mwHeaderMap = M.empty
+                                       , mwIdentifierList = []
                                        }
        "source" (s ++ "\n") of
           Left err'    -> error $ "\nError:\n" ++ show err'
@@ -71,9 +76,22 @@ data MWState = MWState { mwOptions         :: ReaderOptions
                        , mwMaxNestingLevel :: Int
                        , mwNextLinkNumber  :: Int
                        , mwCategoryLinks   :: [Inlines]
+                       , mwHeaderMap       :: M.Map Inlines String
+                       , mwIdentifierList  :: [String]
                        }
 
 type MWParser = Parser [Char] MWState
+
+instance HasReaderOptions MWParser where
+  askReaderOption f = (f . mwOptions) `fmap` getState
+
+instance HasHeaderMap MWParser where
+  getHeaderMap      = fmap mwHeaderMap getState
+  putHeaderMap hm   = updateState $ \st -> st{ mwHeaderMap = hm }
+
+instance HasIdentifierList MWParser where
+  getIdentifierList   = fmap mwIdentifierList getState
+  putIdentifierList l = updateState $ \st -> st{ mwIdentifierList = l }
 
 --
 -- auxiliary functions
@@ -187,7 +205,7 @@ table = do
   tableStart
   styles <- option [] parseAttrs <* blankline
   let tableWidth = case lookup "width" styles of
-                         Just w  -> maybe 1.0 id $ parseWidth w
+                         Just w  -> fromMaybe 1.0 $ parseWidth w
                          Nothing -> 1.0
   caption <- option mempty tableCaption
   optional rowsep
@@ -268,7 +286,7 @@ tableCell = try $ do
                     Just "center" -> AlignCenter
                     _             -> AlignDefault
   let width = case lookup "width" attrs of
-                    Just xs -> maybe 0.0 id $ parseWidth xs
+                    Just xs -> fromMaybe 0.0 $ parseWidth xs
                     Nothing -> 0.0
   return ((align, width), bs)
 
@@ -351,7 +369,8 @@ header = try $ do
   let lev = length eqs
   guard $ lev <= 6
   contents <- trimInlines . mconcat <$> manyTill inline (count lev $ char '=')
-  return $ B.header lev contents
+  attr <- registerHeader nullAttr contents
+  return $ B.headerWith attr lev contents
 
 bulletList :: MWParser Blocks
 bulletList = B.bulletList <$>
@@ -369,7 +388,7 @@ orderedList =
           spaces
           items <- many (listItem '#' <|> li)
           optional (htmlTag (~== TagClose "ol"))
-          let start = maybe 1 id $ safeRead $ fromAttrib "start" tag
+          let start = fromMaybe 1 $ safeRead $ fromAttrib "start" tag
           return $ B.orderedListWith (start, DefaultStyle, DefaultDelim) items
 
 definitionList :: MWParser Blocks
@@ -475,10 +494,10 @@ str :: MWParser Inlines
 str = B.str <$> many1 (noneOf $ specialChars ++ spaceChars)
 
 math :: MWParser Inlines
-math = (B.displayMath <$> try (char ':' >> charsInTags "math"))
-   <|> (B.math <$> charsInTags "math")
-   <|> (B.displayMath <$> try (dmStart *> manyTill anyChar dmEnd))
-   <|> (B.math <$> try (mStart *> manyTill (satisfy (/='\n')) mEnd))
+math = (B.displayMath . trim <$> try (char ':' >> charsInTags "math"))
+   <|> (B.math . trim <$> charsInTags "math")
+   <|> (B.displayMath . trim <$> try (dmStart *> manyTill anyChar dmEnd))
+   <|> (B.math . trim <$> try (mStart *> manyTill (satisfy (/='\n')) mEnd))
  where dmStart = string "\\["
        dmEnd   = try (string "\\]")
        mStart  = string "\\("

@@ -76,9 +76,18 @@ pBody :: TagParser [Block]
 pBody = pInTags "body" block
 
 pHead :: TagParser [Block]
-pHead = pInTags "head" $ pTitle <|> ([] <$ pAnyTag)
+pHead = pInTags "head" $ pTitle <|> pMetaTag <|> ([] <$ pAnyTag)
   where pTitle = pInTags "title" inline >>= setTitle . normalizeSpaces
         setTitle t = [] <$ (updateState $ B.setMeta "title" (B.fromList t))
+        pMetaTag = do
+          mt <- pSatisfy (~== TagOpen "meta" [])
+          let name = fromAttrib "name" mt
+          if null name
+             then return []
+             else do
+               let content = fromAttrib "content" mt
+               updateState $ B.setMeta name (B.text content)
+               return []
 
 block :: TagParser [Block]
 block = choice
@@ -92,6 +101,7 @@ block = choice
             , pHead
             , pBody
             , pPlain
+            , pDiv
             , pRawHtmlBlock
             ]
 
@@ -177,6 +187,13 @@ pRawTag = do
      then return []
      else return $ renderTags' [tag]
 
+pDiv :: TagParser [Block]
+pDiv = try $ do
+  getOption readerParseRaw >>= guard
+  TagOpen _ attr <- lookAhead $ pSatisfy $ tagOpen (=="div") (const True)
+  contents <- pInTags "div" block
+  return [Div (mkAttr attr) contents]
+
 pRawHtmlBlock :: TagParser [Block]
 pRawHtmlBlock = do
   raw <- pHtmlBlock "script" <|> pHtmlBlock "style" <|> pRawTag
@@ -199,7 +216,7 @@ pHeader = try $ do
   let bodyTitle = TagOpen tagtype attr ~== TagOpen "h1" [("class","title")]
   let level = read (drop 1 tagtype)
   contents <- liftM concat $ manyTill inline (pCloses tagtype <|> eof)
-  let ident = maybe "" id $ lookup "id" attr
+  let ident = fromMaybe "" $ lookup "id" attr
   let classes = maybe [] words $ lookup "class" attr
   let keyvals = [(k,v) | (k,v) <- attr, k /= "class", k /= "id"]
   return $ if bodyTitle
@@ -249,7 +266,7 @@ pCol = try $ do
   skipMany pBlank
   return $ case lookup "width" attribs of
            Just x | not (null x) && last x == '%' ->
-             maybe 0.0 id $ safeRead ('0':'.':init x)
+             fromMaybe 0.0 $ safeRead ('0':'.':init x)
            _ -> 0.0
 
 pColgroup :: TagParser [Double]
@@ -295,11 +312,7 @@ pCodeBlock = try $ do
   let result = case reverse result' of
                     '\n':_   -> init result'
                     _        -> result'
-  let attribsId = fromMaybe "" $ lookup "id" attr
-  let attribsClasses = words $ fromMaybe "" $ lookup "class" attr
-  let attribsKV = filter (\(k,_) -> k /= "class" && k /= "id") attr
-  let attribs = (attribsId, attribsClasses, attribsKV)
-  return [CodeBlock attribs result]
+  return [CodeBlock (mkAttr attr) result]
 
 inline :: TagParser [Inline]
 inline = choice
@@ -314,6 +327,7 @@ inline = choice
            , pLink
            , pImage
            , pCode
+           , pSpan
            , pRawHtmlInline
            ]
 
@@ -397,11 +411,14 @@ pCode :: TagParser [Inline]
 pCode = try $ do
   (TagOpen open attr) <- pSatisfy $ tagOpen (`elem` ["code","tt"]) (const True)
   result <- manyTill pAnyTag (pCloses open)
-  let ident = fromMaybe "" $ lookup "id" attr
-  let classes = words $ fromMaybe [] $ lookup "class" attr
-  let rest = filter (\(x,_) -> x /= "id" && x /= "class") attr
-  return [Code (ident,classes,rest)
-         $ intercalate " " $ lines $ innerText result]
+  return [Code (mkAttr attr) $ intercalate " " $ lines $ innerText result]
+
+pSpan :: TagParser [Inline]
+pSpan = try $ do
+  getOption readerParseRaw >>= guard
+  TagOpen _ attr <- lookAhead $ pSatisfy $ tagOpen (=="span") (const True)
+  contents <- pInTags "span" inline
+  return [Span (mkAttr attr) contents]
 
 pRawHtmlInline :: TagParser [Inline]
 pRawHtmlInline = do
@@ -459,7 +476,13 @@ pBlank = try $ do
 
 pTagContents :: Parser [Char] ParserState Inline
 pTagContents =
-  pStr <|> pSpace <|> smartPunctuation pTagContents <|> pSymbol <|> pBad
+      Math InlineMath  `fmap` mathInline
+  <|> Math (DisplayMath nullAttr) `fmap` mathDisplay
+  <|> pStr
+  <|> pSpace
+  <|> smartPunctuation pTagContents
+  <|> pSymbol
+  <|> pBad
 
 pStr :: Parser [Char] ParserState Inline
 pStr = do
@@ -474,6 +497,7 @@ isSpecial '"' = True
 isSpecial '\'' = True
 isSpecial '.' = True
 isSpecial '-' = True
+isSpecial '$' = True
 isSpecial '\8216' = True
 isSpecial '\8217' = True
 isSpecial '\8220' = True
@@ -549,7 +573,7 @@ blockHtmlTags = ["address", "article", "aside", "blockquote", "body", "button", 
                  "noframes", "noscript", "object", "ol", "output", "p", "pre", "progress",
                  "section", "table", "tbody", "textarea", "thead", "tfoot", "ul", "dd",
                  "dt", "frameset", "li", "tbody", "td", "tfoot",
-                 "th", "thead", "tr", "script", "style", "video"]
+                 "th", "thead", "tr", "script", "style", "svg", "video"]
 
 -- We want to allow raw docbook in markdown documents, so we
 -- include docbook block tags here too.
@@ -648,3 +672,10 @@ htmlTag f = try $ do
        _            -> do
           rendered <- manyTill anyChar (char '>')
           return (next, rendered ++ ">")
+
+mkAttr :: [(String, String)] -> Attr
+mkAttr attr = (attribsId, attribsClasses, attribsKV)
+  where attribsId = fromMaybe "" $ lookup "id" attr
+        attribsClasses = words $ fromMaybe "" $ lookup "class" attr
+        attribsKV = filter (\(k,_) -> k /= "class" && k /= "id") attr
+

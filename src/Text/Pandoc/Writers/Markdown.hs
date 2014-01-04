@@ -45,9 +45,9 @@ import Text.Pandoc.Pretty
 import Control.Monad.State
 import qualified Data.Set as Set
 import Text.Pandoc.Writers.HTML (writeHtmlString)
-import Text.Pandoc.Readers.TeXMath (readTeXMath)
+import Text.Pandoc.Readers.TeXMath (readTeXMath')
 import Text.HTML.TagSoup (renderTags, parseTags, isTagText, Tag(..))
-import Network.URI (isAbsoluteURI)
+import Network.URI (isURI)
 import Data.Default
 import Data.Yaml (Value(Object,String,Array,Bool,Number))
 import qualified Data.HashMap.Strict as H
@@ -338,7 +338,7 @@ blockToMarkdown opts (RawBlock f str)
        else return $ if isEnabled Ext_markdown_attribute opts
                         then text (addMarkdownAttribute str) <> text "\n"
                         else text str <> text "\n"
-  | f == "latex" || f == "tex" || f == "markdown" = do
+  | f `elem` ["latex", "tex", "markdown"] = do
     st <- get
     if stPlain st
        then return empty
@@ -381,13 +381,11 @@ blockToMarkdown opts (CodeBlock (_,classes,_) str)
     isEnabled Ext_literate_haskell opts =
   return $ prefixed "> " (text str) <> blankline
 blockToMarkdown opts (CodeBlock attribs str) = return $
-  case attribs of
-     x | x /= nullAttr && isEnabled Ext_fenced_code_blocks opts ->
-          tildes <> " " <> attrs <> cr <> text str <>
-           cr <> tildes <> blankline
-     (_,(cls:_),_) | isEnabled Ext_backtick_code_blocks opts ->
-          backticks <> " " <> text cls <> cr <> text str <>
-           cr <> backticks <> blankline
+  case attribs == nullAttr of
+     False | isEnabled Ext_backtick_code_blocks opts ->
+          backticks <> attrs <> cr <> text str <> cr <> backticks <> blankline
+           | isEnabled Ext_fenced_code_blocks opts ->
+          tildes <> attrs <> cr <> text str <> cr <> tildes <> blankline
      _ -> nest (writerTabStop opts) (text str) <> blankline
    where tildes    = text $ case [ln | ln <- lines str, all (=='~') ln] of
                                [] -> "~~~~"
@@ -396,8 +394,10 @@ blockToMarkdown opts (CodeBlock attribs str) = return $
                                             | otherwise -> replicate (n+1) '~'
          backticks = text "```"
          attrs  = if isEnabled Ext_fenced_code_attributes opts
-                     then nowrap $ attrsToMarkdown attribs
-                     else empty
+                     then nowrap $ " " <> attrsToMarkdown attribs
+                     else case attribs of
+                                (_,[cls],_) -> " " <> text cls
+                                _           -> empty
 blockToMarkdown opts (BlockQuote blocks) = do
   st <- get
   -- if we're writing literate haskell, put a space before the bird tracks
@@ -555,7 +555,14 @@ bulletListItemToMarkdown opts items = do
   contents <- blockListToMarkdown opts items
   let sps = replicate (writerTabStop opts - 2) ' '
   let start = text ('-' : ' ' : sps)
-  return $ hang (writerTabStop opts) start $ contents <> cr
+  -- remove trailing blank line if it is a tight list
+  let contents' = case reverse items of
+                       (BulletList xs:_) | isTightList xs ->
+                            chomp contents <> cr
+                       (OrderedList _ xs:_) | isTightList xs ->
+                            chomp contents <> cr
+                       _ -> contents
+  return $ hang (writerTabStop opts) start $ contents' <> cr
 
 -- | Convert ordered list item (a list of blocks) to markdown.
 orderedListItemToMarkdown :: WriterOptions -- ^ options
@@ -621,10 +628,11 @@ getReference label (src, tit) = do
     Nothing       -> do
       let label' = case find ((== label) . fst) (stRefs st) of
                       Just _ -> -- label is used; generate numerical label
-                                 case find (\n -> not (any (== [Str (show n)])
-                                           (map fst (stRefs st)))) [1..(10000 :: Integer)] of
-                                      Just x  -> [Str (show x)]
-                                      Nothing -> error "no unique label"
+                             case find (\n -> notElem [Str (show n)]
+                                                      (map fst (stRefs st)))
+                                       [1..(10000 :: Integer)] of
+                                  Just x  -> [Str (show x)]
+                                  Nothing -> error "no unique label"
                       Nothing -> label
       modify (\s -> s{ stRefs = (label', (src,tit)) : stRefs st })
       return label'
@@ -642,8 +650,11 @@ escapeSpaces x = x
 -- | Convert Pandoc inline element to markdown.
 inlineToMarkdown :: WriterOptions -> Inline -> State WriterState Doc
 inlineToMarkdown opts (Span attrs ils) = do
+  st <- get
   contents <- inlineListToMarkdown opts ils
-  return $ tagWithAttrs "span" attrs <> contents <> text "</span>"
+  return $ if stPlain st
+              then contents
+              else tagWithAttrs "span" attrs <> contents <> text "</span>"
 inlineToMarkdown opts (Emph lst) = do
   contents <- inlineListToMarkdown opts lst
   return $ "*" <> contents <> "*"
@@ -699,8 +710,8 @@ inlineToMarkdown opts (Math InlineMath str)
       return $ "\\\\(" <> text str <> "\\\\)"
   | isEnabled Ext_tex_math_double_backtick opts =
       return $ "``" <> text (trim str) <> "``"
-  | otherwise = inlineListToMarkdown opts $ readTeXMath str
-inlineToMarkdown opts (Math (DisplayMath _) str)
+  | otherwise = inlineListToMarkdown opts $ readTeXMath' InlineMath str
+inlineToMarkdown opts (Math (DisplayMath a) str)
   | isEnabled Ext_tex_math_dollars opts =
       return $ "$$" <> text str <> "$$"
   | isEnabled Ext_tex_math_single_backslash opts =
@@ -708,7 +719,7 @@ inlineToMarkdown opts (Math (DisplayMath _) str)
   | isEnabled Ext_tex_math_double_backslash opts =
       return $ "\\\\[" <> text str <> "\\\\]"
   | otherwise = (\x -> cr <> x <> cr) `fmap`
-        inlineListToMarkdown opts (readTeXMath str)
+        inlineListToMarkdown opts (readTeXMath' (DisplayMath a) str)
 inlineToMarkdown opts (RawInline f str)
   | f == "html" || f == "markdown" ||
     (isEnabled Ext_raw_tex opts && (f == "latex" || f == "tex")) =
@@ -755,7 +766,7 @@ inlineToMarkdown opts (Link txt (src, tit)) = do
                      then empty
                      else text $ " \"" ++ tit ++ "\""
   let srcSuffix = if isPrefixOf "mailto:" src then drop 7 src else src
-  let useAuto = isAbsoluteURI src &&
+  let useAuto = isURI src &&
                 case txt of
                       [Str s] | escapeURI s == srcSuffix -> True
                       _                                  -> False

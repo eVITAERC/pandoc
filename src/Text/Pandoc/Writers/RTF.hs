@@ -40,7 +40,7 @@ import Data.Char ( ord, chr, isDigit, toLower )
 import System.FilePath ( takeExtension )
 import qualified Data.ByteString as B
 import Text.Printf ( printf )
-import Network.URI ( isAbsoluteURI, unEscapeString )
+import Network.URI ( isURI, unEscapeString )
 import qualified Control.Exception as E
 
 -- | Convert Image inlines into a raw RTF embedded image, read from a file.
@@ -48,7 +48,7 @@ import qualified Control.Exception as E
 rtfEmbedImage :: Inline -> IO Inline
 rtfEmbedImage x@(Image _ (src,_)) = do
   let ext = map toLower (takeExtension src)
-  if ext `elem` [".jpg",".jpeg",".png"] && not (isAbsoluteURI src)
+  if ext `elem` [".jpg",".jpeg",".png"] && not (isURI src)
      then do
        let src' = unEscapeString src
        imgdata <- E.catch (B.readFile src')
@@ -324,7 +324,7 @@ inlineToRTF (Quoted DoubleQuote lst) =
   "\\u8220\"" ++ (inlineListToRTF lst) ++ "\\u8221\""
 inlineToRTF (Code _ str) = "{\\f1 " ++ (codeStringToRTF str) ++ "}"
 inlineToRTF (Str str) = stringToRTF str
-inlineToRTF (Math _ str) = inlineListToRTF $ readTeXMath str
+inlineToRTF (Math t str) = inlineListToRTF $ readTeXMath' t str
 inlineToRTF (Cite _ lst) = inlineListToRTF lst
 inlineToRTF (RawInline f str)
   | f == Format "rtf" = str

@@ -38,7 +38,7 @@ import Text.Pandoc.Writers.Shared
 import Text.Pandoc.Templates (renderTemplate')
 import Text.Pandoc.Builder (deleteMeta)
 import Data.List ( isPrefixOf, intersperse, transpose )
-import Network.URI (isAbsoluteURI)
+import Network.URI (isURI)
 import Text.Pandoc.Pretty
 import Control.Monad.State
 import Control.Applicative ( (<$>) )
@@ -287,7 +287,7 @@ definitionListItemToRST (label, defs) = do
   label' <- inlineListToRST label
   contents <- liftM vcat $ mapM blockListToRST defs
   tabstop <- get >>= (return . writerTabStop . stOptions)
-  return $ label' $$ nest tabstop (contents <> cr)
+  return $ label' $$ nest tabstop (nestle contents <> cr)
 
 -- | Convert list of Pandoc block elements to RST.
 blockListToRST :: [Block]       -- ^ List of block elements
@@ -296,8 +296,14 @@ blockListToRST blocks = mapM blockToRST blocks >>= return . vcat
 
 -- | Convert list of Pandoc inline elements to RST.
 inlineListToRST :: [Inline] -> State WriterState Doc
-inlineListToRST lst = mapM inlineToRST (insertBS lst) >>= return . hcat
-  where insertBS :: [Inline] -> [Inline] -- insert '\ ' where needed
+inlineListToRST lst =
+  mapM inlineToRST (removeSpaceAfterDisplayMath $ insertBS lst) >>= return . hcat
+  where -- remove spaces after displaymath, as they screw up indentation:
+        removeSpaceAfterDisplayMath (Math (DisplayMath a) x : zs) =
+              Math (DisplayMath a) x : dropWhile (==Space) zs
+        removeSpaceAfterDisplayMath (x:xs) = x : removeSpaceAfterDisplayMath xs
+        removeSpaceAfterDisplayMath [] = []
+        insertBS :: [Inline] -> [Inline] -- insert '\ ' where needed
         insertBS (x:y:z:zs)
           | isComplex y && surroundComplex x z =
              x : y : RawInline "rst" "\\ " : insertBS (z:zs)
@@ -387,7 +393,7 @@ inlineToRST (LineBreak) = return cr -- there's no line break in RST (see Para)
 inlineToRST Space = return space
 -- autolink
 inlineToRST (Link [Str str] (src, _))
-  | isAbsoluteURI src &&
+  | isURI src &&
     if "mailto:" `isPrefixOf` src
        then src == escapeURI ("mailto:" ++ str)
        else src == escapeURI str = do

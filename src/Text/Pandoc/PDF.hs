@@ -41,6 +41,7 @@ import System.Directory
 import System.Environment
 import Control.Monad (unless)
 import Data.List (isInfixOf)
+import Data.Maybe (fromMaybe)
 import qualified Data.ByteString.Base64 as B64
 import qualified Text.Pandoc.UTF8 as UTF8
 import Text.Pandoc.Definition
@@ -87,7 +88,7 @@ handleImage' baseURL tmpdir (Image ils (src,tit)) = do
          res <- fetchItem baseURL src
          case res of
               Right (contents, Just mime) -> do
-                let ext = maybe (takeExtension src) id $
+                let ext = fromMaybe (takeExtension src) $
                           extensionFromMimeType mime
                 let basename = UTF8.toString $ B64.encode $ UTF8.fromString src
                 let fname = tmpdir </> basename <.> ext
@@ -107,7 +108,7 @@ tex2pdf' tmpDir program source = do
                    then 3  -- to get page numbers
                    else 2  -- 1 run won't give you PDF bookmarks
   (exit, log', mbPdf) <- runTeXProgram program numruns tmpDir source
-  let msg = "Error producing PDF from TeX source."
+  let msg = "Error producing PDF from TeX source.\n"
   case (exit, mbPdf) of
        (ExitFailure _, _)      -> do
           let logmsg = extractMsg log'
@@ -116,7 +117,7 @@ tex2pdf' tmpDir program source = do
                      x | "! Package inputenc Error" `BC.isPrefixOf` x ->
                            "\nTry running pandoc with --latex-engine=xelatex."
                      _ -> ""
-          return $ Left $ msg <> "\n" <> extractMsg log' <> extramsg
+          return $ Left $ msg <> logmsg <> extramsg
        (ExitSuccess, Nothing)  -> return $ Left msg
        (ExitSuccess, Just pdf) -> return $ Right pdf
 

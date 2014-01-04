@@ -40,7 +40,8 @@ getMimeType f = M.lookup (map toLower $ drop 1 $ takeExtension f) mimeTypes
   where mimeTypes = M.fromList mimeTypesList
 
 extensionFromMimeType :: String -> Maybe String
-extensionFromMimeType mimetype = M.lookup mimetype reverseMimeTypes
+extensionFromMimeType mimetype = M.lookup (takeWhile (/=';') mimetype) reverseMimeTypes
+  -- note:  we just look up the basic mime type, dropping the content-encoding etc.
   where reverseMimeTypes = M.fromList $ map (\(k,v) -> (v,k)) mimeTypesList
 
 mimeTypesList :: [(String, String)]
@@ -219,6 +220,7 @@ mimeTypesList = -- List borrowed from happstack-server.
            ,("jnlp","application/x-java-jnlp-file")
            ,("jpe","image/jpeg")
            ,("jpeg","image/jpeg")
+           ,("jfif","image/jpeg")
            ,("jpg","image/jpeg")
            ,("js","application/x-javascript")
            ,("kar","audio/midi")
