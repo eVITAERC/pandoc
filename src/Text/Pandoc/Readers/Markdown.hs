@@ -215,10 +215,10 @@ pandocTitleBlock = try $ do
                  author' <- author
                  date' <- date
                  return $
-                   ( if B.isNull title' then id else B.setMeta "title" title'
-                   . if null author' then id else B.setMeta "author" author'
-                   . if B.isNull date' then id else B.setMeta "date" date' )
-                   nullMeta
+                     (if B.isNull title' then id else B.setMeta "title" title')
+                   . (if null author' then id else B.setMeta "author" author')
+                   . (if B.isNull date' then id else B.setMeta "date" date')
+                   $ nullMeta
   updateState $ \st -> st{ stateMeta' = stateMeta' st <> meta' }
 
 yamlMetaBlock :: MarkdownParser (F Blocks)
@@ -227,6 +227,7 @@ yamlMetaBlock = try $ do
   pos <- getPosition
   string "---"
   blankline
+  notFollowedBy blankline  -- if --- is followed by a blank it's an HRULE
   rawYamlLines <- manyTill anyLine stopLine
   -- by including --- and ..., we allow yaml blocks with just comments:
   let rawYaml = unlines ("---" : (rawYamlLines ++ ["..."]))
@@ -443,6 +444,9 @@ block = choice [ mempty <$ blanklines
                , codeBlockFenced
                , yamlMetaBlock
                , guardEnabled Ext_latex_macros *> (macro >>= return . return)
+               -- note: bulletList needs to be before header because of
+               -- the possibility of empty list items: -
+               , bulletList
                , header
                , lhsCodeBlock
                , rawTeXBlock
@@ -453,7 +457,6 @@ block = choice [ mempty <$ blanklines
                , codeBlockIndented
                , blockQuote
                , hrule
-               , bulletList
                , orderedList
                , definitionList
                , noteBlock
@@ -698,7 +701,7 @@ bulletListStart = try $ do
   skipNonindentSpaces
   notFollowedBy' (() <$ hrule)     -- because hrules start out just like lists
   satisfy isBulletListMarker
-  spaceChar
+  spaceChar <|> lookAhead newline
   skipSpaces
 
 anyOrderedListStart :: MarkdownParser (Int, ListNumberStyle, ListNumberDelim)
@@ -726,11 +729,15 @@ listStart = bulletListStart <|> (anyOrderedListStart >> return ())
 -- parse a line of a list item (start = parser for beginning of list item)
 listLine :: MarkdownParser String
 listLine = try $ do
-  notFollowedBy blankline
   notFollowedBy' (do indentSpaces
-                     many (spaceChar)
+                     many spaceChar
                      listStart)
-  chunks <- manyTill (liftM snd (htmlTag isCommentTag) <|> count 1 anyChar) newline
+  notFollowedBy' $ htmlTag (~== TagClose "div")
+  chunks <- manyTill
+              (  many1 (satisfy $ \c -> c /= '\n' && c /= '<')
+             <|> liftM snd (htmlTag isCommentTag)
+             <|> count 1 anyChar
+              ) newline
   return $ concat chunks
 
 -- parse raw text for one list item, excluding start marker and continuations
@@ -739,7 +746,7 @@ rawListItem :: MarkdownParser a
 rawListItem start = try $ do
   start
   first <- listLine
-  rest <- many (notFollowedBy listStart >> listLine)
+  rest <- many (notFollowedBy listStart >> notFollowedBy blankline >> listLine)
   blanks <- many blankline
   return $ unlines (first:rest) ++ blanks
 
@@ -757,6 +764,7 @@ listContinuationLine :: MarkdownParser String
 listContinuationLine = try $ do
   notFollowedBy blankline
   notFollowedBy' listStart
+  notFollowedBy' $ htmlTag (~== TagClose "div")
   optional indentSpaces
   result <- anyLine
   return $ result ++ "\n"
@@ -781,8 +789,8 @@ listItem start = try $ do
 orderedList :: MarkdownParser (F Blocks)
 orderedList = try $ do
   (start, style, delim) <- lookAhead anyOrderedListStart
-  unless ((style == DefaultStyle || style == Decimal || style == Example) &&
-          (delim == DefaultDelim || delim == Period)) $
+  unless (style `elem` [DefaultStyle, Decimal, Example] &&
+          delim `elem` [DefaultDelim, Period]) $
     guardEnabled Ext_fancy_lists
   when (style == Example) $ guardEnabled Ext_example_lists
   items <- fmap sequence $ many1 $ listItem
@@ -894,7 +902,9 @@ plain = fmap B.plain . trimInlinesF . mconcat <$> many1 inline
 --
 
 htmlElement :: MarkdownParser String
-htmlElement = strictHtmlBlock <|> liftM snd (htmlTag isBlockTag)
+htmlElement = rawVerbatimBlock
+          <|> strictHtmlBlock
+          <|> liftM snd (htmlTag isBlockTag)
 
 htmlBlock :: MarkdownParser (F Blocks)
 htmlBlock = do
@@ -915,8 +925,8 @@ strictHtmlBlock = htmlInBalanced (not . isInlineTag)
 
 rawVerbatimBlock :: MarkdownParser String
 rawVerbatimBlock = try $ do
-  (TagOpen tag _, open) <- htmlTag (tagOpen (\t ->
-                              t == "pre" || t == "style" || t == "script")
+  (TagOpen tag _, open) <- htmlTag (tagOpen (flip elem
+                                                  ["pre", "style", "script"])
                               (const True))
   contents <- manyTill anyChar (htmlTag (~== TagClose tag))
   return $ open ++ contents ++ renderTags [TagClose tag]
@@ -1404,39 +1414,6 @@ math :: MarkdownParser (F Inlines)
 math =  (return . B.displayMath <$> (mathDisplay >>= applyMacros'))
      <|> (return . B.math <$> (mathInline >>= applyMacros'))
 
-mathDisplay :: MarkdownParser String
-mathDisplay =
-      (guardEnabled Ext_tex_math_dollars >> mathDisplayWith "$$" "$$")
-  <|> (guardEnabled Ext_tex_math_single_backslash >>
-       mathDisplayWith "\\[" "\\]")
-  <|> (guardEnabled Ext_tex_math_double_backslash >>
-       mathDisplayWith "\\\\[" "\\\\]")
-
-mathDisplayWith :: String -> String -> MarkdownParser String
-mathDisplayWith op cl = try $ do
-  string op
-  many1Till (noneOf "\n" <|> (newline >>~ notFollowedBy' blankline)) (try $ string cl)
-
-mathInline :: MarkdownParser String
-mathInline =
-      (guardEnabled Ext_tex_math_dollars >> mathInlineWith "$" "$")
-  <|> (guardEnabled Ext_tex_math_single_backslash >>
-       mathInlineWith "\\(" "\\)")
-  <|> (guardEnabled Ext_tex_math_double_backslash >>
-       mathInlineWith "\\\\(" "\\\\)")
-
-mathInlineWith :: String -> String -> MarkdownParser String
-mathInlineWith op cl = try $ do
-  string op
-  notFollowedBy space
-  words' <- many1Till (count 1 (noneOf "\n\\")
-                   <|> (char '\\' >> anyChar >>= \c -> return ['\\',c])
-                   <|> count 1 newline <* notFollowedBy' blankline
-                       *> return " ")
-              (try $ string cl)
-  notFollowedBy digit  -- to prevent capture of $5
-  return $ concat words'
-
 -- Parses material enclosed in *s, **s, _s, or __s.
 -- Designed to avoid backtracking.
 enclosure :: Char
@@ -1453,6 +1430,7 @@ enclosure c = do
 -- Parse inlines til you hit one c or a sequence of two cs.
 -- If one c, emit emph and then parse two.
 -- If two cs, emit strong and then parse one.
+-- Otherwise, emit ccc then the results.
 three :: Char -> MarkdownParser (F Inlines)
 three c = do
   contents <- mconcat <$> many (notFollowedBy (char c) >> inline)
@@ -1477,7 +1455,7 @@ one c prefix' = do
   contents <- mconcat <$> many (  (notFollowedBy (char c) >> inline)
                            <|> try (string [c,c] >>
                                     notFollowedBy (char c) >>
-                                    two c prefix') )
+                                    two c mempty) )
   (char c >> return (B.emph <$> (prefix' <> contents)))
     <|> return (return (B.str [c]) <> (prefix' <> contents))
 
@@ -1744,7 +1722,7 @@ spanHtml = try $ do
   guardEnabled Ext_markdown_in_html_blocks
   (TagOpen _ attrs, _) <- htmlTag (~== TagOpen "span" [])
   contents <- mconcat <$> manyTill inline (htmlTag (~== TagClose "span"))
-  let ident = maybe "" id $ lookup "id" attrs
+  let ident = fromMaybe "" $ lookup "id" attrs
   let classes = maybe [] words $ lookup "class" attrs
   let keyvals = [(k,v) | (k,v) <- attrs, k /= "id" && k /= "class"]
   return $ B.spanWith (ident, classes, keyvals) <$> contents
@@ -1754,7 +1732,7 @@ divHtml = try $ do
   guardEnabled Ext_markdown_in_html_blocks
   (TagOpen _ attrs, _) <- htmlTag (~== TagOpen "div" [])
   contents <- mconcat <$> manyTill block (htmlTag (~== TagClose "div"))
-  let ident = maybe "" id $ lookup "id" attrs
+  let ident = fromMaybe "" $ lookup "id" attrs
   let classes = maybe [] words $ lookup "class" attrs
   let keyvals = [(k,v) | (k,v) <- attrs, k /= "id" && k /= "class"]
   return $ B.divWith (ident, classes, keyvals) <$> contents
