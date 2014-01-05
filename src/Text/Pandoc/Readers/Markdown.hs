@@ -1431,7 +1431,14 @@ inlineCodeDelimiter =
 math :: MarkdownParser (F Inlines)
 math =  (return . B.displayMath <$> (mathDisplay >>= applyMacros'))
      <|> (return . B.math <$> (mathInline >>= applyMacros'))
+     <|> (return . B.math <$> (mathInlineWithBacktick >>= applyMacros'))
 
+-- InlineMath delimted by double backticks
+mathInlineWithBacktick :: MarkdownParser String
+mathInlineWithBacktick = guardEnabled Ext_tex_math_double_backtick >>
+                           mathInlineWith "``" "``"
+
+-- DisplayMath blocks with attributes inside a fenced code block
 -- only match if class of fenced code block starts with math
 mathDisplayFenced :: MarkdownParser (F Inlines)
 mathDisplayFenced = try $ do

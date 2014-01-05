@@ -50,6 +50,7 @@ module Text.Pandoc.Parsing ( (>>~),
                              uri,
                              mathInline,
                              mathDisplay,
+                             mathInlineWith,
                              withHorizDisplacement,
                              withRaw,
                              escaped,
@@ -489,8 +490,6 @@ mathInline =
        mathInlineWith "\\(" "\\)")
   <|> (guardEnabled Ext_tex_math_double_backslash >>
        mathInlineWith "\\\\(" "\\\\)")
-  <|> (guardEnabled Ext_tex_math_double_backtick >>
-       mathDisplayWith "``" "``")
 
 -- | Applies a parser, returns tuple of its results and its horizontal
 -- displacement (the difference between the source column at the end
