@@ -124,7 +124,12 @@ opfName n = QName n Nothing (Just "opf")
 
 plainify :: [Inline] -> String
 plainify t =
-  trimr $ writePlain def{ writerStandalone = False } $ Pandoc nullMeta [Plain t]
+  trimr $ writePlain def{ writerStandalone = False }
+        $ Pandoc nullMeta [Plain $ walk removeNote t]
+
+removeNote :: Inline -> Inline
+removeNote (Note _) = Str ""
+removeNote x        = x
 
 getEPUBMetadata :: WriterOptions -> Meta -> IO EPUBMetadata
 getEPUBMetadata opts meta = do
@@ -404,7 +409,9 @@ writeEPUB opts doc@(Pandoc meta _) = do
             fromMaybe [] mbnum }
         $ case bs of
               (Header _ _ xs : _) ->
-                 Pandoc (setMeta "title" (fromList xs) nullMeta) bs
+                 -- remove notes or we get doubled footnotes
+                 Pandoc (setMeta "title" (walk removeNote $ fromList xs)
+                            nullMeta) bs
               _                   ->
                  Pandoc nullMeta bs
 

@@ -1127,12 +1127,12 @@ multilineTableHeader headless = try $ do
                      then liftM (map (:[]) . tail .
                               splitStringByIndices (init indices)) $ lookAhead anyLine
                      else return $ transpose $ map
-                           (\ln -> tail $ splitStringByIndices (init indices) ln)
+                           (tail . splitStringByIndices (init indices))
                            rawContent
   let aligns   = zipWith alignType rawHeadsList lengths
   let rawHeads = if headless
                     then replicate (length dashes) ""
-                    else map unwords rawHeadsList
+                    else map (unlines . map trim) rawHeadsList
   heads <- fmap sequence $
            mapM (parseFromString (mconcat <$> many plain)) $
              map trim rawHeads
@@ -1189,7 +1189,7 @@ gridTableHeader headless = try $ do
   -- RST does not have a notion of alignments
   let rawHeads = if headless
                     then replicate (length dashes) ""
-                    else map unwords $ transpose
+                    else map (unlines . map trim) $ transpose
                        $ map (gridTableSplitLine indices) rawContent
   heads <- fmap sequence $ mapM (parseFromString parseBlocks . trim) rawHeads
   return (heads, aligns, indices)
@@ -1856,9 +1856,10 @@ citeKey = try $ do
   guard $ lastStrPos /= Just pos
   suppress_author <- option False (char '-' >> return True)
   char '@'
-  first <- letter
-  let internal p = try $ p >>~ lookAhead (letter <|> digit)
-  rest <- many $ letter <|> digit <|> internal (oneOf ":.#$%&-_+?<>~/")
+  first <- letter <|> char '_'
+  let regchar = satisfy (\c -> isAlphaNum c || c == '_')
+  let internal p = try $ p >>~ lookAhead regchar
+  rest <- many $ regchar <|> internal (oneOf ":.#$%&-+?<>~/")
   let key = first:rest
   return (suppress_author, key)
 
