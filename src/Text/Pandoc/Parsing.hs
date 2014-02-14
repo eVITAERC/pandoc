@@ -35,6 +35,7 @@ module Text.Pandoc.Parsing ( (>>~),
                              notFollowedBy',
                              oneOfStrings,
                              oneOfStringsCI,
+                             exactly,
                              spaceChar,
                              nonspaceChar,
                              skipSpaces,
@@ -50,7 +51,8 @@ module Text.Pandoc.Parsing ( (>>~),
                              uri,
                              mathInline,
                              mathDisplay,
-                             mathInlineWith,
+                             mathInlineWith',
+                             mathDisplayWith',
                              withHorizDisplacement,
                              withRaw,
                              escaped,
@@ -266,6 +268,10 @@ oneOfStringsCI = oneOfStrings' ciMatch
                    | isAscii c = c
                    | otherwise = toLower c
 
+-- | Parses an exact number of characters, no more and no less
+exactly :: Int -> Char -> Parser [Char] st [Char]
+exactly cnt ch = count cnt (char ch) >>~ notFollowedBy (char ch)
+
 -- | Parses a space or tab.
 spaceChar :: Parser [Char] st Char
 spaceChar = satisfy $ \c -> c == ' ' || c == '\t'
@@ -458,15 +464,20 @@ uri = try $ do
   let uri' = scheme ++ ":" ++ fromEntities str'
   return (uri', escapeURI uri')
 
+-- | Parse the internal code of an inline math element until it encounters a
+-- successful parse of the specified closing parser.
+mathInlineCodeUntil :: Parser [Char] st String -> Parser [Char] st [String]
+mathInlineCodeUntil cl = many1Till (count 1 (noneOf "\n\\")
+                               <|> (char '\\' >> anyChar >>= \c -> return ['\\',c])
+                               <|> count 1 newline <* notFollowedBy' blankline
+                                   *> return " ")
+                           (try $ cl)
+
 mathInlineWith :: String -> String -> Parser [Char] st String
 mathInlineWith op cl = try $ do
   string op
   notFollowedBy space
-  words' <- many1Till (count 1 (noneOf "\n\\")
-                   <|> (char '\\' >> anyChar >>= \c -> return ['\\',c])
-                   <|> count 1 newline <* notFollowedBy' blankline
-                       *> return " ")
-              (try $ string cl)
+  words' <- mathInlineCodeUntil (string cl)
   notFollowedBy digit  -- to prevent capture of $5
   return $ concat words'
 
@@ -474,6 +485,25 @@ mathDisplayWith :: String -> String -> Parser [Char] st String
 mathDisplayWith op cl = try $ do
   string op
   many1Till (noneOf "\n" <|> (newline >>~ notFollowedBy' blankline)) (try $ string cl)
+
+-- | Generic version of mathInlineWith that takes any opening and closing
+-- parsers instead of just strings.
+mathInlineWith' :: Parser [Char] st String -> Parser [Char] st String
+                -> Parser [Char] st String
+mathInlineWith' op cl = try $ do
+  op
+  notFollowedBy space
+  words' <- mathInlineCodeUntil cl
+  notFollowedBy digit  -- to prevent capture of $5
+  return $ concat words'
+
+-- | Generic version of mathDisplayWith that takes any opening and closing
+-- parsers instead of just strings.
+mathDisplayWith' :: Parser [Char] st String -> Parser [Char] st String
+                 -> Parser [Char] st String
+mathDisplayWith' op cl = try $ do
+  op
+  many1Till (noneOf "\n" <|> (newline >>~ notFollowedBy' blankline)) (try $ cl)
 
 mathDisplay :: Parser [Char] ParserState String
 mathDisplay =

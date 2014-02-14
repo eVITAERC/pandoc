@@ -1422,7 +1422,7 @@ inlineCodeDelimiter =
         (
          try (do{ x <- count 3 (char '`'); xs <- many (char '`'); return (x++xs)}) -- 3 or more backticks
          <|> try (count 2 (char '`') >> (spaceChar <|> newline) >> return "``") -- 2 backtick + whitespace
-         <|> try (string "`" >> notFollowedBy (string "`") >> return "`") -- single backtick
+         <|> try (exactly 1 '`') -- single backtick
         ))
   <|> (guardDisabled Ext_tex_math_double_backtick >> 
        many1 (char '`'))
@@ -1436,7 +1436,7 @@ math =  (return . B.displayMath <$> (mathDisplay >>= applyMacros'))
 -- InlineMath delimted by double backticks
 mathInlineWithBacktick :: MarkdownParser String
 mathInlineWithBacktick = guardEnabled Ext_tex_math_double_backtick >>
-                           mathInlineWith "``" "``"
+                           mathInlineWith' (exactly 2 '`') (exactly 2 '`')
 
 -- DisplayMath blocks with attributes inside a fenced code block
 -- only match if class of fenced code block starts with math
