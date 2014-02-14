@@ -6,6 +6,7 @@ author:
 - name: Second Author
   affiliation: U of Technical
 tags: [test, markdown, scholarly]
+date: January 1, 2000
 ---
 
 # Scholarly Markdown math support
@@ -30,15 +31,23 @@ The following is a displaymath with an aligned environment in a separate paragra
     & \|x\|_2 \le \sigma.
 ```
 
-Here is an align math environment with no identifier, it should not be numbered
+Here is an implicit align math environment consisting of multiple lines of equations with no newline in between, with at least one `&` symbol in the whole expression. It should be in the same paragraph as this one.
 ```math
       \sum_{j_1, j_2, \ldots j_m} \sum_{k_1, k_2, \ldots, k_m} & \widetilde{A}_{j_1,k_1}^{\ast} \widetilde{A}_{j_1,k_2} \tilde{A}_{j_2,k_2}^{\ast} \widetilde{A}_{j_2,k_3}  \ldots \widetilde{A}_{j_m,k_m}^{\ast} \widetilde{A}_{j_m,k_1}
 ```
-```math
+```math #middleAlignMathNumber
      =   \sum_{j_1, j_2, \ldots j_m} \sum_{k_1, k_2, \ldots, k_m} & \left(  R_{\Lambda} T_{k_1}^{\ast} P_{\Omega} T_{j_1} R_{\Lambda}^{\ast} \right) \left(  R_{\Lambda} T_{j_1}^{\ast} P_{\Omega} T_{k_2} R_{\Lambda}^{\ast} \right)   \left(  R_{\Lambda} T_{k_2}^{\ast} P_{\Omega} T_{j_2} R_{\Lambda}^{\ast} \right)
 ```
 ```math
      & \left(  R_{\Lambda} T_{j_2}^{\ast} P_{\Omega} T_{k_3} R_{\Lambda}^{\ast} \right) \ldots \left(  R_{\Lambda} T_{k_m}^{\ast} P_{\Omega} T_{j_m} R_{\Lambda}^{\ast} \right) \left(  R_{\Lambda} T_{j_m}^{\ast} P_{\Omega} T_{k_1} R_{\Lambda}^{\ast} \right).
+```
+
+And here is an implicit gather math environment consisting of multiple lines of equations with no newline in between, with no `&` symbol appearing anywhere:
+```math #firstGatherMathNumber
+A = B
+```
+```math
+AAAAAAA = BBBBBB
 ```
 
 Here are two proposed internal link to the previous math equation.
