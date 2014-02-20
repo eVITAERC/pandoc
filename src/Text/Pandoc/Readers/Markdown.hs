@@ -1400,12 +1400,12 @@ symbol = do
   return $ return $ B.str [result]
 
 -- parses inline code, between n `s and n `s
--- but ignores exactly 2 `s AND NOT followed by whitespace if Ext_tex_math_double_backtick
+-- but ignores exactly 2 `s AND NOT followed by whitespace if Ext_scholarly_markdown
 code :: MarkdownParser (F Inlines)
 code = try $ do
   starts <- inlineCodeDelimiter
   (notFollowedBy (string "math" <|> string " {")
-    <|> guardDisabled Ext_tex_math_fenced_display) -- avoid fenced-codeBlock style displayMath
+    <|> guardDisabled Ext_scholarly_markdown) -- avoid fenced-codeBlock style displayMath
   skipSpaces
   result <- many1Till (many1 (noneOf "`\n") <|> many1 (char '`') <|>
                        (char '\n' >> notFollowedBy' blankline >> return " "))
@@ -1435,14 +1435,14 @@ math =  (return . B.displayMath <$> (mathDisplay >>= applyMacros'))
 
 -- InlineMath delimted by double backticks
 mathInlineWithBacktick :: MarkdownParser String
-mathInlineWithBacktick = guardEnabled Ext_tex_math_double_backtick >>
+mathInlineWithBacktick = guardEnabled Ext_scholarly_markdown >>
                            mathInlineWith' (exactly 2 '`') (exactly 2 '`')
 
 -- DisplayMath blocks with attributes inside a fenced code block
 -- only match if class of fenced code block starts with math
 mathDisplayFenced :: MarkdownParser (F Inlines)
 mathDisplayFenced = try $ do
-  guardEnabled Ext_tex_math_fenced_display
+  guardEnabled Ext_scholarly_markdown
   c <- try (guardEnabled Ext_fenced_code_blocks >> lookAhead (char '~'))
      <|> (guardEnabled Ext_backtick_code_blocks >> lookAhead (char '`'))
   size <- blockDelimiter (== c) Nothing
