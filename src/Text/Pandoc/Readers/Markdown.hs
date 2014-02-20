@@ -1433,32 +1433,6 @@ math =  (return . B.displayMath <$> (mathDisplay >>= applyMacros'))
      <|> (return . B.math <$> (mathInline >>= applyMacros'))
      <|> (return . B.math <$> (mathInlineWithBacktick >>= applyMacros'))
 
--- InlineMath delimted by double backticks
-mathInlineWithBacktick :: MarkdownParser String
-mathInlineWithBacktick = guardEnabled Ext_scholarly_markdown >>
-                           mathInlineWith' (exactly 2 '`') (exactly 2 '`')
-
--- DisplayMath blocks with attributes inside a fenced code block
--- only match if class of fenced code block starts with math
-mathDisplayFenced :: MarkdownParser (F Inlines)
-mathDisplayFenced = try $ do
-  guardEnabled Ext_scholarly_markdown
-  c <- try (guardEnabled Ext_fenced_code_blocks >> lookAhead (char '~'))
-     <|> (guardEnabled Ext_backtick_code_blocks >> lookAhead (char '`'))
-  size <- blockDelimiter (== c) Nothing
-  skipMany spaceChar
-  attr <- option ([],[],[]) $
-            try (guardEnabled Ext_fenced_code_attributes >> attributes)
-           <|> ((\x -> ("",[x],[])) <$> identifier)
-  guard $ classIsMath attr
-  blankline
-  contents <- manyTill anyLine (blockDelimiter (== c) (Just size))
-  return $ return $ B.displayMathWith attr $ intercalate "\n" contents
-
--- true only if some element of classes start with "math"
-classIsMath :: Attr -> Bool
-classIsMath (_,classes,_) = any ("math" `isPrefixOf`) classes
-
 -- Parses material enclosed in *s, **s, _s, or __s.
 -- Designed to avoid backtracking.
 enclosure :: Char
