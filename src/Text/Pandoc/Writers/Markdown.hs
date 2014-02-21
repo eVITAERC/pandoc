@@ -708,7 +708,7 @@ inlineToMarkdown opts (Math InlineMath str)
       return $ "\\(" <> text str <> "\\)"
   | isEnabled Ext_tex_math_double_backslash opts =
       return $ "\\\\(" <> text str <> "\\\\)"
-  | isEnabled Ext_tex_math_double_backtick opts =
+  | isEnabled Ext_scholarly_markdown opts =
       return $ "``" <> text (trim str) <> "``"
   | otherwise = inlineListToMarkdown opts $ readTeXMath' InlineMath str
 inlineToMarkdown opts (Math (DisplayMath a) str)

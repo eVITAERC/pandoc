@@ -1332,15 +1332,15 @@ inline :: MarkdownParser (F Inlines)
 inline = choice [ whitespace
                 , bareURL
                 , str
+                , scholarlyMath -- before endline to accomodate displayMath
                 , endline
                 , code
-                , mathDisplayFenced
                 , strongOrEmph
                 , note
                 , cite
                 , link
                 , image
-                , math -- after code to accomodate backtick delimiter
+                , math
                 , strikeout
                 , subscript
                 , superscript
@@ -1403,9 +1403,7 @@ symbol = do
 -- but ignores exactly 2 `s AND NOT followed by whitespace if Ext_scholarly_markdown
 code :: MarkdownParser (F Inlines)
 code = try $ do
-  starts <- inlineCodeDelimiter
-  (notFollowedBy (string "math" <|> string " {")
-    <|> guardDisabled Ext_scholarly_markdown) -- avoid fenced-codeBlock style displayMath
+  starts <- many1 (char '`')
   skipSpaces
   result <- many1Till (many1 (noneOf "`\n") <|> many1 (char '`') <|>
                        (char '\n' >> notFollowedBy' blankline >> return " "))
@@ -1414,24 +1412,12 @@ code = try $ do
   attr <- option ([],[],[]) (try $ guardEnabled Ext_inline_code_attributes >>
                                    optional whitespace >> attributes)
   return $ return $ B.codeWith attr $ trim $ concat result
-  
-inlineCodeDelimiter :: MarkdownParser String
-inlineCodeDelimiter =
-      -- for Ext_tex_math_double_backtick, ignore two occurances of ``s NOT followed by whitespace
-      (guardEnabled Ext_tex_math_double_backtick >> 
-        (
-         try (do{ x <- count 3 (char '`'); xs <- many (char '`'); return (x++xs)}) -- 3 or more backticks
-         <|> try (count 2 (char '`') >> (spaceChar <|> newline) >> return "``") -- 2 backtick + whitespace
-         <|> try (exactly 1 '`') -- single backtick
-        ))
-  <|> (guardDisabled Ext_tex_math_double_backtick >> 
-       many1 (char '`'))
-  
+
+
 -- Parses plain inline or display math without additional attributes
 math :: MarkdownParser (F Inlines)
 math =  (return . B.displayMath <$> (mathDisplay >>= applyMacros'))
      <|> (return . B.math <$> (mathInline >>= applyMacros'))
-     <|> (return . B.math <$> (mathInlineWithBacktick >>= applyMacros'))
 
 -- Parses material enclosed in *s, **s, _s, or __s.
 -- Designed to avoid backtracking.
@@ -1894,4 +1880,70 @@ doubleQuoted = try $ do
   (withQuoteContext InDoubleQuote $ doubleQuoteEnd >> return
        (fmap B.doubleQuoted . trimInlinesF $ contents))
    <|> (return $ return (B.str "\8220") <> contents)
+
+
+--
+-- Scholarly Markdown extensions
+--
+
+ensureScholarlyMarkdown :: MarkdownParser ()
+ensureScholarlyMarkdown = guardEnabled Ext_scholarly_markdown
+
+--
+-- Scholarly Markdown math extensions
+--
+
+scholarlyMath :: MarkdownParser (F Inlines)
+scholarlyMath = ensureScholarlyMarkdown >>
+     (scholarlyDisplayMath
+      <|> (return . B.math <$> (scholarlyInlineMath >>= applyMacros')))
+
+-- InlineMath delimted by double backticks
+scholarlyInlineMath :: MarkdownParser String
+scholarlyInlineMath = mathInlineWith' (exactly 2 '`') (exactly 2 '`')
+
+-- DisplayMath blocks with attributes inside a fenced code block
+-- only match if class of fenced code block starts with math
+scholarlyDisplayMath :: MarkdownParser (F Inlines)
+scholarlyDisplayMath = try $ do
+  c <- try (guardEnabled Ext_fenced_code_blocks >> lookAhead (char '~'))
+     <|> (guardEnabled Ext_backtick_code_blocks >> lookAhead (char '`'))
+  size <- blockDelimiter (== c) Nothing
+  skipMany spaceChar
+  attr <- option ([],[],[]) $
+            try (guardEnabled Ext_fenced_code_attributes >> attributes)
+           <|> ((\x -> ("",[x],[])) <$> identifier)
+  guard $ classIsMath attr
+  blankline
+  contents <- manyTill anyLine (blockDelimiter (== c) (Just size))
+  return $ return $ B.displayMathWith attr $ intercalate "\n" contents
+
+-- TODO: multilineMath :: ScholarlyParser (F Inlines)
+
+-- TODO: mathDefinitions :: ScholarlyParser (F Inlines)
+
+-- true only if some element of classes start with "math"
+classIsMath :: Attr -> Bool
+classIsMath (_,classes,_) = any ("math" `isPrefixOf`) classes
+
+--
+-- Scholarly Markdown figures
+--
+
+--
+-- Scholarly Markdown numerical cross-references
+--
+
+--
+-- Scholarly Markdown statements
+--
+
+--
+-- Scholarly Markdown algorithm
+--
+
+--
+-- Scholarly Markdown tables
+--
+
 
