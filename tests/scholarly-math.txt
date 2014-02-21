@@ -50,7 +50,8 @@ Here is an implicit align math environment consisting of multiple lines of equat
 
 And here is an implicit gather math environment consisting of multiple lines of equations with no newline in between, with no `&` symbol appearing anywhere:
 
-```math #firstGatherMathNumber
+```math
+    #firstGatherMathNumber
 A = B
 ```
 ```math
@@ -82,7 +83,8 @@ Referencing using the `\ref` tag: Equation [#matheqn1].
 Referencing using the `\eqref` tag: Equation (#middleAlignMathNumber).
 
 Below is more internal vertical alignment tests. The first is one that uses `cases` internally:
-```math #matheqn2
+```math
+#matheqn2
     P_{r-j}=\begin{cases}
     0& \text{if $r-j$ is odd},\\
     r!\,(-1)^{(r-j)/2}& \text{if $r-j$ is even},
