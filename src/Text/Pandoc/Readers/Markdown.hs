@@ -1895,12 +1895,12 @@ ensureScholarlyMarkdown = guardEnabled Ext_scholarly_markdown
 
 scholarlyMath :: MarkdownParser (F Inlines)
 scholarlyMath = ensureScholarlyMarkdown >>
-     (scholarlyDisplayMath
-      <|> (return . B.math <$> (scholarlyInlineMath >>= applyMacros')))
+                  (scholarlyInlineMath <|> scholarlyDisplayMath)
 
 -- InlineMath delimted by double backticks
-scholarlyInlineMath :: MarkdownParser String
-scholarlyInlineMath = mathInlineWith' (exactly 2 '`') (exactly 2 '`')
+scholarlyInlineMath :: MarkdownParser (F Inlines)
+scholarlyInlineMath = return . B.math <$>
+                        mathInlineWith' (exactly 2 '`') (exactly 2 '`')
 
 -- DisplayMath blocks with attributes inside a fenced code block
 -- only match if class of fenced code block starts with math
