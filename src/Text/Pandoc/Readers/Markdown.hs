@@ -1906,13 +1906,23 @@ scholarlyInlineMath = mathInlineWith' (exactly 2 '`') (exactly 2 '`')
 -- only match if class of fenced code block starts with math
 scholarlyDisplayMath :: MarkdownParser (F Inlines)
 scholarlyDisplayMath = try $ do
+  newline
+  optional blankline
+  singleEquation
+
+singleEquation :: MarkdownParser (F Inlines)
+singleEquation = try $ do
   c <- try (guardEnabled Ext_fenced_code_blocks >> lookAhead (char '~'))
      <|> (guardEnabled Ext_backtick_code_blocks >> lookAhead (char '`'))
   size <- blockDelimiter (== c) Nothing
   skipMany spaceChar
   attr <- option ([],[],[]) $
             try (guardEnabled Ext_fenced_code_attributes >> attributes)
-           <|> ((\x -> ("",[x],[])) <$> identifier)
+           <|> do
+               cls <- identifier
+               label <- option "" $ try
+                 (optional blankline >> skipSpaces >> char '#' >> identifier)
+               return $ (label,[cls],[])
   guard $ classIsMath attr
   blankline
   contents <- manyTill anyLine (blockDelimiter (== c) (Just size))
