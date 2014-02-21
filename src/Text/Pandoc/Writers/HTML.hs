@@ -391,8 +391,8 @@ attrsToHtml opts (id',classes',keyvals) =
 imageExts :: [String]
 imageExts = [ "art", "bmp", "cdr", "cdt", "cpt", "cr2", "crw", "djvu", "erf",
               "gif", "ico", "ief", "jng", "jpg", "jpeg", "nef", "orf", "pat", "pbm",
-              "pcx", "pgm", "png", "pnm", "ppm", "psd", "ras", "rgb", "svg", "tiff",
-              "wbmp", "xbm", "xpm", "xwd" ]
+              "pcx", "pdf", "pgm", "png", "pnm", "ppm", "psd", "ras", "rgb", "svg",
+              "tiff", "wbmp", "xbm", "xpm", "xwd" ]
 
 treatAsImage :: FilePath -> Bool
 treatAsImage fp =
