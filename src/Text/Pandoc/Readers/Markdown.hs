@@ -875,7 +875,14 @@ compactify'DL items =
 para :: MarkdownParser (F Blocks)
 para = try $ do
   exts <- getOption readerExtensions
-  result <- trimInlinesF . mconcat <$> many1 inline
+  -- the only time Scholarly displayMath doesn't need to begin with newline is at the start of a para
+  maybeDisplayMath <- optionMaybe $
+                guardEnabled Ext_scholarly_markdown >> scholarlyDisplayMath
+  result <- case maybeDisplayMath of
+                 Just dispMath -> try $ do
+                     moreInlines <- option mempty (many1 inline)
+                     return $ trimInlinesF $ dispMath <> (mconcat moreInlines)
+                 Nothing -> trimInlinesF . mconcat <$> many1 inline
   option (B.plain <$> result)
     $ try $ do
             newline
@@ -1895,23 +1902,30 @@ ensureScholarlyMarkdown = guardEnabled Ext_scholarly_markdown
 
 scholarlyMath :: MarkdownParser (F Inlines)
 scholarlyMath = ensureScholarlyMarkdown >>
-                  (scholarlyInlineMath <|> scholarlyDisplayMath)
+                  (scholarlyInlineMath <|> scholarlyDisplayMath')
 
 -- InlineMath delimted by double backticks
 scholarlyInlineMath :: MarkdownParser (F Inlines)
 scholarlyInlineMath = return . B.math <$>
                         mathInlineWith' (exactly 2 '`') (exactly 2 '`')
 
--- DisplayMath blocks with attributes inside a fenced code block
--- only match if class of fenced code block starts with math
+-- DisplayMath as defined by Scholarly Markdown
 scholarlyDisplayMath :: MarkdownParser (F Inlines)
-scholarlyDisplayMath = try $ do
-  blankline -- allow blank line without starting new block
-  singleEquation
+scholarlyDisplayMath = singleEquation
+
+-- ensures the displayMath is delimited by newspace
+scholarlyDisplayMath' :: MarkdownParser (F Inlines)
+scholarlyDisplayMath' = try $ do
+  blankline
+  optional blankline -- allow blank line without starting new block
+  dispmath <- scholarlyDisplayMath
+  return $ (B.space <>) <$> dispmath
 
 singleEquation :: MarkdownParser (F Inlines)
 singleEquation = fencedCodeEquation <|> doubleDollarEquation
 
+-- DisplayMath with attributes inside a fenced code block
+-- only match if class of fenced code block starts with math
 fencedCodeEquation :: MarkdownParser (F Inlines)
 fencedCodeEquation = try $ do
   c <- try (guardEnabled Ext_fenced_code_blocks >> lookAhead (char '~'))
@@ -1927,10 +1941,12 @@ fencedCodeEquation = try $ do
                return $ (label,[cls],[])
   guard $ classIsMath attr
   blankline
-  contents <- manyTill anyLine (blockDelimiter (== c) (Just size) >> blankline)
-  optional blankline -- allow blank line without starting new block
+  contents <- manyTill anyLine (blockDelimiter (== c) (Just size))
+  try (lookAhead (count 2 blankline) >> blankline) <|> lookAhead blankline
   return $ return $ B.displayMathWith attr $ intercalate "\n" contents
 
+-- DisplayMath delimited by double dollar signs
+-- only match if class of fenced code block starts with math
 doubleDollarEquation :: MarkdownParser (F Inlines)
 doubleDollarEquation = try $ do
   let delimitr = exactly 2 '$'
@@ -1943,8 +1959,8 @@ doubleDollarEquation = try $ do
             return $ (label,[cls],[])
   guard $ classIsMath attr
   blankline
-  contents <- manyTill anyLine (delimitr >> blankline)
-  optional blankline -- allow blank line without starting new block
+  contents <- manyTill anyLine delimitr
+  try (lookAhead (count 2 blankline) >> blankline) <|> lookAhead blankline
   return $ return $ B.displayMathWith attr $ intercalate "\n" contents
 
 -- TODO: multilineMath :: ScholarlyParser (F Inlines)
