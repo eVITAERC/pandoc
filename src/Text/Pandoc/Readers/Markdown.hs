@@ -53,6 +53,7 @@ import Text.Pandoc.Parsing hiding (tableWith)
 import Text.Pandoc.Readers.LaTeX ( rawLaTeXInline, rawLaTeXBlock )
 import Text.Pandoc.Readers.HTML ( htmlTag, htmlInBalanced, isInlineTag, isBlockTag,
                                   isTextTag, isCommentTag )
+import Text.Pandoc.Scholarly
 import Data.Monoid (mconcat, mempty)
 import Control.Applicative ((<$>), (<*), (*>), (<$))
 import Control.Monad
@@ -1966,10 +1967,6 @@ doubleDollarEquation = try $ do
 -- TODO: multilineMath :: ScholarlyParser (F Inlines)
 
 -- TODO: mathDefinitions :: ScholarlyParser (F Inlines)
-
--- true only if some element of classes start with "math"
-classIsMath :: Attr -> Bool
-classIsMath (_,classes,_) = any ("math" `isPrefixOf`) classes
 
 --
 -- Scholarly Markdown figures

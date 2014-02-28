@@ -30,7 +30,8 @@ Utility functions for Scholarly Markdown extensions.
 module Text.Pandoc.Scholarly (classIsMath)
 where
 
-import Data.List ( transpose, sortBy, findIndex, intersperse, intercalate, isPrefixOf )
+import Data.List ( transpose, sortBy, findIndex, intersperse, intercalate,
+                   isPrefixOf, isInfixOf )
 import qualified Data.Map as M
 import Data.Ord ( comparing )
 import Data.Char ( isAlphaNum, toLower )
@@ -47,7 +48,7 @@ import Text.Pandoc.Options
 import Text.Pandoc.Shared
 import Text.Pandoc.XML (fromEntities)
 import Text.Pandoc.Parsing hiding (tableWith)
-import Text.Pandoc.Readers.LaTeX ( rawLaTeXInline, rawLaTeXBlock )
+import Text.Pandoc.Readers.LaTeX ( rawLaTeXInline, rawLaTeXBlock, anyControlSeq )
 import Text.Pandoc.Readers.HTML ( htmlTag, htmlInBalanced, isInlineTag, isBlockTag,
                                   isTextTag, isCommentTag )
 import Data.Monoid (mconcat, mempty)
@@ -58,7 +59,49 @@ import Text.HTML.TagSoup
 import Text.HTML.TagSoup.Match (tagOpen)
 import qualified Data.Set as Set
 
+type AnyMath = Math MathType
+type InlineM = Math InlineMath
+type DispM = Math DisplayMath Attr
+
 -- true only if some element of classes start with "math"
 classIsMath :: Attr -> Bool
 classIsMath (_,classes,_) = any ("math" `isPrefixOf`) classes
 
+-- filter math raw content
+filtMathContent :: AnyMath String -> (String -> String) -> AnyMath String
+filtMathContent (InlineM content) filtf = InlineM $ filtf content
+filtMathContent (Math DisplayMath attr content) filtf = Math DisplayMath attr $ filtf content
+
+-- filter displayMath attr
+filtMathAttr :: DispM String -> (Attr -> Attr) -> DispM String
+filtMathAttr (Math DisplayMath attr content) filtf = Math DisplayMath (filtf attr) content
+
+---
+--- Process functions for single-equation Scholarly DisplayMath
+---
+
+processSingleEqn :: DispM String -> DispM String
+
+-- Automatically surround with split env if token @'\\'@ detected, or aligned env if both token @'\\'@ and @'&'@ detected
+addMultilineEnv :: String -> String
+addEnvAligned content
+  | hasTeXLinebreak content =
+                        if hasTeXAlignment
+                          then warpInAlign
+  | otherwise = content
+
+
+-- Scan for occurance of @'\\'@ in non-commented parts
+hasTeXLinebreak :: String -> Bool
+hasTeXLinebreak content =
+  case parse (skipMany try $ string "\\%" <|> skipTeXComment <|> anyControlSeq <|> noneOf ['\\'] >> char '&')
+
+-- Scan for occurance of non-escaped @'&'@ in non-commented parts
+hasTeXAlignment :: String -> Bool
+
+wrapInTeXEnv :: String -> String -> String
+wrapInTeXEnv envName content = intercalate '\n' $
+            ["\\begin{" ++ envName ++ "}", content, "\\end{" ++ envName ++ "}"]
+
+skipTeXComment :: Parser [Char] st ()
+skipTeXComment = char '%' >> manyTill anyChar $ try (newline <|> eof) >> return ()
