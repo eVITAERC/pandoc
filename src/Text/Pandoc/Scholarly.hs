@@ -29,7 +29,9 @@ Utility functions for Scholarly Markdown extensions.
 -}
 module Text.Pandoc.Scholarly (classIsMath,
                               processSingleEqn,
-                              AttributedMath
+                              processMultiEqn,
+                              AttributedMath,
+                              insertAttrClass
                              )
 where
 
@@ -43,6 +45,17 @@ type AttributedMath = (Attr, String)
 classIsMath :: Attr -> Bool
 classIsMath (_,classes,_) = any ("math" `isPrefixOf`) classes
 
+insertAttrClass :: String -> Attr -> Attr
+insertAttrClass className attr@(ident, classes, keyval)
+  | className `elem` classes = (ident, className:classes, keyval)
+  | otherwise = attr
+
+getClasses :: Attr -> [String]
+getClasses (_, classes, _) = classes
+
+getIdentifier :: Attr -> String
+getIdentifier (identifier, _, _) = identifier
+
 ---
 --- Process functions for single-equation Scholarly DisplayMath
 ---
@@ -51,28 +64,56 @@ classIsMath (_,classes,_) = any ("math" `isPrefixOf`) classes
 -- 1) automatically wrap in @aligned@ or @split@ envionrment if needed
 -- 2) if attribute has no id, append @\nonumber@ to code
 processSingleEqn :: AttributedMath -> AttributedMath
-processSingleEqn (attr@(_,classes,_), content) =
-  let ensureMultilineEnv' = if any ("math_plain" ==) classes
-                               then id
-                               else ensureMultilineEnv
-      processors = [ensureNonumber attr, ensureMultilineEnv']
-  in (attr, foldr ($) content processors)
+processSingleEqn eqn =
+  let processors = [ensureNonumber,
+                    ensureLabeled,
+                    ensureMultilineEnv]
+  in foldr ($) eqn processors
+
+processMultiEqn :: [AttributedMath] -> AttributedMath
+processMultiEqn eqnList =
+  let processors = [ensureNonumber,
+                    ensureLabeled]
+      processedEqnList = foldr map eqnList processors
+  in concatMultiEquations processedEqnList
 
 -- Automatically surround with split env if naked token @'\\'@ detected,
--- or aligned env if both naked token @'\\'@ and @'&'@ detected
-ensureMultilineEnv :: String -> String
-ensureMultilineEnv content
+-- or aligned env if both naked token @'\\'@ and @'&'@ detected.
+-- Skipped classes: [math_plain]
+ensureMultilineEnv :: AttributedMath -> AttributedMath
+ensureMultilineEnv eqn@(attr, content)
+  | "math_plain" `elem` (getClasses attr) = eqn
   | hasTeXLinebreak content = if hasTeXAlignment content
-                                 then wrapInLatexEnv "aligned" content
-                                 else wrapInLatexEnv "split" content
-  | otherwise = content
+                                 then (attr, wrapInLatexEnv "aligned" content)
+                                 else (attr, wrapInLatexEnv "split" content)
+  | otherwise = eqn
 
 -- if attribute has no id, append @\nonumber@ to code
-ensureNonumber :: Attr -> String -> String
-ensureNonumber attr content =
+ensureNonumber :: AttributedMath -> AttributedMath
+ensureNonumber eqn@(attr, content) =
   case attr of
-    ("",_ ,_) -> "\\nonumber " ++ content
-    _         -> content
+    ("",_ ,_) -> (attr, "\\nonumber " ++ content)
+    _         -> eqn
+
+-- if attribute has id, append @\label{id}@ to code
+-- (does not ensure no duplicate labels)
+ensureLabeled :: AttributedMath -> AttributedMath
+ensureLabeled eqn@(attr, content) =
+  case attr of
+    ("",_ ,_)     -> eqn
+    (label, _, _) -> (attr, "\\label{" ++ label ++ "} " ++ content)
+
+-- scans first equation for alignment characters,
+-- assign @align@ or @gather@ accordingly
+concatMultiEquations :: [AttributedMath] -> AttributedMath
+concatMultiEquations eqnList =
+  let eqnContents = map snd eqnList
+      multiClass = if hasTeXAlignment (head eqnContents)
+                      then "align"
+                      else "gather"
+  in ( ("", ["math",multiClass], [("labelList",show (map (getIdentifier.fst) eqnList))]),
+       intercalate "\\\\\n" eqnContents )
+
 
 wrapInLatexEnv :: String -> String -> String
 wrapInLatexEnv envName content = intercalate "\n" $
@@ -119,5 +160,5 @@ skipTeXComment = try $ do
 skipTexEnvironment :: String -> Parser [Char] st [Char]
 skipTexEnvironment envName = try $ do
   string ("\\begin{" ++ envName ++ "}")
-  manyTill anyChar $ string ("\\end{" ++ envName ++ "}")
+  manyTill anyChar $ try $ string ("\\end{" ++ envName ++ "}")
   return []
