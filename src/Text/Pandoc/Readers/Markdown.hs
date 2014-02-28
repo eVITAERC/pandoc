@@ -31,7 +31,7 @@ Conversion of markdown-formatted plain text to 'Pandoc' document.
 module Text.Pandoc.Readers.Markdown ( readMarkdown,
                                       readMarkdownWithWarnings ) where
 
-import Data.List ( transpose, sortBy, findIndex, intersperse, intercalate, isPrefixOf )
+import Data.List ( transpose, sortBy, findIndex, intersperse, intercalate )
 import qualified Data.Map as M
 import Data.Ord ( comparing )
 import Data.Char ( isAlphaNum, toLower )
@@ -1923,11 +1923,14 @@ scholarlyDisplayMath' = try $ do
   return $ (B.space <>) <$> dispmath
 
 singleEquation :: MarkdownParser (F Inlines)
-singleEquation = fencedCodeEquation <|> doubleDollarEquation
+singleEquation = do
+  (attr, content) <- fencedCodeEquation <|> doubleDollarEquation
+  let (attr', content') = processSingleEqn (attr, content)
+  return $ return $ B.displayMathWith attr' content'
 
 -- DisplayMath with attributes inside a fenced code block
 -- only match if class of fenced code block starts with math
-fencedCodeEquation :: MarkdownParser (F Inlines)
+fencedCodeEquation :: MarkdownParser AttributedMath
 fencedCodeEquation = try $ do
   c <- try (guardEnabled Ext_fenced_code_blocks >> lookAhead (char '~'))
      <|> (guardEnabled Ext_backtick_code_blocks >> lookAhead (char '`'))
@@ -1944,11 +1947,11 @@ fencedCodeEquation = try $ do
   blankline
   contents <- manyTill anyLine (blockDelimiter (== c) (Just size))
   try (lookAhead (count 2 blankline) >> blankline) <|> lookAhead blankline
-  return $ return $ B.displayMathWith attr $ intercalate "\n" contents
+  return (attr, intercalate "\n" contents)
 
 -- DisplayMath delimited by double dollar signs
 -- only match if class of fenced code block starts with math
-doubleDollarEquation :: MarkdownParser (F Inlines)
+doubleDollarEquation :: MarkdownParser AttributedMath
 doubleDollarEquation = try $ do
   let delimitr = exactly 2 '$'
   delimitr
@@ -1962,7 +1965,7 @@ doubleDollarEquation = try $ do
   blankline
   contents <- manyTill anyLine delimitr
   try (lookAhead (count 2 blankline) >> blankline) <|> lookAhead blankline
-  return $ return $ B.displayMathWith attr $ intercalate "\n" contents
+  return (attr, intercalate "\n" contents)
 
 -- TODO: multilineMath :: ScholarlyParser (F Inlines)
 

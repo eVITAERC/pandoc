@@ -27,81 +27,97 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Utility functions for Scholarly Markdown extensions.
 -}
-module Text.Pandoc.Scholarly (classIsMath)
+module Text.Pandoc.Scholarly (classIsMath,
+                              processSingleEqn,
+                              AttributedMath
+                             )
 where
 
-import Data.List ( transpose, sortBy, findIndex, intersperse, intercalate,
-                   isPrefixOf, isInfixOf )
-import qualified Data.Map as M
-import Data.Ord ( comparing )
-import Data.Char ( isAlphaNum, toLower )
-import Data.Maybe
+import Data.List ( intercalate, isPrefixOf )
 import Text.Pandoc.Definition
-import qualified Data.Text as T
-import Data.Text (Text)
-import qualified Data.HashMap.Strict as H
-import qualified Text.Pandoc.Builder as B
-import qualified Text.Pandoc.UTF8 as UTF8
-import qualified Data.Vector as V
-import Text.Pandoc.Builder (Inlines, Blocks, trimInlines, (<>))
-import Text.Pandoc.Options
-import Text.Pandoc.Shared
-import Text.Pandoc.XML (fromEntities)
 import Text.Pandoc.Parsing hiding (tableWith)
-import Text.Pandoc.Readers.LaTeX ( rawLaTeXInline, rawLaTeXBlock, anyControlSeq )
-import Text.Pandoc.Readers.HTML ( htmlTag, htmlInBalanced, isInlineTag, isBlockTag,
-                                  isTextTag, isCommentTag )
-import Data.Monoid (mconcat, mempty)
-import Control.Applicative ((<$>), (<*), (*>), (<$))
-import Control.Monad
-import System.FilePath (takeExtension, addExtension)
-import Text.HTML.TagSoup
-import Text.HTML.TagSoup.Match (tagOpen)
-import qualified Data.Set as Set
 
-type AnyMath = Math MathType
-type InlineM = Math InlineMath
-type DispM = Math DisplayMath Attr
+type AttributedMath = (Attr, String)
 
 -- true only if some element of classes start with "math"
 classIsMath :: Attr -> Bool
 classIsMath (_,classes,_) = any ("math" `isPrefixOf`) classes
 
--- filter math raw content
-filtMathContent :: AnyMath String -> (String -> String) -> AnyMath String
-filtMathContent (InlineM content) filtf = InlineM $ filtf content
-filtMathContent (Math DisplayMath attr content) filtf = Math DisplayMath attr $ filtf content
-
--- filter displayMath attr
-filtMathAttr :: DispM String -> (Attr -> Attr) -> DispM String
-filtMathAttr (Math DisplayMath attr content) filtf = Math DisplayMath (filtf attr) content
-
 ---
 --- Process functions for single-equation Scholarly DisplayMath
 ---
 
-processSingleEqn :: DispM String -> DispM String
+-- Currently does the following:
+-- 1) automatically wrap in @aligned@ or @split@ envionrment if needed
+-- 2) if attribute has no id, append @\nonumber@ to code
+processSingleEqn :: AttributedMath -> AttributedMath
+processSingleEqn (attr@(_,classes,_), content) =
+  let ensureMultilineEnv' = if any ("math_plain" ==) classes
+                               then id
+                               else ensureMultilineEnv
+      processors = [ensureNonumber attr, ensureMultilineEnv']
+  in (attr, foldr ($) content processors)
 
--- Automatically surround with split env if token @'\\'@ detected, or aligned env if both token @'\\'@ and @'&'@ detected
-addMultilineEnv :: String -> String
-addEnvAligned content
-  | hasTeXLinebreak content =
-                        if hasTeXAlignment
-                          then warpInAlign
+-- Automatically surround with split env if naked token @'\\'@ detected,
+-- or aligned env if both naked token @'\\'@ and @'&'@ detected
+ensureMultilineEnv :: String -> String
+ensureMultilineEnv content
+  | hasTeXLinebreak content = if hasTeXAlignment content
+                                 then wrapInLatexEnv "aligned" content
+                                 else wrapInLatexEnv "split" content
   | otherwise = content
 
+-- if attribute has no id, append @\nonumber@ to code
+ensureNonumber :: Attr -> String -> String
+ensureNonumber attr content =
+  case attr of
+    ("",_ ,_) -> "\\nonumber " ++ content
+    _         -> content
 
--- Scan for occurance of @'\\'@ in non-commented parts
-hasTeXLinebreak :: String -> Bool
-hasTeXLinebreak content =
-  case parse (skipMany try $ string "\\%" <|> skipTeXComment <|> anyControlSeq <|> noneOf ['\\'] >> char '&')
-
--- Scan for occurance of non-escaped @'&'@ in non-commented parts
-hasTeXAlignment :: String -> Bool
-
-wrapInTeXEnv :: String -> String -> String
-wrapInTeXEnv envName content = intercalate '\n' $
+wrapInLatexEnv :: String -> String -> String
+wrapInLatexEnv envName content = intercalate "\n" $
             ["\\begin{" ++ envName ++ "}", content, "\\end{" ++ envName ++ "}"]
 
-skipTeXComment :: Parser [Char] st ()
-skipTeXComment = char '%' >> manyTill anyChar $ try (newline <|> eof) >> return ()
+-- Scan for occurance of @'\\'@ in non-commented parts,
+-- not within "split" or "aligned" environment
+hasTeXLinebreak :: String -> Bool
+hasTeXLinebreak content =
+  case parse (skipMany (try (string "\\%")
+                        <|> skipTeXComment
+                        <|> skipTexEnvironment "split"
+                        <|> skipTexEnvironment "aligned"
+                        <|> skipTexEnvironment "alignedat"
+                        <|> skipTexEnvironment "cases"
+                        <|> try (char '\\' >> notFollowedBy (char '\\') >> return [])
+                        <|> try (noneOf ['\\'] >> return []))
+               >> (string "\\\\" >> return ())) [] content of
+       Left _  -> False
+       Right _ -> True
+
+-- Scan for occurance of non-escaped @'&'@ in non-commented parts
+-- not within "split" or "aligned" environment
+hasTeXAlignment :: String -> Bool
+hasTeXAlignment content =
+  case parse (skipMany (try (string "\\%")
+                        <|>  skipTeXComment
+                        <|>  skipTexEnvironment "split"
+                        <|>  skipTexEnvironment "aligned"
+                        <|>  skipTexEnvironment "alignedat"
+                        <|>  skipTexEnvironment "cases"
+                        <|>  try (string "\\&")
+                        <|>  try (noneOf ['&'] >> return []))
+              >> (char '&' >> return ())) [] content of
+       Left _  -> False
+       Right _ -> True
+
+skipTeXComment :: Parser [Char] st [Char]
+skipTeXComment = try $ do
+  char '%'
+  manyTill anyChar $ try $ newline <|> (eof >> return '\n')
+  return []
+
+skipTexEnvironment :: String -> Parser [Char] st [Char]
+skipTexEnvironment envName = try $ do
+  string ("\\begin{" ++ envName ++ "}")
+  manyTill anyChar $ string ("\\end{" ++ envName ++ "}")
+  return []
