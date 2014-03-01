@@ -64,7 +64,8 @@ getIdentifier (identifier, _, _) = identifier
 
 -- Currently does the following:
 -- 1) automatically wrap in @aligned@ or @split@ envionrment if needed
--- 2) if attribute has no id, append @\nonumber@ to code
+-- 2) if attribute has id, append @\label{id}@ to code
+-- 3) if attribute has no id, append @\nonumber@ to code
 processSingleEqn :: AttributedMath -> AttributedMath
 processSingleEqn eqn =
   let processors = [ensureNonumber,
@@ -72,6 +73,13 @@ processSingleEqn eqn =
                     ensureMultilineEnv]
   in foldr ($) eqn processors
 
+-- Currently does the following:
+-- 1) trim whitespace from all equation codes
+-- 2) if attribute has id, append @\label{id}@ to code
+-- 3) if attribute has no id, append @\nonumber@ to code
+-- 4) concatenate all equations into one code chunk delimited by @'\\'@
+-- 5) assign @align@ or @gather@ class as needed
+-- 6) gather all equation labels as list and output to @labelList@ key
 processMultiEqn :: [AttributedMath] -> AttributedMath
 processMultiEqn eqnList =
   let processors = [ensureNonumber,
