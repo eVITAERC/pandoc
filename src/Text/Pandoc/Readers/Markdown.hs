@@ -1920,12 +1920,15 @@ scholarlyDisplayMath' = try $ do
   blankline
   optional blankline -- allow blank line without starting new block
   dispmath <- scholarlyDisplayMath
+  -- consume at most one blankline immediately following,
+  -- which prevents starting a new block element while allowing blankline
+  try (lookAhead (count 2 blankline) >> blankline) <|> lookAhead blankline
   return $ (B.space <>) <$> dispmath
 
 singleEquation :: MarkdownParser (F Inlines)
 singleEquation = try $ do
-  eqn <- (fencedCodeEquation <|> doubleDollarEquation) >>~
-         notFollowedBy (blankline >> (fencedCodeEquation <|> doubleDollarEquation))
+  eqn <- (fencedCodeEquation <|> doubleDollarEquation)
+  notFollowedBy (blankline >> (fencedCodeEquation <|> doubleDollarEquation))
   let eqn' = processSingleEqn eqn
   return $ return $ uncurry B.displayMathWith eqn'
 
@@ -1933,7 +1936,9 @@ singleEquation = try $ do
 -- into a single gather or align structure
 multiEquation :: MarkdownParser (F Inlines)
 multiEquation = try $ do
-  eqnList <- sepBy1 (fencedCodeEquation <|> doubleDollarEquation) blankline
+  -- eqnList <- (fencedCodeEquation <|> doubleDollarEquation)
+  eqnList <- many1 ((fencedCodeEquation <|> doubleDollarEquation) >>~ blankline)
+  -- eqnList <- sepBy (fencedCodeEquation <|> doubleDollarEquation) blankline
   let eqn = processMultiEqn eqnList
   return $ return $ uncurry B.displayMathWith eqn
 
@@ -1955,9 +1960,6 @@ fencedCodeEquation = try $ do
   guard $ classIsMath attr
   blankline
   contents <- manyTill anyLine (blockDelimiter (== c) (Just size))
-  -- consume at most one blankline immediately following,
-  -- which prevents starting a new block element while allowing blankline
-  try (lookAhead (count 2 blankline) >> blankline) <|> lookAhead blankline
   return (attr, intercalate "\n" contents)
 
 -- DisplayMath delimited by double dollar signs
@@ -1975,9 +1977,6 @@ doubleDollarEquation = try $ do
   guard $ classIsMath attr
   blankline
   contents <- manyTill anyLine delimitr
-  -- consume at most one blankline immediately following,
-  -- which prevents starting a new block element while allowing blankline
-  try (lookAhead (count 2 blankline) >> blankline) <|> lookAhead blankline
   return (attr, intercalate "\n" contents)
 
 -- TODO: mathDefinitions :: ScholarlyParser (F Inlines)
