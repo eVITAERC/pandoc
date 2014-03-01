@@ -37,7 +37,9 @@ where
 
 import Data.List ( intercalate, isPrefixOf )
 import Text.Pandoc.Definition
+import Text.Pandoc.Shared
 import Text.Pandoc.Parsing hiding (tableWith)
+import Control.Arrow
 
 type AttributedMath = (Attr, String)
 
@@ -73,7 +75,8 @@ processSingleEqn eqn =
 processMultiEqn :: [AttributedMath] -> AttributedMath
 processMultiEqn eqnList =
   let processors = [ensureNonumber,
-                    ensureLabeled]
+                    ensureLabeled,
+                    id *** trim]
       processedEqnList = foldr map eqnList processors
   in concatMultiEquations processedEqnList
 
@@ -104,7 +107,9 @@ ensureLabeled eqn@(attr, content) =
     (label, _, _) -> (attr, "\\label{" ++ label ++ "} " ++ content)
 
 -- scans first equation for alignment characters,
--- assign @align@ or @gather@ accordingly
+-- assign @align@ or @gather@ accordingly,
+-- then concatenate all lines into one multi-equation displayMath,
+-- gathering the idents of all equations into one large list
 concatMultiEquations :: [AttributedMath] -> AttributedMath
 concatMultiEquations eqnList =
   let eqnContents = map snd eqnList
@@ -114,7 +119,6 @@ concatMultiEquations eqnList =
   in ( ("", ["math",multiClass], [("labelList",show (map (getIdentifier.fst) eqnList))]),
        intercalate "\\\\\n" eqnContents )
 
-
 wrapInLatexEnv :: String -> String -> String
 wrapInLatexEnv envName content = intercalate "\n" $
             ["\\begin{" ++ envName ++ "}", content, "\\end{" ++ envName ++ "}"]
@@ -123,12 +127,7 @@ wrapInLatexEnv envName content = intercalate "\n" $
 -- not within "split" or "aligned" environment
 hasTeXLinebreak :: String -> Bool
 hasTeXLinebreak content =
-  case parse (skipMany (try (string "\\%")
-                        <|> skipTeXComment
-                        <|> skipTexEnvironment "split"
-                        <|> skipTexEnvironment "aligned"
-                        <|> skipTexEnvironment "alignedat"
-                        <|> skipTexEnvironment "cases"
+  case parse (skipMany (try ignoreLinebreak
                         <|> try (char '\\' >> notFollowedBy (char '\\') >> return [])
                         <|> try (noneOf ['\\'] >> return []))
                >> (string "\\\\" >> return ())) [] content of
@@ -139,12 +138,7 @@ hasTeXLinebreak content =
 -- not within "split" or "aligned" environment
 hasTeXAlignment :: String -> Bool
 hasTeXAlignment content =
-  case parse (skipMany (try (string "\\%")
-                        <|>  skipTeXComment
-                        <|>  skipTexEnvironment "split"
-                        <|>  skipTexEnvironment "aligned"
-                        <|>  skipTexEnvironment "alignedat"
-                        <|>  skipTexEnvironment "cases"
+  case parse (skipMany (try ignoreLinebreak
                         <|>  try (string "\\&")
                         <|>  try (noneOf ['&'] >> return []))
               >> (char '&' >> return ())) [] content of
@@ -162,3 +156,11 @@ skipTexEnvironment envName = try $ do
   string ("\\begin{" ++ envName ++ "}")
   manyTill anyChar $ try $ string ("\\end{" ++ envName ++ "}")
   return []
+
+ignoreLinebreak :: Parser [Char] st [Char]
+ignoreLinebreak = try (string "\\%")
+                  <|>  skipTeXComment
+                  <|>  skipTexEnvironment "split"
+                  <|>  skipTexEnvironment "aligned"
+                  <|>  skipTexEnvironment "alignedat"
+                  <|>  skipTexEnvironment "cases"

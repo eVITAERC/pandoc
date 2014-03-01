@@ -1910,37 +1910,30 @@ scholarlyInlineMath :: MarkdownParser (F Inlines)
 scholarlyInlineMath = return . B.math <$>
                         mathInlineWith' (exactly 2 '`') (exactly 2 '`')
 
--- DisplayMath as defined by Scholarly Markdown
+-- DisplayMath as defined by Scholarly Markdown:
+-- Single equations appear in a fenced code block with class prepended by 'math'
+-- or delimited by double dollar-signs on their own lines.
+-- Multiple equations not separated by a standalone blankline will be collapsed
+-- into a single gather or align structure.
 scholarlyDisplayMath :: MarkdownParser (F Inlines)
-scholarlyDisplayMath = singleEquation <|> multiEquation
+scholarlyDisplayMath = try $ do
+  firstEqn <- (fencedCodeEquation <|> doubleDollarEquation)
+  restEqn <- many $ try (blankline >> (fencedCodeEquation <|> doubleDollarEquation))
+  let eqn = case restEqn of
+                 [] -> processSingleEqn firstEqn
+                 _  -> processMultiEqn (firstEqn:restEqn)
+  return $ return $ uncurry B.displayMathWith eqn
 
--- ensures the displayMath is delimited by newspace
+-- ensures that displayMath are delimited by blanklines
 scholarlyDisplayMath' :: MarkdownParser (F Inlines)
 scholarlyDisplayMath' = try $ do
   blankline
-  optional blankline -- allow blank line without starting new block
+  optional blankline -- allow another blank line without starting new block
   dispmath <- scholarlyDisplayMath
   -- consume at most one blankline immediately following,
   -- which prevents starting a new block element while allowing blankline
   try (lookAhead (count 2 blankline) >> blankline) <|> lookAhead blankline
   return $ (B.space <>) <$> dispmath
-
-singleEquation :: MarkdownParser (F Inlines)
-singleEquation = try $ do
-  eqn <- (fencedCodeEquation <|> doubleDollarEquation)
-  notFollowedBy (blankline >> (fencedCodeEquation <|> doubleDollarEquation))
-  let eqn' = processSingleEqn eqn
-  return $ return $ uncurry B.displayMathWith eqn'
-
--- Multiple singleEquations (not separated by blanklines) will be collapsed
--- into a single gather or align structure
-multiEquation :: MarkdownParser (F Inlines)
-multiEquation = try $ do
-  -- eqnList <- (fencedCodeEquation <|> doubleDollarEquation)
-  eqnList <- many1 ((fencedCodeEquation <|> doubleDollarEquation) >>~ blankline)
-  -- eqnList <- sepBy (fencedCodeEquation <|> doubleDollarEquation) blankline
-  let eqn = processMultiEqn eqnList
-  return $ return $ uncurry B.displayMathWith eqn
 
 -- DisplayMath with attributes inside a fenced code block
 -- only match if class of fenced code block starts with math
