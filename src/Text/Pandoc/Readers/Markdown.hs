@@ -1914,6 +1914,19 @@ doubleQuoted = try $ do
 ensureScholarlyMarkdown :: MarkdownParser ()
 ensureScholarlyMarkdown = guardEnabled Ext_scholarly_markdown
 
+inBraces :: MarkdownParser String -> MarkdownParser String
+inBraces parser = try $ do
+  char '{'
+  content <- parser
+  char '}'
+  return content
+
+many1InSeparateLines :: MarkdownParser a -> MarkdownParser [a]
+many1InSeparateLines parser = try $ do
+  first <- parser
+  rest <- many $ try (blankline >> parser)
+  return (first:rest)
+
 --
 -- Scholarly Markdown math extensions
 --
@@ -1934,11 +1947,10 @@ scholarlyInlineMath = return . B.math <$>
 -- into a single gather or align structure.
 scholarlyDisplayMath :: MarkdownParser (F Inlines)
 scholarlyDisplayMath = try $ do
-  firstEqn <- (fencedCodeEquation <|> doubleDollarEquation)
-  restEqn <- many $ try (blankline >> (fencedCodeEquation <|> doubleDollarEquation))
-  let eqn = case restEqn of
-                 [] -> processSingleEqn firstEqn
-                 _  -> processMultiEqn (firstEqn:restEqn)
+  eqnList <- many1InSeparateLines (fencedCodeEquation <|> doubleDollarEquation)
+  let eqn = case eqnList of
+                 singleEqn:[] -> processSingleEqn singleEqn
+                 _            -> processMultiEqn eqnList
   return $ return $ uncurry B.displayMathWith eqn
 
 -- ensures that displayMath are delimited by blanklines
@@ -1991,15 +2003,8 @@ doubleDollarEquation = try $ do
   contents <- manyTill anyLine delimitr
   return (attr, intercalate "\n" contents)
 
-inBraces :: Parser [Char] st String -> Parser [Char] st String
-inBraces parser = try $ do
-  char '{'
-  content <- parser
-  char '}'
-  return content
-
 -- TODO: mathDefinitions :: ScholarlyParser (F Inlines)
--- not sure if needed
+-- not sure if needed?
 
 --
 -- Scholarly Markdown figures
