@@ -1947,8 +1947,9 @@ fencedCodeEquation = try $ do
             try (guardEnabled Ext_fenced_code_attributes >> attributes)
            <|> do
                cls <- identifier
-               label <- option [] $ try
-                 (optional blankline >> skipSpaces >> char '#' >> identifier)
+               label <- option [] $
+                 try (optional blankline >> skipSpaces >> char '#' >> identifier)
+                 <|> try (skipSpaces >> inBraces (char '#' >> identifier))
                return $ (label,[cls],[])
   guard $ classIsMath attr
   blankline
@@ -1963,14 +1964,22 @@ doubleDollarEquation = try $ do
   delimitr
   skipSpaces
   attr <- do
-            cls <- option "math" $ try identifier
-            label <- option [] $ try
-              (optional blankline >> skipSpaces >> char '#' >> identifier)
-            return $ (label,[cls],[])
+          cls <- option "math" $ try identifier
+          label <- option [] $
+            try (optional blankline >> skipSpaces >> char '#' >> identifier)
+            <|> try (skipSpaces >> inBraces (char '#' >> identifier))
+          return $ (label,[cls],[])
   guard $ classIsMath attr
   blankline
   contents <- manyTill anyLine delimitr
   return (attr, intercalate "\n" contents)
+
+inBraces :: Parser [Char] st String -> Parser [Char] st String
+inBraces parser = try $ do
+  char '{'
+  content <- parser
+  char '}'
+  return content
 
 -- TODO: mathDefinitions :: ScholarlyParser (F Inlines)
 -- not sure if needed
