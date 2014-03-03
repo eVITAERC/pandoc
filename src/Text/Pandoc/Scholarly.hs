@@ -65,11 +65,9 @@ getIdentifier (identifier, _, _) = identifier
 -- Currently does the following:
 -- 1) automatically wrap in @aligned@ or @split@ envionrment if needed
 -- 2) if attribute has id, append @\label{id}@ to code
--- 3) if attribute has no id, append @\nonumber@ to code
 processSingleEqn :: AttributedMath -> AttributedMath
 processSingleEqn eqn =
-  let processors = [ensureNonumber,
-                    ensureLabeled,
+  let processors = [ensureLabeled "\n", -- ensureNonumber is handled by writer
                     ensureMultilineEnv]
   in foldr ($) eqn processors
 
@@ -82,8 +80,8 @@ processSingleEqn eqn =
 -- 6) gather all equation labels as list and output to @labelList@ key
 processMultiEqn :: [AttributedMath] -> AttributedMath
 processMultiEqn eqnList =
-  let processors = [ensureNonumber,
-                    ensureLabeled,
+  let processors = [ensureNonumber " ",
+                    ensureLabeled " ",
                     id *** trim]
       processedEqnList = foldr map eqnList processors
   in concatMultiEquations processedEqnList
@@ -100,19 +98,19 @@ ensureMultilineEnv eqn@(attr, content)
   | otherwise = eqn
 
 -- if attribute has no id, append @\nonumber@ to code
-ensureNonumber :: AttributedMath -> AttributedMath
-ensureNonumber eqn@(attr, content) =
+ensureNonumber :: String -> AttributedMath -> AttributedMath
+ensureNonumber terminal eqn@(attr, content) =
   case attr of
-    ("",_ ,_) -> (attr, "\\nonumber " ++ content)
+    ("",_ ,_) -> (attr, "\\nonumber" ++ terminal ++ content)
     _         -> eqn
 
 -- if attribute has id, append @\label{id}@ to code
 -- (does not ensure no duplicate labels)
-ensureLabeled :: AttributedMath -> AttributedMath
-ensureLabeled eqn@(attr, content) =
+ensureLabeled :: String -> AttributedMath -> AttributedMath
+ensureLabeled terminal eqn@(attr, content) =
   case attr of
     ("",_ ,_)     -> eqn
-    (label, _, _) -> (attr, "\\label{" ++ label ++ "} " ++ content)
+    (label, _, _) -> (attr, "\\label{" ++ label ++ "}" ++ terminal ++ content)
 
 -- scans first equation for alignment characters,
 -- assign @align@ or @gather@ accordingly,
