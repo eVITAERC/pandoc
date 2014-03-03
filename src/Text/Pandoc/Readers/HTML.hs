@@ -476,7 +476,7 @@ pBlank = try $ do
 
 pTagContents :: Parser [Char] ParserState Inline
 pTagContents =
-      Math DisplayMath `fmap` mathDisplay
+      Math (DisplayMath nullAttr) `fmap` mathDisplay
   <|> Math InlineMath  `fmap` mathInline
   <|> pStr
   <|> pSpace

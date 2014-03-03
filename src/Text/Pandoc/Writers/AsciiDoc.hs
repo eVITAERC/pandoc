@@ -347,7 +347,7 @@ inlineToAsciiDoc _ (Code _ str) = return $
 inlineToAsciiDoc _ (Str str) = return $ text $ escapeString str
 inlineToAsciiDoc _ (Math InlineMath str) =
   return $ "latexmath:[$" <> text str <> "$]"
-inlineToAsciiDoc _ (Math DisplayMath str) =
+inlineToAsciiDoc _ (Math (DisplayMath _) str) =
   return $ "latexmath:[\\[" <> text str <> "\\]]"
 inlineToAsciiDoc _ (RawInline f s)
   | f == "asciidoc" = return $ text s

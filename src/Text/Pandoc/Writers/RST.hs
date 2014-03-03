@@ -299,8 +299,8 @@ inlineListToRST :: [Inline] -> State WriterState Doc
 inlineListToRST lst =
   mapM inlineToRST (removeSpaceAfterDisplayMath $ insertBS lst) >>= return . hcat
   where -- remove spaces after displaymath, as they screw up indentation:
-        removeSpaceAfterDisplayMath (Math DisplayMath x : zs) =
-              Math DisplayMath x : dropWhile (==Space) zs
+        removeSpaceAfterDisplayMath (Math (DisplayMath a) x : zs) =
+              Math (DisplayMath a) x : dropWhile (==Space) zs
         removeSpaceAfterDisplayMath (x:xs) = x : removeSpaceAfterDisplayMath xs
         removeSpaceAfterDisplayMath [] = []
         insertBS :: [Inline] -> [Inline] -- insert '\ ' where needed

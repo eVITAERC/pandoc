@@ -708,8 +708,10 @@ inlineToMarkdown opts (Math InlineMath str)
       return $ "\\(" <> text str <> "\\)"
   | isEnabled Ext_tex_math_double_backslash opts =
       return $ "\\\\(" <> text str <> "\\\\)"
+  | isEnabled Ext_scholarly_markdown opts =
+      return $ "``" <> text (trim str) <> "``"
   | otherwise = inlineListToMarkdown opts $ readTeXMath' InlineMath str
-inlineToMarkdown opts (Math DisplayMath str)
+inlineToMarkdown opts (Math (DisplayMath a) str)
   | isEnabled Ext_tex_math_dollars opts =
       return $ "$$" <> text str <> "$$"
   | isEnabled Ext_tex_math_single_backslash opts =
@@ -717,7 +719,7 @@ inlineToMarkdown opts (Math DisplayMath str)
   | isEnabled Ext_tex_math_double_backslash opts =
       return $ "\\\\[" <> text str <> "\\\\]"
   | otherwise = (\x -> cr <> x <> cr) `fmap`
-        inlineListToMarkdown opts (readTeXMath' DisplayMath str)
+        inlineListToMarkdown opts (readTeXMath' (DisplayMath a) str)
 inlineToMarkdown opts (RawInline f str)
   | f == "html" || f == "markdown" ||
     (isEnabled Ext_raw_tex opts && (f == "latex" || f == "tex")) =

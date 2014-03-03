@@ -140,7 +140,7 @@ tagWithAttrs tag (ident,classes,kvs) = hsep
   ] <> ">"
 
 isDisplayMath :: Inline -> Bool
-isDisplayMath (Math DisplayMath _) = True
+isDisplayMath (Math (DisplayMath _) _) = True
 isDisplayMath _                    = False
 
 stripLeadingTrailingSpace :: [Inline] -> [Inline]

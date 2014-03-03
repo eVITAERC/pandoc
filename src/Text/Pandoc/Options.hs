@@ -34,6 +34,7 @@ module Text.Pandoc.Options ( Extension(..)
                            , phpMarkdownExtraExtensions
                            , githubMarkdownExtensions
                            , multimarkdownExtensions
+                           , scholarlyMarkdownExtensions
                            , ReaderOptions(..)
                            , HTMLMathMethod (..)
                            , CiteMethod (..)
@@ -101,6 +102,7 @@ data Extension =
     | Ext_mmd_header_identifiers -- ^ Multimarkdown style header identifiers [myid]
     | Ext_implicit_header_references -- ^ Implicit reference links for headers
     | Ext_line_blocks         -- ^ RST style line blocks
+    | Ext_scholarly_markdown  -- ^ Enables all Scholarly Markdown extensions
     deriving (Show, Read, Enum, Eq, Ord, Bounded)
 
 pandocExtensions :: Set Extension
@@ -189,6 +191,47 @@ multimarkdownExtensions = Set.fromList
   , Ext_implicit_header_references
   , Ext_auto_identifiers
   , Ext_mmd_header_identifiers
+  ]
+
+scholarlyMarkdownExtensions :: Set Extension
+scholarlyMarkdownExtensions = Set.fromList
+  [ Ext_footnotes
+  , Ext_inline_notes
+  , Ext_pandoc_title_block
+  , Ext_yaml_metadata_block
+  , Ext_table_captions
+  , Ext_implicit_figures
+  , Ext_simple_tables
+  , Ext_multiline_tables
+  , Ext_grid_tables
+  , Ext_pipe_tables
+  , Ext_citations
+  , Ext_raw_tex
+  , Ext_raw_html
+  , Ext_tex_math_dollars
+  , Ext_latex_macros
+  , Ext_fenced_code_blocks
+  , Ext_fenced_code_attributes
+  , Ext_backtick_code_blocks
+  , Ext_inline_code_attributes
+  , Ext_markdown_in_html_blocks
+  , Ext_escaped_line_breaks
+  , Ext_fancy_lists
+  , Ext_startnum
+  , Ext_definition_lists
+  , Ext_example_lists
+  , Ext_all_symbols_escapable
+  , Ext_intraword_underscores
+  , Ext_blank_before_blockquote
+  , Ext_blank_before_header
+  , Ext_strikeout
+  , Ext_superscript
+  , Ext_subscript
+  , Ext_auto_identifiers
+  , Ext_header_attributes
+  , Ext_implicit_header_references
+  , Ext_line_blocks
+  , Ext_scholarly_markdown
   ]
 
 strictExtensions :: Set Extension

@@ -53,6 +53,7 @@ import Text.Pandoc.Parsing hiding (tableWith)
 import Text.Pandoc.Readers.LaTeX ( rawLaTeXInline, rawLaTeXBlock )
 import Text.Pandoc.Readers.HTML ( htmlTag, htmlInBalanced, isInlineTag, isBlockTag,
                                   isTextTag, isCommentTag )
+import Text.Pandoc.Scholarly
 import Data.Monoid (mconcat, mempty)
 import Control.Applicative ((<$>), (<*), (*>), (<$))
 import Control.Monad
@@ -616,6 +617,7 @@ codeBlockFenced = try $ do
   attr <- option ([],[],[]) $
             try (guardEnabled Ext_fenced_code_attributes >> attributes)
            <|> ((\x -> ("",[x],[])) <$> identifier)
+  guard $ not (classIsMath attr)
   blankline
   contents <- manyTill anyLine (blockDelimiter (== c) (Just size))
   blanklines
@@ -884,7 +886,14 @@ compactify'DL items =
 para :: MarkdownParser (F Blocks)
 para = try $ do
   exts <- getOption readerExtensions
-  result <- trimInlinesF . mconcat <$> many1 inline
+  -- the only time Scholarly displayMath doesn't need to begin with newline is at the start of a para
+  maybeDisplayMath <- optionMaybe $
+                guardEnabled Ext_scholarly_markdown >> scholarlyDisplayMath
+  result <- case maybeDisplayMath of
+                 Just dispMath -> try $ do
+                     moreInlines <- option mempty (many1 inline)
+                     return $ trimInlinesF $ dispMath <> (mconcat moreInlines)
+                 Nothing -> trimInlinesF . mconcat <$> many1 inline
   option (B.plain <$> result)
     $ try $ do
             newline
@@ -1343,6 +1352,7 @@ inline :: MarkdownParser (F Inlines)
 inline = choice [ whitespace
                 , bareURL
                 , str
+                , scholarlyMath -- before endline to accomodate displayMath
                 , endline
                 , code
                 , strongOrEmph
@@ -1410,6 +1420,7 @@ symbol = do
   return $ return $ B.str [result]
 
 -- parses inline code, between n `s and n `s
+-- but ignores exactly 2 `s AND NOT followed by whitespace if Ext_scholarly_markdown
 code :: MarkdownParser (F Inlines)
 code = try $ do
   starts <- many1 (char '`')
@@ -1422,6 +1433,8 @@ code = try $ do
                                    optional whitespace >> attributes)
   return $ return $ B.codeWith attr $ trim $ concat result
 
+
+-- Parses plain inline or display math without additional attributes
 math :: MarkdownParser (F Inlines)
 math =  (return . B.displayMath <$> (mathDisplay >>= applyMacros'))
      <|> (return . B.math <$> (mathInline >>= applyMacros'))
@@ -1892,4 +1905,120 @@ doubleQuoted = try $ do
   (withQuoteContext InDoubleQuote $ doubleQuoteEnd >> return
        (fmap B.doubleQuoted . trimInlinesF $ contents))
    <|> (return $ return (B.str "\8220") <> contents)
+
+
+--
+-- Scholarly Markdown extensions
+--
+
+ensureScholarlyMarkdown :: MarkdownParser ()
+ensureScholarlyMarkdown = guardEnabled Ext_scholarly_markdown
+
+--
+-- Scholarly Markdown math extensions
+--
+
+scholarlyMath :: MarkdownParser (F Inlines)
+scholarlyMath = ensureScholarlyMarkdown >>
+                  (scholarlyInlineMath <|> scholarlyDisplayMath')
+
+-- InlineMath delimted by double backticks
+scholarlyInlineMath :: MarkdownParser (F Inlines)
+scholarlyInlineMath = return . B.math <$>
+                        mathInlineWith' (exactly 2 '`') (exactly 2 '`')
+
+-- DisplayMath as defined by Scholarly Markdown:
+-- Single equations appear in a fenced code block with class prepended by 'math'
+-- or delimited by double dollar-signs on their own lines.
+-- Multiple equations not separated by a standalone blankline will be collapsed
+-- into a single gather or align structure.
+scholarlyDisplayMath :: MarkdownParser (F Inlines)
+scholarlyDisplayMath = try $ do
+  firstEqn <- (fencedCodeEquation <|> doubleDollarEquation)
+  restEqn <- many $ try (blankline >> (fencedCodeEquation <|> doubleDollarEquation))
+  let eqn = case restEqn of
+                 [] -> processSingleEqn firstEqn
+                 _  -> processMultiEqn (firstEqn:restEqn)
+  return $ return $ uncurry B.displayMathWith eqn
+
+-- ensures that displayMath are delimited by blanklines
+scholarlyDisplayMath' :: MarkdownParser (F Inlines)
+scholarlyDisplayMath' = try $ do
+  blankline
+  optional blankline -- allow another blank line without starting new block
+  dispmath <- scholarlyDisplayMath
+  -- consume at most one blankline immediately following,
+  -- which prevents starting a new block element while allowing blankline
+  try (lookAhead (count 2 blankline) >> blankline) <|> lookAhead blankline
+  return $ (B.space <>) <$> dispmath
+
+-- DisplayMath with attributes inside a fenced code block
+-- only match if class of fenced code block starts with math
+fencedCodeEquation :: MarkdownParser AttributedMath
+fencedCodeEquation = try $ do
+  c <- try (guardEnabled Ext_fenced_code_blocks >> lookAhead (char '~'))
+     <|> (guardEnabled Ext_backtick_code_blocks >> lookAhead (char '`'))
+  size <- blockDelimiter (== c) Nothing
+  skipSpaces
+  attr <- option ([],[],[]) $
+            try (guardEnabled Ext_fenced_code_attributes >> attributes)
+           <|> do
+               cls <- identifier
+               label <- option [] $
+                 try (optional blankline >> skipSpaces >> char '#' >> identifier)
+                 <|> try (skipSpaces >> inBraces (char '#' >> identifier))
+               return $ (label,[cls],[])
+  guard $ classIsMath attr
+  blankline
+  contents <- manyTill anyLine (blockDelimiter (== c) (Just size))
+  return (attr, intercalate "\n" contents)
+
+-- DisplayMath delimited by double dollar signs
+-- only match if class of fenced code block starts with math
+doubleDollarEquation :: MarkdownParser AttributedMath
+doubleDollarEquation = try $ do
+  let delimitr = exactly 2 '$'
+  delimitr
+  skipSpaces
+  attr <- do
+          cls <- option "math" $ try identifier
+          label <- option [] $
+            try (optional blankline >> skipSpaces >> char '#' >> identifier)
+            <|> try (skipSpaces >> inBraces (char '#' >> identifier))
+          return $ (label,[cls],[])
+  guard $ classIsMath attr
+  blankline
+  contents <- manyTill anyLine delimitr
+  return (attr, intercalate "\n" contents)
+
+inBraces :: Parser [Char] st String -> Parser [Char] st String
+inBraces parser = try $ do
+  char '{'
+  content <- parser
+  char '}'
+  return content
+
+-- TODO: mathDefinitions :: ScholarlyParser (F Inlines)
+-- not sure if needed
+
+--
+-- Scholarly Markdown figures
+--
+
+--
+-- Scholarly Markdown numerical cross-references
+--
+
+--
+-- Scholarly Markdown statements
+--
+
+--
+-- Scholarly Markdown algorithm
+--
+
+--
+-- Scholarly Markdown tables
+--
+
 

@@ -162,9 +162,9 @@ transformPicMath _ entriesRef (Math t math) = do
          modifyIORef entriesRef (entry:)
          return $ RawInline (Format "opendocument") $ render Nothing $
            inTags False "draw:frame" [("text:anchor-type",
-                                       if t == DisplayMath
-                                          then "paragraph"
-                                          else "as-char")
+                                       case t of
+                                          DisplayMath _ -> "paragraph"
+                                          InlineMath    -> "as-char")
                                      ,("style:vertical-pos", "middle")
                                      ,("style:vertical-rel", "text")] $
              selfClosingTag "draw:object" [("xlink:href", dirname)

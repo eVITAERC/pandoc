@@ -308,6 +308,7 @@ Library
                    Text.Pandoc.Highlighting,
                    Text.Pandoc.Compat.Monoid,
                    Text.Pandoc.Compat.TagSoupEntity,
+                   Text.Pandoc.Scholarly,
                    Paths_pandoc
 
   Buildable:       True

@@ -42,7 +42,7 @@ readTeXMath' mt inp = case texMathToPandoc dt inp of
                            Left _    -> [Str (delim ++ inp ++ delim)]
                            Right res -> res
     where (dt, delim) = case mt of
-                             DisplayMath -> (DisplayBlock, "$$")
+                             (DisplayMath _) -> (DisplayBlock, "$$")
                              InlineMath  -> (DisplayInline, "$")
 
 {-# DEPRECATED readTeXMath "Use readTeXMath' from Text.Pandoc.JSON instead" #-}

@@ -136,7 +136,7 @@ instance Arbitrary MathType where
         arbitrary
           = do x <- choose (0 :: Int, 1)
                case x of
-                   0 -> return DisplayMath
+                   0 -> liftM DisplayMath arbAttr
                    1 -> return InlineMath
                    _ -> error "FATAL ERROR: Arbitrary instance, logic bug"
 

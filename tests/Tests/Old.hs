@@ -58,6 +58,8 @@ tests = [ testGroup "markdown"
               "pipe-tables.txt" "pipe-tables.native"
             , test "more" ["-r", "markdown", "-w", "native", "-S"]
               "markdown-reader-more.txt" "markdown-reader-more.native"
+            , test "scholarly-math" ["-r", "markdown_scholarly", "-w", "native"]
+              "scholarly-math.txt" "scholarly-math.native"
             , lhsReaderTest "markdown+lhs"
             ]
           , testGroup "citations"
