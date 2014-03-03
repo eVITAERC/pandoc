@@ -60,6 +60,8 @@ import System.FilePath (takeExtension, addExtension)
 import Text.HTML.TagSoup
 import Text.HTML.TagSoup.Match (tagOpen)
 import qualified Data.Set as Set
+import Text.Printf (printf)
+import Debug.Trace (trace)
 
 type MarkdownParser = Parser [Char] ParserState
 
@@ -354,7 +356,7 @@ referenceKey = try $ do
   tit <- option "" referenceTitle
   -- currently we just ignore MMD-style link/image attributes
   _kvs <- option [] $ guardEnabled Ext_link_attributes
-                      >> many (spnl >> keyValAttr)
+                      >> many (try $ spnl >> keyValAttr)
   blanklines
   let target = (escapeURI $ trimr src,  tit)
   st <- getState
@@ -440,7 +442,10 @@ parseBlocks :: MarkdownParser (F Blocks)
 parseBlocks = mconcat <$> manyTill block eof
 
 block :: MarkdownParser (F Blocks)
-block = choice [ mempty <$ blanklines
+block = do
+  tr <- getOption readerTrace
+  pos <- getPosition
+  res <- choice [ mempty <$ blanklines
                , codeBlockFenced
                , yamlMetaBlock
                , guardEnabled Ext_latex_macros *> (macro >>= return . return)
@@ -465,6 +470,11 @@ block = choice [ mempty <$ blanklines
                , para
                , plain
                ] <?> "block"
+  when tr $ do
+    st <- getState
+    trace (printf "line %d: %s" (sourceLine pos)
+           (take 60 $ show $ B.toList $ runF res st)) (return ())
+  return res
 
 --
 -- header blocks
@@ -944,6 +954,8 @@ rawHtmlBlocks = do
   htmlBlocks <- many1 $ try $ do
                           s <- rawVerbatimBlock <|> try (
                                 do (t,raw) <- htmlTag isBlockTag
+                                   guard $ t ~/= TagOpen "div" [] &&
+                                           t ~/= TagClose "div"
                                    exts <- getOption readerExtensions
                                    -- if open tag, need markdown="1" if
                                    -- markdown_attributes extension is set
@@ -1374,7 +1386,7 @@ ltSign :: MarkdownParser (F Inlines)
 ltSign = do
   guardDisabled Ext_raw_html
     <|> guardDisabled Ext_markdown_in_html_blocks
-    <|> (notFollowedBy' rawHtmlBlocks >> return ())
+    <|> (notFollowedBy' (htmlTag isBlockTag) >> return ())
   char '<'
   return $ return $ B.str "<"
 
@@ -1540,16 +1552,14 @@ endline :: MarkdownParser (F Inlines)
 endline = try $ do
   newline
   notFollowedBy blankline
+  -- parse potential list-starts differently if in a list:
+  st <- getState
+  when (stateParserContext st == ListItemState) $ notFollowedBy listStart
   guardDisabled Ext_lists_without_preceding_blankline <|> notFollowedBy listStart
   guardEnabled Ext_blank_before_blockquote <|> notFollowedBy emailBlockQuoteStart
   guardEnabled Ext_blank_before_header <|> notFollowedBy (char '#') -- atx header
   guardEnabled Ext_backtick_code_blocks >>
      notFollowedBy (() <$ (lookAhead (char '`') >> codeBlockFenced))
-  -- parse potential list-starts differently if in a list:
-  st <- getState
-  when (stateParserContext st == ListItemState) $ do
-     notFollowedBy' bulletListStart
-     notFollowedBy' anyOrderedListStart
   (guardEnabled Ext_hard_line_breaks >> return (return B.linebreak))
     <|> (guardEnabled Ext_ignore_line_breaks >> return mempty)
     <|> (return $ return B.space)
@@ -1730,12 +1740,19 @@ spanHtml = try $ do
 divHtml :: MarkdownParser (F Blocks)
 divHtml = try $ do
   guardEnabled Ext_markdown_in_html_blocks
-  (TagOpen _ attrs, _) <- htmlTag (~== TagOpen "div" [])
-  contents <- mconcat <$> manyTill block (htmlTag (~== TagClose "div"))
-  let ident = fromMaybe "" $ lookup "id" attrs
-  let classes = maybe [] words $ lookup "class" attrs
-  let keyvals = [(k,v) | (k,v) <- attrs, k /= "id" && k /= "class"]
-  return $ B.divWith (ident, classes, keyvals) <$> contents
+  (TagOpen _ attrs, rawtag) <- htmlTag (~== TagOpen "div" [])
+  bls <- option "" (blankline >> option "" blanklines)
+  contents <- mconcat <$>
+              many (notFollowedBy' (htmlTag (~== TagClose "div")) >> block)
+  closed <- option False (True <$ htmlTag (~== TagClose "div"))
+  if closed
+     then do
+       let ident = fromMaybe "" $ lookup "id" attrs
+       let classes = maybe [] words $ lookup "class" attrs
+       let keyvals = [(k,v) | (k,v) <- attrs, k /= "id" && k /= "class"]
+       return $ B.divWith (ident, classes, keyvals) <$> contents
+     else -- avoid backtracing
+       return $ return (B.rawBlock "html" (rawtag <> bls)) <> contents
 
 rawHtmlInline :: MarkdownParser (F Inlines)
 rawHtmlInline = do
