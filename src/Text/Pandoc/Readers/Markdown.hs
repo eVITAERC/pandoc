@@ -1617,22 +1617,25 @@ link = try $ do
   setState $ st{ stateAllowLinks = False }
   (lab,raw) <- reference
   setState $ st{ stateAllowLinks = True }
-  regLink B.link lab <|> referenceLink B.link (lab,raw)
+  let constructor _ = B.link
+  regLink constructor lab <|> referenceLink constructor (lab,raw)
 
-regLink :: (String -> String -> Inlines -> Inlines)
+regLink :: (Attr -> String -> String -> Inlines -> Inlines)
         -> F Inlines -> MarkdownParser (F Inlines)
 regLink constructor lab = try $ do
   (src, tit) <- source
-  return $ constructor src tit <$> lab
+  attr <- option nullAttr attributes
+  return $ constructor attr src tit <$> lab
 
 -- a link like [this][ref] or [this][] or [this]
-referenceLink :: (String -> String -> Inlines -> Inlines)
+referenceLink :: (Attr -> String -> String -> Inlines -> Inlines)
               -> (F Inlines, String) -> MarkdownParser (F Inlines)
 referenceLink constructor (lab, raw) = do
   sp <- (True <$ lookAhead (char ' ')) <|> return False
   (ref,raw') <- try
            (skipSpaces >> optional (newline >> skipSpaces) >> reference)
            <|> return (mempty, "")
+  attr <- option nullAttr attributes
   let labIsRef = raw' == "" || raw' == "[]"
   let key = toKey $ if labIsRef then raw else raw'
   parsedRaw <- parseFromString (mconcat <$> many inline) raw'
@@ -1653,10 +1656,10 @@ referenceLink constructor (lab, raw) = do
          ref' <- if labIsRef then lab else ref
          if implicitHeaderRefs
             then case M.lookup ref' headers of
-                   Just ident -> constructor ('#':ident) "" <$> lab
+                   Just ident -> constructor attr ('#':ident) "" <$> lab
                    Nothing    -> makeFallback
             else makeFallback
-       Just (src,tit) -> constructor src tit <$> lab
+       Just (src,tit) -> constructor attr src tit <$> lab
 
 dropBrackets :: String -> String
 dropBrackets = reverse . dropRB . reverse . dropLB
@@ -1688,9 +1691,10 @@ image = try $ do
   char '!'
   (lab,raw) <- reference
   defaultExt <- getOption readerDefaultImageExtension
-  let constructor src = case takeExtension src of
-                              "" -> B.image (addExtension src defaultExt)
-                              _  -> B.image src
+  let builder = B.imageWith
+  let constructor attr src = case takeExtension src of
+                              "" -> builder attr (addExtension src defaultExt)
+                              _  -> builder attr src
   regLink constructor lab <|> referenceLink constructor (lab,raw)
 
 note :: MarkdownParser (F Inlines)
@@ -1972,7 +1976,7 @@ fencedCodeEquation = try $ do
      <|> (guardEnabled Ext_backtick_code_blocks >> lookAhead (char '`'))
   size <- blockDelimiter (== c) Nothing
   skipSpaces
-  attr <- option ([],[],[]) $
+  attr <- option nullAttr $
             try (guardEnabled Ext_fenced_code_attributes >> attributes)
            <|> do
                cls <- identifier
