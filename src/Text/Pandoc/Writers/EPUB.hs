@@ -719,7 +719,7 @@ transformInline  :: WriterOptions
                  -> IORef [(FilePath, FilePath)] -- ^ (oldpath, newpath) images
                  -> Inline
                  -> IO Inline
-transformInline opts picsRef (Image lab (src,tit)) = do
+transformInline opts picsRef (Image attr lab (src,tit)) = do
     let src' = unEscapeString src
     pics <- readIORef picsRef
     let oldsrc = maybe src' (</> src) $ writerSourceURL opts
@@ -730,7 +730,7 @@ transformInline opts picsRef (Image lab (src,tit)) = do
                           let new = "images/img" ++ show (length pics) ++ ext
                           modifyIORef picsRef ( (oldsrc, new): )
                           return new
-    return $ Image lab (newsrc, tit)
+    return $ Image attr lab (newsrc, tit)
 transformInline opts _ (x@(Math _ _))
   | WebTeX _ <- writerHTMLMathMethod opts = do
     raw <- makeSelfContained Nothing $ writeHtmlInline opts x

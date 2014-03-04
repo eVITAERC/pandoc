@@ -386,7 +386,7 @@ inlineToOpenDocument o ils
                                 then return $ text s
                                 else return empty
     | Link  l (s,t) <- ils = mkLink s t <$> inlinesToOpenDocument o l
-    | Image _ (s,t) <- ils = mkImg  s t
+    | Image _ _ (s,t) <- ils = mkImg  s t
     | Note        l <- ils = mkNote l
     | otherwise            = return empty
     where

@@ -168,7 +168,7 @@ blockToRST (Div attr bs) = do
   return $ blankline <> startTag $+$ contents $+$ endTag $$ blankline
 blockToRST (Plain inlines) = inlineListToRST inlines
 -- title beginning with fig: indicates that the image is a figure
-blockToRST (Para [Image txt (src,'f':'i':'g':':':tit)]) = do
+blockToRST (Para [Image _ txt (src,'f':'i':'g':':':tit)]) = do
   capt <- inlineListToRST txt
   let fig = "figure:: " <> text src
   let alt = ":alt: " <> if null tit then capt else text tit
@@ -344,7 +344,7 @@ inlineListToRST lst =
         isComplex (Superscript _) = True
         isComplex (Subscript _) = True
         isComplex (Link _ _) = True
-        isComplex (Image _ _) = True
+        isComplex (Image _ _ _) = True
         isComplex (Code _ _) = True
         isComplex (Math _ _) = True
         isComplex _ = False
@@ -399,7 +399,7 @@ inlineToRST (Link [Str str] (src, _))
        else src == escapeURI str = do
   let srcSuffix = if isPrefixOf "mailto:" src then drop 7 src else src
   return $ text srcSuffix
-inlineToRST (Link [Image alt (imgsrc,imgtit)] (src, _tit)) = do
+inlineToRST (Link [Image _ alt (imgsrc,imgtit)] (src, _tit)) = do
   label <- registerImage alt (imgsrc,imgtit) (Just src)
   return $ "|" <> label <> "|"
 inlineToRST (Link txt (src, tit)) = do
@@ -417,7 +417,7 @@ inlineToRST (Link txt (src, tit)) = do
                    modify $ \st -> st { stLinks = (txt,(src,tit)):refs }
                    return $ "`" <> linktext <> "`_"
     else return $ "`" <> linktext <> " <" <> text src <> ">`__"
-inlineToRST (Image alternate (source, tit)) = do
+inlineToRST (Image _ alternate (source, tit)) = do
   label <- registerImage alternate (source,tit) Nothing
   return $ "|" <> label <> "|"
 inlineToRST (Note contents) = do

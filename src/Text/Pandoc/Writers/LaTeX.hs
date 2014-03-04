@@ -306,11 +306,11 @@ blockToLaTeX (Div (_,classes,_) bs) = do
 blockToLaTeX (Plain lst) =
   inlineListToLaTeX $ dropWhile isLineBreakOrSpace lst
 -- title beginning with fig: indicates that the image is a figure
-blockToLaTeX (Para [Image txt (src,'f':'i':'g':':':tit)]) = do
+blockToLaTeX (Para [Image attr txt (src,'f':'i':'g':':':tit)]) = do
   capt <- if null txt
              then return empty
              else (\c -> "\\caption" <> braces c) `fmap` inlineListToLaTeX txt
-  img <- inlineToLaTeX (Image txt (src,tit))
+  img <- inlineToLaTeX (Image attr txt (src,tit))
   return $ "\\begin{figure}[htbp]" $$ "\\centering" $$ img $$
            capt $$ "\\end{figure}"
 -- . . . indicates pause in beamer slides
@@ -723,7 +723,7 @@ inlineToLaTeX (Link txt (src, _)) =
                 src' <- stringToLaTeX URLString src
                 return $ text ("\\href{" ++ src' ++ "}{") <>
                          contents <> char '}'
-inlineToLaTeX (Image _ (source, _)) = do
+inlineToLaTeX (Image _ _ (source, _)) = do
   modify $ \s -> s{ stGraphics = True }
   let source' = if isURI source
                    then source

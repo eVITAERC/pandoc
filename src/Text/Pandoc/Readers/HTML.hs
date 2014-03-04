@@ -399,13 +399,14 @@ pLink = try $ do
   lab <- liftM concat $ manyTill inline (pCloses "a")
   return [Link (normalizeSpaces lab) (escapeURI url, title)]
 
+-- | TODO: parse additional attributes into Attr
 pImage :: TagParser [Inline]
 pImage = do
   tag <- pSelfClosing (=="img") (isJust . lookup "src")
   let url = fromAttrib "src" tag
   let title = fromAttrib "title" tag
   let alt = fromAttrib "alt" tag
-  return [Image (B.toList $ B.text alt) (escapeURI url, title)]
+  return [Image nullAttr (B.toList $ B.text alt) (escapeURI url, title)]
 
 pCode :: TagParser [Inline]
 pCode = try $ do

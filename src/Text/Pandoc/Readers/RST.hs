@@ -773,10 +773,10 @@ substKey = try $ do
   res <- B.toList <$> directive'
   il <- case res of
              -- use alt unless :alt: attribute on image:
-             [Para [Image [Str "image"] (src,tit)]] ->
-                return $ B.image src tit alt
-             [Para [Link [Image [Str "image"] (src,tit)] (src',tit')]] ->
-                return $ B.link src' tit' (B.image src tit alt)
+             [Para [Image attr [Str "image"] (src,tit)]] ->
+                return $ B.imageWith attr src tit alt
+             [Para [Link [Image attr [Str "image"] (src,tit)] (src',tit')]] ->
+                return $ B.link src' tit' (B.imageWith attr src tit alt)
              [Para ils] -> return $ B.fromList ils
              _          -> mzero
   let key = toKey $ stripFirstAndLast ref

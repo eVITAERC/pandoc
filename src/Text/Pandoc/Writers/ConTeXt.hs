@@ -128,7 +128,7 @@ blockToConTeXt :: Block
 blockToConTeXt Null = return empty
 blockToConTeXt (Plain lst) = inlineListToConTeXt lst
 -- title beginning with fig: indicates that the image is a figure
-blockToConTeXt (Para [Image txt (src,'f':'i':'g':':':_)]) = do
+blockToConTeXt (Para [Image _ txt (src,'f':'i':'g':':':_)]) = do
   capt <- inlineListToConTeXt txt
   return $ blankline $$ "\\placefigure" <> braces capt <>
            braces ("\\externalfigure" <> brackets (text src)) <> blankline
@@ -317,7 +317,7 @@ inlineToConTeXt (Link txt          (src, _))      = do
            <> brackets label
            <> "\\from"
            <> brackets (text ref)
-inlineToConTeXt (Image _ (src, _)) = do
+inlineToConTeXt (Image _ _ (src, _)) = do
   let src' = if isURI src
                 then src
                 else unEscapeString src

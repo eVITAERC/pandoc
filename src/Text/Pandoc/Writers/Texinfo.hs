@@ -130,12 +130,12 @@ blockToTexinfo (Plain lst) =
   inlineListToTexinfo lst
 
 -- title beginning with fig: indicates that the image is a figure
-blockToTexinfo (Para [Image txt (src,'f':'i':'g':':':tit)]) = do
+blockToTexinfo (Para [Image attr txt (src,'f':'i':'g':':':tit)]) = do
   capt <- if null txt
              then return empty
              else (\c -> text "@caption" <> braces c) `fmap`
                     inlineListToTexinfo txt
-  img  <- inlineToTexinfo (Image txt (src,tit))
+  img  <- inlineToTexinfo (Image attr txt (src,tit))
   return $ text "@float" $$ img $$ capt $$ text "@end float"
 
 blockToTexinfo (Para lst) =
@@ -437,7 +437,7 @@ inlineToTexinfo (Link txt (src, _)) = do
                 return $ text ("@uref{" ++ src1 ++ ",") <> contents <>
                          char '}'
 
-inlineToTexinfo (Image alternate (source, _)) = do
+inlineToTexinfo (Image _ alternate (source, _)) = do
   content <- escapeCommas $ inlineListToTexinfo alternate
   return $ text ("@image{" ++ base ++ ",,,") <> content <> text "," <>
            text (ext ++ "}")

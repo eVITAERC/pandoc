@@ -123,8 +123,8 @@ blockToAsciiDoc _ Null = return empty
 blockToAsciiDoc opts (Plain inlines) = do
   contents <- inlineListToAsciiDoc opts inlines
   return $ contents <> cr
-blockToAsciiDoc opts (Para [Image alt (src,'f':'i':'g':':':tit)]) =
-  blockToAsciiDoc opts (Para [Image alt (src,tit)])
+blockToAsciiDoc opts (Para [Image attr alt (src,'f':'i':'g':':':tit)]) =
+  blockToAsciiDoc opts (Para [Image attr alt (src,tit)])
 blockToAsciiDoc opts (Para inlines) = do
   contents <- inlineListToAsciiDoc opts inlines
   -- escape if para starts with ordered list marker
@@ -371,7 +371,7 @@ inlineToAsciiDoc opts (Link txt (src, _tit)) = do
   return $ if useAuto
               then text srcSuffix
               else prefix <> text src <> "[" <> linktext <> "]"
-inlineToAsciiDoc opts (Image alternate (src, tit)) = do
+inlineToAsciiDoc opts (Image _ alternate (src, tit)) = do
 -- image:images/logo.png[Company logo, title="blah"]
   let txt = if (null alternate) || (alternate == [Str ""])
                then [Str "image"]

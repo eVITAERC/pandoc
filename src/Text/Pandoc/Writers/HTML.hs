@@ -404,8 +404,8 @@ blockToHtml :: WriterOptions -> Block -> State WriterState Html
 blockToHtml _ Null = return mempty
 blockToHtml opts (Plain lst) = inlineListToHtml opts lst
 -- title beginning with fig: indicates that the image is a figure
-blockToHtml opts (Para [Image txt (s,'f':'i':'g':':':tit)]) = do
-  img <- inlineToHtml opts (Image txt (s,tit))
+blockToHtml opts (Para [Image attr txt (s,'f':'i':'g':':':tit)]) = do
+  img <- inlineToHtml opts (Image attr txt (s,tit))
   let tocapt = if writerHtml5 opts
                   then H5.figcaption
                   else H.p ! A.class_ "caption"
@@ -731,7 +731,7 @@ inlineToHtml opts inline =
                         return $ if null tit
                                     then link
                                     else link ! A.title (toValue tit)
-    (Image txt (s,tit)) | treatAsImage s -> do
+    (Image _ txt (s,tit)) | treatAsImage s -> do
                         let alternate' = stringify txt
                         let attributes = [A.src $ toValue s] ++
                                          (if null tit
@@ -743,7 +743,7 @@ inlineToHtml opts inline =
                         let tag = if writerHtml5 opts then H5.img else H.img
                         return $ foldl (!) tag attributes
                         -- note:  null title included, as in Markdown.pl
-    (Image _ (s,tit)) -> do
+    (Image _ _ (s,tit)) -> do
                         let attributes = [A.src $ toValue s] ++
                                          (if null tit
                                             then []

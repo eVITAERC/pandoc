@@ -112,9 +112,9 @@ blockToTextile opts (Plain inlines) =
   inlineListToTextile opts inlines
 
 -- title beginning with fig: indicates that the image is a figure
-blockToTextile opts (Para [Image txt (src,'f':'i':'g':':':tit)]) = do
+blockToTextile opts (Para [Image attr txt (src,'f':'i':'g':':':tit)]) = do
   capt <- blockToTextile opts (Para txt)
-  im <- inlineToTextile opts (Image txt (src,tit))
+  im <- inlineToTextile opts (Image attr txt (src,tit))
   return $ im ++ "\n" ++ capt
 
 blockToTextile opts (Para inlines) = do
@@ -421,7 +421,7 @@ inlineToTextile opts (Link txt (src, _)) = do
                 _           -> inlineListToTextile opts txt
   return $ "\"" ++ label ++ "\":" ++ src
 
-inlineToTextile opts (Image alt (source, tit)) = do
+inlineToTextile opts (Image _ alt (source, tit)) = do
   alt' <- inlineListToTextile opts alt
   let txt = if null tit
                then if null alt'

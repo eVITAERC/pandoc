@@ -527,7 +527,7 @@ image = try $ do
   src <- manyTill anyChar (lookAhead $ oneOf "!(")
   alt <- option "" (try $ (char '(' >> manyTill anyChar (char ')')))
   char '!'
-  return $ Image [Str alt] (src, alt)
+  return $ Image nullAttr [Str alt] (src, alt)
 
 escapedInline :: Parser [Char] ParserState Inline
 escapedInline = escapedEqs <|> escapedTag

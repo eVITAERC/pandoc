@@ -94,7 +94,7 @@ plainify = walk go
         go (Math _ s) = Str s
         go (RawInline _ _) = Str ""
         go (Link xs _) = SmallCaps xs
-        go (Image xs _) = SmallCaps $ [Str "["] ++ xs ++ [Str "]"]
+        go (Image _ xs _) = SmallCaps $ [Str "["] ++ xs ++ [Str "]"]
         go (Cite _ cits) = SmallCaps cits
         go x = x
 
@@ -318,8 +318,8 @@ blockToMarkdown opts (Plain inlines) = do
   contents <- inlineListToMarkdown opts inlines
   return $ contents <> cr
 -- title beginning with fig: indicates figure
-blockToMarkdown opts (Para [Image alt (src,'f':'i':'g':':':tit)]) =
-  blockToMarkdown opts (Para [Image alt (src,tit)])
+blockToMarkdown opts (Para [Image attr alt (src,'f':'i':'g':':':tit)]) =
+  blockToMarkdown opts (Para [Image attr alt (src,tit)])
 blockToMarkdown opts (Para inlines) = do
   contents <- inlineListToMarkdown opts inlines
   -- escape if para starts with ordered list marker
@@ -783,7 +783,7 @@ inlineToMarkdown opts (Link txt (src, tit)) = do
                            in  first <> second
                       else "[" <> linktext <> "](" <>
                            text src <> linktitle <> ")"
-inlineToMarkdown opts (Image alternate (source, tit)) = do
+inlineToMarkdown opts (Image _ alternate (source, tit)) = do
   let txt = if null alternate || alternate == [Str source]
                                  -- to prevent autolinks
                then [Str ""]
