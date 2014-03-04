@@ -31,7 +31,14 @@ module Text.Pandoc.Scholarly (classIsMath,
                               processSingleEqn,
                               processMultiEqn,
                               AttributedMath,
-                              insertAttrClass
+                              getIdentifier,
+                              getClasses,
+                              getKeyVals,
+                              lookupKey,
+                              setIdentifier,
+                              insertClass,
+                              insertIfNoneKeyVal,
+                              insertReplaceKeyVal
                              )
 where
 
@@ -40,6 +47,7 @@ import Text.Pandoc.Definition
 import Text.Pandoc.Shared
 import Text.Pandoc.Parsing hiding (tableWith)
 import Control.Arrow
+import qualified Data.Map as M
 
 type AttributedMath = (Attr, String)
 
@@ -47,16 +55,43 @@ type AttributedMath = (Attr, String)
 classIsMath :: Attr -> Bool
 classIsMath (_,classes,_) = any ("math" `isPrefixOf`) classes
 
-insertAttrClass :: String -> Attr -> Attr
-insertAttrClass className attr@(ident, classes, keyval)
-  | className `elem` classes = (ident, className:classes, keyval)
+--
+-- Attribute manipulation functions
+--
+
+insertClass :: String -> Attr -> Attr
+insertClass className attr@(ident, classes, keyval)
+  | className `notElem` classes = (ident, className:classes, keyval)
   | otherwise = attr
+
+insertWithKeyVal :: (String -> String -> String) -- ^ new, old, final value
+                 -> (String, String) -- ^ (key, new value)
+                 -> Attr
+                 -> Attr
+insertWithKeyVal f (key, val) (ident, classes, keyval) =
+  let newKeyValMap = M.insertWith f key val $ M.fromList keyval
+  in (ident, classes, M.toList newKeyValMap)
+
+insertIfNoneKeyVal :: (String, String) -> Attr -> Attr
+insertIfNoneKeyVal keyval attr = insertWithKeyVal (\_ x -> x) keyval attr
+
+insertReplaceKeyVal :: (String, String) -> Attr -> Attr
+insertReplaceKeyVal keyval attr = insertWithKeyVal (\x _ -> x) keyval attr
 
 getClasses :: Attr -> [String]
 getClasses (_, classes, _) = classes
 
 getIdentifier :: Attr -> String
 getIdentifier (identifier, _, _) = identifier
+
+setIdentifier :: String -> Attr -> Attr
+setIdentifier identifier (_, classes, keyval) = (identifier, classes, keyval)
+
+getKeyVals :: Attr -> [(String, String)]
+getKeyVals (_, _, keyVals) = keyVals
+
+lookupKey :: String -> Attr -> Maybe String
+lookupKey key (_, _, keyval) = M.lookup key $ M.fromList keyval
 
 ---
 --- Process functions for single-equation Scholarly DisplayMath
