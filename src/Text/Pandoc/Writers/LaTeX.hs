@@ -34,6 +34,7 @@ import Text.Pandoc.Walk
 import Text.Pandoc.Shared
 import Text.Pandoc.Writers.Shared
 import Text.Pandoc.Options
+import Text.Pandoc.Scholarly
 import Text.Pandoc.Templates
 import Text.Printf ( printf )
 import Network.URI ( isURI, unEscapeString )
@@ -700,8 +701,10 @@ inlineToLaTeX (Quoted qt lst) = do
 inlineToLaTeX (Str str) = liftM text $ stringToLaTeX TextString str
 inlineToLaTeX (Math InlineMath str) =
   return $ char '$' <> text str <> char '$'
-inlineToLaTeX (Math (DisplayMath _) str) =
-  return $ "\\[" <> text str <> "\\]"
+inlineToLaTeX (Math (DisplayMath attr) str) =
+  return $ cr <> char '%' <> cr
+           <> text (dispMathToLaTeX attr str)
+           <> cr <> char '%' <> cr
 inlineToLaTeX (RawInline f str)
   | f == Format "latex" || f == Format "tex"
                         = return $ text str

@@ -215,6 +215,7 @@ dispMathToLaTeX :: Attr -> String -> String
 dispMathToLaTeX (label, classes, _) mathCode
   | "align" `elem` classes = wrapInLatexEnv "align" mathCode
   | "gather" `elem` classes = wrapInLatexEnv "gather" mathCode
+  | "math_def" `elem` classes = mathCode
   | otherwise = case label of
                   "" -> wrapInLatexEnv "equation*" mathCode
                   _  -> wrapInLatexEnv "equation" mathCode
