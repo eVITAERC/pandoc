@@ -30,6 +30,7 @@ Utility functions for Scholarly Markdown extensions.
 module Text.Pandoc.Scholarly (classIsMath,
                               processSingleEqn,
                               processMultiEqn,
+                              dispMathToLaTeX,
                               AttributedMath,
                               getIdentifier,
                               getClasses,
@@ -38,7 +39,7 @@ module Text.Pandoc.Scholarly (classIsMath,
                               setIdentifier,
                               insertClass,
                               insertIfNoneKeyVal,
-                              insertReplaceKeyVal
+                              insertReplaceKeyVal,
                              )
 where
 
@@ -94,7 +95,7 @@ lookupKey :: String -> Attr -> Maybe String
 lookupKey key (_, _, keyval) = M.lookup key $ M.fromList keyval
 
 ---
---- Process functions for single-equation Scholarly DisplayMath
+--- Parser functions for Scholarly DisplayMath
 ---
 
 -- Currently does the following:
@@ -205,3 +206,15 @@ ignoreLinebreak = try (string "\\%")
                   <|>  skipTexEnvironment "aligned"
                   <|>  skipTexEnvironment "alignedat"
                   <|>  skipTexEnvironment "cases"
+
+--
+-- Writer functions for Scholarly DisplayMath
+--
+
+dispMathToLaTeX :: Attr -> String -> String
+dispMathToLaTeX (label, classes, _) mathCode
+  | "align" `elem` classes = wrapInLatexEnv "align" mathCode
+  | "gather" `elem` classes = wrapInLatexEnv "gather" mathCode
+  | otherwise = case label of
+                  "" -> wrapInLatexEnv "equation*" mathCode
+                  _  -> wrapInLatexEnv "equation" mathCode

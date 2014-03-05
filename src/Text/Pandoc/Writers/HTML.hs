@@ -697,10 +697,7 @@ inlineToHtml opts inline =
                                         Left  _ -> inlineListToHtml opts
                                                    (readTeXMath' t str) >>= return .
                                                      (H.span ! A.class_ "math")
-                               MathJax _ -> return $ H.span ! A.class_ "math" $ toHtml $
-                                  case t of
-                                    InlineMath  -> "\\(" ++ str ++ "\\)"
-                                    (DisplayMath _) -> "\\[" ++ str ++ "\\]"
+                               MathJax _ -> return $ mathToMathJax opts t str
                                PlainMath -> do
                                   x <- inlineListToHtml opts (readTeXMath' t str)
                                   let m = H.span ! A.class_ "math" $ x
@@ -803,3 +800,14 @@ blockListToNote opts ref blocks =
                               Just EPUB3 -> noteItem ! customAttribute "epub:type" "footnote"
                               _          -> noteItem
          return $ nl opts >> noteItem'
+
+mathToMathJax :: WriterOptions -> MathType -> String -> Html
+mathToMathJax opts mathType mathCode =
+  case mathType of
+    InlineMath -> H.span ! A.class_ "math inlineMath" $ toHtml $ "\\(" ++ mathCode ++ "\\)"
+    DisplayMath attr -> mconcat [nl opts,
+                                 H.div ! A.class_ "math displayMath" $
+                                   mconcat [toHtml ("\\[" :: String), nl opts,
+                                            toHtml $ dispMathToLaTeX attr mathCode,
+                                            nl opts, toHtml ("\\]" :: String)],
+                                 nl opts]
