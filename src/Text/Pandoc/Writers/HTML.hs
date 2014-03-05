@@ -805,8 +805,8 @@ mathToMathJax :: WriterOptions -> MathType -> String -> Html
 mathToMathJax opts mathType mathCode =
   case mathType of
     InlineMath -> H.span ! A.class_ "math inlineMath" $ toHtml $ "\\(" ++ mathCode ++ "\\)"
-    DisplayMath attr@(_, classes, _) ->
-      let isMathDef = "math_def" `elem` classes
+    DisplayMath attr ->
+      let isMathDef = "math_def" `elem` (getClasses attr)
       in mconcat [nl opts,
                   H.div ! A.class_ "math displayMath" !?
                      (isMathDef, A.style $ toValue ("visibility: hidden;" :: String)) $
