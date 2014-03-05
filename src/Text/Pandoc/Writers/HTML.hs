@@ -40,6 +40,7 @@ import Text.Pandoc.Slides
 import Text.Pandoc.Highlighting ( highlight, styleToCss,
                                   formatHtmlInline, formatHtmlBlock )
 import Text.Pandoc.XML (fromEntities, escapeStringForXML)
+import Text.Pandoc.Scholarly
 import Network.HTTP ( urlEncode )
 import Numeric ( showHex )
 import Data.Char ( ord, toLower )
@@ -405,7 +406,8 @@ blockToHtml _ Null = return mempty
 blockToHtml opts (Plain lst) = inlineListToHtml opts lst
 -- title beginning with fig: indicates that the image is a figure
 blockToHtml opts (Para [Image attr txt (s,'f':'i':'g':':':tit)]) = do
-  img <- inlineToHtml opts (Image attr txt (s,tit))
+  let ident = getIdentifier attr
+  img <- inlineToHtml opts (Image (setIdentifier "" attr) txt (s,tit))
   let tocapt = if writerHtml5 opts
                   then H5.figcaption
                   else H.p ! A.class_ "caption"
@@ -413,10 +415,10 @@ blockToHtml opts (Para [Image attr txt (s,'f':'i':'g':':':tit)]) = do
              then return mempty
              else tocapt `fmap` inlineListToHtml opts txt
   return $ if writerHtml5 opts
-              then H5.figure $ mconcat
+              then H5.figure !? (ident /= "", prefixedId opts ident) $ mconcat
                     [nl opts, img, capt, nl opts]
-              else H.div ! A.class_ "figure" $ mconcat
-                    [nl opts, img, capt, nl opts]
+              else H.div ! A.class_ "figure" !? (ident /= "", prefixedId opts ident) $
+                    mconcat [nl opts, img, capt, nl opts]
 blockToHtml opts (Para lst) = do
   contents <- inlineListToHtml opts lst
   return $ H.p contents
@@ -731,7 +733,7 @@ inlineToHtml opts inline =
                         return $ if null tit
                                     then link
                                     else link ! A.title (toValue tit)
-    (Image _ txt (s,tit)) | treatAsImage s -> do
+    (Image attr txt (s,tit)) | treatAsImage s -> do
                         let alternate' = stringify txt
                         let attributes = [A.src $ toValue s] ++
                                          (if null tit
@@ -741,14 +743,14 @@ inlineToHtml opts inline =
                                             then []
                                             else [A.alt $ toValue alternate']
                         let tag = if writerHtml5 opts then H5.img else H.img
-                        return $ foldl (!) tag attributes
+                        return $ addAttrs opts attr $ foldl (!) tag attributes
                         -- note:  null title included, as in Markdown.pl
-    (Image _ _ (s,tit)) -> do
+    (Image attr _ (s,tit)) -> do
                         let attributes = [A.src $ toValue s] ++
                                          (if null tit
                                             then []
                                             else [A.title $ toValue tit])
-                        return $ foldl (!) H5.embed attributes
+                        return $ addAttrs opts attr $ foldl (!) H5.embed attributes
                         -- note:  null title included, as in Markdown.pl
     (Note contents)
       | writerIgnoreNotes opts -> return mempty
