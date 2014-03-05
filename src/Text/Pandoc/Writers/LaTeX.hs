@@ -42,6 +42,7 @@ import Data.List ( (\\), isSuffixOf, isInfixOf,
                    isPrefixOf, intercalate, intersperse )
 import Data.Char ( toLower, isPunctuation, isAscii, isLetter, isDigit, ord )
 import Data.Maybe ( fromMaybe )
+import qualified Data.Map as M
 import Control.Applicative ((<|>))
 import Control.Monad.State
 import Text.Pandoc.Pretty
@@ -726,13 +727,13 @@ inlineToLaTeX (Link txt (src, _)) =
                 src' <- stringToLaTeX URLString src
                 return $ text ("\\href{" ++ src' ++ "}{") <>
                          contents <> char '}'
-inlineToLaTeX (Image _ _ (source, _)) = do
+inlineToLaTeX (Image attr _ (source, _)) = do
   modify $ \s -> s{ stGraphics = True }
   let source' = if isURI source
                    then source
                    else unEscapeString source
   source'' <- stringToLaTeX URLString source'
-  return $ "\\includegraphics" <> braces (text source'')
+  return $ imageWithAttrToLatex "\\textwidth" attr source''
 inlineToLaTeX (Note contents) = do
   inMinipage <- gets stInMinipage
   modify (\s -> s{stInNote = True})
@@ -848,3 +849,44 @@ citationsToBiblatex _ = return empty
 getListingsLanguage :: [String] -> Maybe String
 getListingsLanguage [] = Nothing
 getListingsLanguage (x:xs) = toListingsLanguage x <|> getListingsLanguage xs
+
+-- Extracts dimension attributes and include in the @includegraphics@ directive
+-- (required "fullWidth" argument, which is a command that defines 100% width
+-- of container, such as @\\textwidth@)
+imageWithAttrToLatex :: String -> Attr -> String -> Doc
+imageWithAttrToLatex fullWidth attr src =
+  let keyval' = M.fromList $ getKeyVals attr
+      width = case M.lookup "width" keyval' of
+                Just len -> filterLength fullWidth len
+                Nothing  -> case M.lookup "max-width" keyval' of
+                  Just len -> filterLength fullWidth len
+                  Nothing  -> ""
+      hight = case M.lookup "height" keyval' of
+                Just len -> filterLength fullWidth len
+                Nothing  -> case M.lookup "max-height" keyval' of
+                  Just len -> filterLength fullWidth len
+                  Nothing  -> ""
+      width' = if (null width) then "" else ("width=" ++ width)
+      hight' = if (null hight) then "" else ("height=" ++ hight)
+      keepAspectRatio = if (not (null width) && not (null hight))
+                           then "keepaspectratio=true"
+                           else ""
+      graphicxAttr = intercalate ","
+                    [ x | x <- [width', hight', keepAspectRatio], not $ null x]
+  in "\\includegraphics" <> brackets (text graphicxAttr) <> braces (text src)
+
+-- Ensures that dimension is understandable by LaTeX,
+-- mostly converts unit of percentage @%@ to measure of relative width.
+-- If unit not recognized, then returns empty string.
+-- (required "fullWidth" argument, which is a command that defines 100% width
+-- of container, such as @\\textwidth@)
+filterLength :: String -> String -> String
+filterLength fullWidth len =
+  if any (`isSuffixOf` len) validLaTeXUnits
+     then if ("%" `isSuffixOf` len)
+          then "0." ++ (init len) ++ fullWidth -- does not deal with non-Int
+          else len
+     else ""
+
+validLaTeXUnits :: [String]
+validLaTeXUnits = ["mm","cm","in","pt","em","ex","%"]
