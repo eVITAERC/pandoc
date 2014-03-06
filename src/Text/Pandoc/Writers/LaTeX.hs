@@ -315,6 +315,12 @@ blockToLaTeX (Para [Image attr txt (src,'f':'i':'g':':':tit)]) = do
   img <- inlineToLaTeX (Image attr txt (src,tit))
   return $ "\\begin{figure}[htbp]" $$ "\\centering" $$ img $$
            capt $$ "\\end{figure}"
+blockToLaTeX (Figure _ _ txt) = do
+  capt <- if null txt
+             then return empty
+             else (\c -> "\\caption" <> braces c) `fmap` inlineListToLaTeX txt
+  return $ "\\begin{figure}[htbp]" $$ "\\centering" $$
+           capt $$ "\\end{figure}"
 -- . . . indicates pause in beamer slides
 blockToLaTeX (Para [Str ".",Space,Str ".",Space,Str "."]) = do
   beamer <- writerBeamer `fmap` gets stOptions

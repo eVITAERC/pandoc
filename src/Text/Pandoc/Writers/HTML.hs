@@ -44,9 +44,9 @@ import Text.Pandoc.Scholarly
 import Network.HTTP ( urlEncode )
 import Numeric ( showHex )
 import Data.Char ( ord, toLower )
-import Data.List ( isPrefixOf, intersperse )
+import Data.List ( isPrefixOf, intersperse, intercalate )
 import Data.String ( fromString )
-import Data.Maybe ( catMaybes, fromMaybe )
+import Data.Maybe ( catMaybes, fromMaybe, fromJust )
 import Control.Monad.State
 import Text.Blaze.Html hiding(contents)
 import Text.Blaze.Internal(preEscapedString)
@@ -400,25 +400,57 @@ treatAsImage fp =
   let ext = map toLower $ drop 1 $ takeExtension fp
   in  null ext || ext `elem` imageExts
 
+figureToHtml :: WriterOptions -> Attr -> [[Inline]] -> [Inline] -> State WriterState Html
+figureToHtml opts attr subfigRows caption = do
+  let ident = getIdentifier attr
+  let subfigRows' = case subfigRows of
+                      [[Image a b c]] -> [[Image a [] c]]
+                      _ -> subfigRows
+  let subfiglist = intercalate [LineBreak] subfigRows'
+  let subfigs = evalState (mapM (subfigsToHtml opts True) subfiglist) 1
+  let addCaptPrefix = not (null ident)
+  let numLabel = fromJust $ lookupKey "numLabel" attr
+  let captPrefix = if addCaptPrefix then [Strong [Str "Figure",Space,Str numLabel],Space]
+                                    else []
+  let tocapt = if writerHtml5 opts
+                  then H5.figcaption
+                  else H.p ! A.class_ "caption"
+  capt <- if null caption
+             then return mempty
+             else inlineListToHtml opts (captPrefix ++ caption)
+  return $ H5.figure !? (ident /= "", prefixedId opts ident) $ mconcat
+                      [nl opts, mconcat subfigs, tocapt capt, nl opts]
+
+subfigsToHtml :: WriterOptions -> Bool -> Inline -> State Int Html
+subfigsToHtml opts appendLabel (Image attr txt (s,tit)) = do
+  currentIndex <- get
+  put (currentIndex + 1)
+  let ident = getIdentifier attr
+  let size = case lookupKey "width" attr of
+                  Just width -> "width: " ++ width
+                  Nothing -> ""
+  let sublabel = [Str ("(" ++ (alphEnum currentIndex) ++ ")"), Space]
+  let subcap = if null txt
+                  then mempty
+                  else evalState (inlineListToHtml opts $
+                       if appendLabel then (sublabel ++ txt) else txt) defaultWriterState
+  let img = foldl (!) H5.img [A.src $ toValue s]
+  return $ H5.figure
+              !? (ident /= "", prefixedId opts ident)
+              ! A.style (toValue ("display: inline-block; " ++ size :: String))
+              $ mconcat[nl opts, img, H5.figcaption $ subcap, nl opts]
+subfigsToHtml opts appendCounter LineBreak = do
+  return $ if writerHtml5 opts then H5.br else H.br
+
 -- | Convert Pandoc block element to HTML.
 blockToHtml :: WriterOptions -> Block -> State WriterState Html
 blockToHtml _ Null = return mempty
 blockToHtml opts (Plain lst) = inlineListToHtml opts lst
 -- title beginning with fig: indicates that the image is a figure
-blockToHtml opts (Para [Image attr txt (s,'f':'i':'g':':':tit)]) = do
-  let ident = getIdentifier attr
-  img <- inlineToHtml opts (Image (setIdentifier "" attr) txt (s,tit))
-  let tocapt = if writerHtml5 opts
-                  then H5.figcaption
-                  else H.p ! A.class_ "caption"
-  capt <- if null txt
-             then return mempty
-             else tocapt `fmap` inlineListToHtml opts txt
-  return $ if writerHtml5 opts
-              then H5.figure !? (ident /= "", prefixedId opts ident) $ mconcat
-                    [nl opts, img, capt, nl opts]
-              else H.div ! A.class_ "figure" !? (ident /= "", prefixedId opts ident) $
-                    mconcat [nl opts, img, capt, nl opts]
+blockToHtml opts (Para [Image attr txt (s,'f':'i':'g':':':tit)]) =
+  figureToHtml opts attr [[Image attr [] (s,tit)]] txt
+blockToHtml opts (Figure attr subfigRows caption) =
+  figureToHtml opts attr subfigRows caption
 blockToHtml opts (Para lst) = do
   contents <- inlineListToHtml opts lst
   return $ H.p contents

@@ -453,6 +453,7 @@ block = do
                -- note: bulletList needs to be before header because of
                -- the possibility of empty list items: -
                , bulletList
+               , scholarlyFigure -- starts with an ATX header
                , header
                , lhsCodeBlock
                , rawTeXBlock
@@ -1357,6 +1358,7 @@ inline = choice [ whitespace
                 , code
                 , strongOrEmph
                 , note
+                , scholarlyXRef
                 , cite
                 , link
                 , image
@@ -1952,6 +1954,7 @@ scholarlyInlineMath = return . B.math <$>
 scholarlyDisplayMath :: MarkdownParser (F Inlines)
 scholarlyDisplayMath = try $ do
   eqnList <- many1InSeparateLines (fencedCodeEquation <|> doubleDollarEquation)
+  state <- getState
   let eqn = case eqnList of
                  singleEqn:[] -> processSingleEqn singleEqn
                  _            -> processMultiEqn eqnList
@@ -2014,13 +2017,87 @@ doubleDollarEquation = try $ do
 -- Scholarly Markdown figures
 --
 
+scholarlyFigure :: MarkdownParser (F Blocks)
+scholarlyFigure = try $ do
+  many1 (char '#')
+  notFollowedBy $ guardEnabled Ext_fancy_lists >>
+                  (char '.' <|> char ')') -- this would be a list
+  skipSpaces
+  string "Figure:" >> skipSpaces
+  attr <- atxClosing
+  subfigRows <- many1 scholarlySubfigureRow
+  caption <- option mempty (trimInlinesF . mconcat <$> many1 inline)
+  blanklines
+  let allIds = concat $ map snd subfigRows
+  let figClass = if (length allIds == 1) then "singleFigure"
+                                         else "multiFigure"
+  state <- getState
+  let xrefIds = stateXRefIdents state
+  let myNumLabel = show $ (length $ idsForFigure xrefIds) + 1
+  let newXrefIds = xrefIds{ idsForFigure = (idsForFigure xrefIds) ++ [getIdentifier attr],
+                            idsForSubfigure = (idsForSubfigure xrefIds) ++ [allIds] }
+  updateState $ \s -> s{ stateXRefIdents = newXrefIds }
+  let attr' = insertReplaceKeyVal ("subfigIds", show allIds) attr
+  let attr'' = insertReplaceKeyVal ("numLabel", myNumLabel) attr'
+  let attr''' = insertClass figClass attr''
+  let subfigRows' = map fst subfigRows
+  return $ liftM2 (B.figure attr''') (sequence subfigRows') caption
+
+scholarlySubfigureRow :: MarkdownParser (F Inlines, [String])
+scholarlySubfigureRow = try $ do
+  subfigs <- many1InSeparateLines image
+  optional $ try (skipSpaces >> char '\\' >> skipSpaces)
+  newline
+  let ids = [ (getIdentifier . getImageAttr) $
+              head $ B.toList $ runF x defaultParserState | x <- subfigs ]
+  return (mconcat subfigs, ids)
+
 --
 -- Scholarly Markdown numerical cross-references
 --
 
+scholarlyXRef :: MarkdownParser (F Inlines)
+scholarlyXRef = scholarlyPlainXRef <|> scholarlyParensXRef
+
+scholarlyPlainXRef :: MarkdownParser (F Inlines)
+scholarlyPlainXRef = try $ do
+  char '['
+  char '#'
+  label <- identifier
+  char ']'
+  return $ do
+    xRefs <- asksF stateXRefIdents
+    if not (label `elem` (idsForMath xRefs))
+      then return $ B.str (getNumericalLabel label xRefs)
+      else return $ B.math ("\\ref(" ++ label ++ ")")
+
+scholarlyParensXRef :: MarkdownParser (F Inlines)
+scholarlyParensXRef = try $ do
+  char '('
+  char '#'
+  label <- identifier
+  char ')'
+  return $ do
+    xRefs <- asksF stateXRefIdents
+    if not (label `elem` (idsForMath xRefs))
+      then return $ B.str ("(" ++ (getNumericalLabel label xRefs) ++ ")")
+      else return $ B.math ("\\eqref(" ++ label ++ ")")
+
 --
 -- Scholarly Markdown statements
 --
+
+scholarlyFencedBlocks :: MarkdownParser (F Blocks)
+scholarlyFencedBlocks = try $ do
+  start <- satisfy isHruleChar
+  count 2 (char start)
+  newline
+  level <- many1 (char '#') >>= return . length
+  notFollowedBy $ guardEnabled Ext_fancy_lists >>
+                  (char '.' <|> char ')') -- this would be a list
+  skipSpaces
+  return mempty
+
 
 --
 -- Scholarly Markdown algorithm

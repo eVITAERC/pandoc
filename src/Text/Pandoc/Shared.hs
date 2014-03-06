@@ -59,6 +59,7 @@ module Text.Pandoc.Shared (
                      Element (..),
                      hierarchicalize,
                      uniqueIdent,
+                     alphEnum,
                      isHeaderBlock,
                      headerShift,
                      isTightList,
@@ -88,7 +89,7 @@ import qualified Text.Pandoc.UTF8 as UTF8
 import System.Environment (getProgName)
 import System.Exit (exitWith, ExitCode(..))
 import Data.Char ( toLower, isLower, isUpper, isAlpha,
-                   isLetter, isDigit, isSpace )
+                   isLetter, isDigit, isSpace, ord, chr )
 import Data.List ( find, isPrefixOf, intercalate )
 import qualified Data.Map as M
 import Network.URI ( escapeURIString, isURI, nonStrictRelativeTo,
@@ -518,6 +519,10 @@ uniqueIdent title' usedIdents =
                   Just x  -> numIdent x
                   Nothing -> baseIdent   -- if we have more than 60,000, allow repeats
         else baseIdent
+
+-- | gives 1 -> a, 2 -> b, etc...
+alphEnum :: Int -> String
+alphEnum n = [chr (ord 'a' + n - 1)]
 
 -- | True if block is a Header block.
 isHeaderBlock :: Block -> Bool

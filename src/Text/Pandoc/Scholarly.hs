@@ -32,6 +32,7 @@ module Text.Pandoc.Scholarly (classIsMath,
                               processMultiEqn,
                               dispMathToLaTeX,
                               AttributedMath,
+                              getImageAttr,
                               getIdentifier,
                               getClasses,
                               getKeyVals,
@@ -93,6 +94,10 @@ getKeyVals (_, _, keyVals) = keyVals
 
 lookupKey :: String -> Attr -> Maybe String
 lookupKey key (_, _, keyval) = M.lookup key $ M.fromList keyval
+
+getImageAttr :: Inline -> Attr
+getImageAttr (Image attr _ _) = attr
+getImageAttr _ = nullAttr
 
 ---
 --- Parser functions for Scholarly DisplayMath
