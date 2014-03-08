@@ -414,7 +414,7 @@ figureToHtml opts attr subfigRows caption = do
   let subfigs = evalState (mapM (subfigsToHtml opts appendLabel) subfiglist) 1
   let addCaptPrefix = not (null ident) && not (null caption)
   let myNumLabel = fromJust $ lookupKey "numLabel" attr
-  let captPrefix = if addCaptPrefix then [Strong [Str "Figure",Space,Str numLabel],Space]
+  let captPrefix = if addCaptPrefix then [Strong [Str "Figure",Space,Str myNumLabel],Space]
                                     else []
   let tocapt = H5.figcaption
   capt <- if null caption

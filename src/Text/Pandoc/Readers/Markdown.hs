@@ -1955,9 +1955,13 @@ scholarlyDisplayMath :: MarkdownParser (F Inlines)
 scholarlyDisplayMath = try $ do
   eqnList <- many1InSeparateLines (fencedCodeEquation <|> doubleDollarEquation)
   state <- getState
-  let eqn = case eqnList of
-                 singleEqn:[] -> processSingleEqn singleEqn
-                 _            -> processMultiEqn eqnList
+  let (eqn, idList) = case eqnList of
+                         singleEqn:[] -> processSingleEqn singleEqn
+                         _            -> processMultiEqn eqnList
+  state <- getState
+  let xrefIds = stateXRefIdents state
+  let newXrefIds = xrefIds{ idsForMath = (idsForMath xrefIds) ++ idList }
+  updateState $ \s -> s{ stateXRefIdents = newXrefIds }
   return $ return $ uncurry B.displayMathWith eqn
 
 -- ensures that displayMath are delimited by blanklines
@@ -2067,9 +2071,9 @@ scholarlyPlainXRef = try $ do
   char ']'
   return $ do
     xRefs <- asksF stateXRefIdents
-    if not (label `elem` (idsForMath xRefs))
-      then return $ B.str (getNumericalLabel label xRefs)
-      else return $ B.math ("\\ref(" ++ label ++ ")")
+    if label `elem` (idsForMath xRefs)
+      then return $ B.math ("\\ref(" ++ label ++ ")")
+      else return $ B.str (getNumericalLabel label xRefs)
 
 scholarlyParensXRef :: MarkdownParser (F Inlines)
 scholarlyParensXRef = try $ do
@@ -2079,9 +2083,9 @@ scholarlyParensXRef = try $ do
   char ')'
   return $ do
     xRefs <- asksF stateXRefIdents
-    if not (label `elem` (idsForMath xRefs))
-      then return $ B.str ("(" ++ (getNumericalLabel label xRefs) ++ ")")
-      else return $ B.math ("\\eqref(" ++ label ++ ")")
+    if label `elem` (idsForMath xRefs)
+      then return $ B.math ("\\eqref(" ++ label ++ ")")
+      else return $ B.str ("(" ++ (getNumericalLabel label xRefs) ++ ")")
 
 --
 -- Scholarly Markdown statements

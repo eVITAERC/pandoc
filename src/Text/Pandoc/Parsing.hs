@@ -927,7 +927,7 @@ getNumericalLabel ident ids
   | ident `elem` (idsForTables ids) = show $ fromJust (elemIndex ident $ idsForTables ids)
   | ident `elem` (idsForAlgorithms ids) = show $ fromJust (elemIndex ident $ idsForAlgorithms ids)
   | ident `elem` (idsForStatements ids) = show $ fromJust (elemIndex ident $ idsForStatements ids)
-  | otherwise = ident
+  | otherwise = "#" ++ ident
 
 instance Default ParserState where
   def = defaultParserState

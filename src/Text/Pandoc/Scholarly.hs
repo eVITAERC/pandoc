@@ -106,11 +106,13 @@ getImageAttr _ = nullAttr
 -- Currently does the following:
 -- 1) automatically wrap in @aligned@ or @split@ envionrment if needed
 -- 2) if attribute has id, append @\label{id}@ to code
-processSingleEqn :: AttributedMath -> AttributedMath
+-- 3) Returns also the label string in an list
+processSingleEqn :: AttributedMath -> (AttributedMath, [String])
 processSingleEqn eqn =
   let processors = [ensureLabeled "\n", -- ensureNonumber is handled by writer
                     ensureMultilineEnv]
-  in foldr ($) eqn processors
+      label = (getIdentifier . fst) eqn
+  in (foldr ($) eqn processors, [label])
 
 -- Currently does the following:
 -- 1) trim whitespace from all equation codes
@@ -119,13 +121,14 @@ processSingleEqn eqn =
 -- 4) concatenate all equations into one code chunk delimited by @'\\'@
 -- 5) assign @align@ or @gather@ class as needed
 -- 6) gather all equation labels as list and output to @labelList@ key
-processMultiEqn :: [AttributedMath] -> AttributedMath
+processMultiEqn :: [AttributedMath] -> (AttributedMath, [String])
 processMultiEqn eqnList =
   let processors = [ensureNonumber " ",
                     ensureLabeled " ",
                     id *** trim]
       processedEqnList = foldr map eqnList processors
-  in concatMultiEquations processedEqnList
+      labels = map (getIdentifier . fst) eqnList
+  in (concatMultiEquations processedEqnList, labels)
 
 -- Automatically surround with split env if naked token @'\\'@ detected,
 -- or aligned env if both naked token @'\\'@ and @'&'@ detected.
