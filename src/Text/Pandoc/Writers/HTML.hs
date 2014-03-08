@@ -406,21 +406,24 @@ figureToHtml opts attr subfigRows caption = do
   let subfigRows' = case subfigRows of
                       [[Image a b c]] -> [[Image a [] c]]
                       _ -> subfigRows
+  let subfigIds = case (safeRead $ fromMaybe [] $ lookupKey "subfigIds" attr) :: Maybe [String] of
+                      Just a -> a
+                      Nothing -> [""]
+  let appendLabel = any (not . null) subfigIds
   let subfiglist = intercalate [LineBreak] subfigRows'
-  let subfigs = evalState (mapM (subfigsToHtml opts True) subfiglist) 1
-  let addCaptPrefix = not (null ident)
-  let numLabel = fromJust $ lookupKey "numLabel" attr
+  let subfigs = evalState (mapM (subfigsToHtml opts appendLabel) subfiglist) 1
+  let addCaptPrefix = not (null ident) && not (null caption)
+  let myNumLabel = fromJust $ lookupKey "numLabel" attr
   let captPrefix = if addCaptPrefix then [Strong [Str "Figure",Space,Str numLabel],Space]
                                     else []
-  let tocapt = if writerHtml5 opts
-                  then H5.figcaption
-                  else H.p ! A.class_ "caption"
+  let tocapt = H5.figcaption
   capt <- if null caption
              then return mempty
              else inlineListToHtml opts (captPrefix ++ caption)
   return $ H5.figure !? (ident /= "", prefixedId opts ident) $ mconcat
-                      [nl opts, mconcat subfigs, tocapt capt, nl opts]
+                      [nl opts, mconcat subfigs, nl opts, tocapt capt, nl opts]
 
+-- | Transforms a list of subfigures to tags. The State monad implements the counter for automatic subfigure-numbering
 subfigsToHtml :: WriterOptions -> Bool -> Inline -> State Int Html
 subfigsToHtml opts appendLabel (Image attr txt (s,tit)) = do
   currentIndex <- get
