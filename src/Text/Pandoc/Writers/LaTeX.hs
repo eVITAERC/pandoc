@@ -69,6 +69,7 @@ data WriterState =
               , stIncremental   :: Bool          -- true if beamer lists should be displayed bit by bit
               , stInternalLinks :: [String]      -- list of internal link targets
               , stUsesEuro      :: Bool          -- true if euro symbol used
+              , stMathIds       :: [String]      -- list of math identifiers
               }
 
 -- | Convert Pandoc to LaTeX.
@@ -83,7 +84,8 @@ writeLaTeX options document =
                 stLHS = False, stBook = writerChapters options,
                 stCsquotes = False, stHighlighting = False,
                 stIncremental = writerIncremental options,
-                stInternalLinks = [], stUsesEuro = False }
+                stInternalLinks = [], stUsesEuro = False,
+                stMathIds = [] }
 
 pandocToLaTeX :: WriterOptions -> Pandoc -> State WriterState String
 pandocToLaTeX options (Pandoc meta blocks) = do
@@ -119,6 +121,9 @@ pandocToLaTeX options (Pandoc meta blocks) = do
               (fmap (render colwidth) . blockListToLaTeX)
               (fmap (render colwidth) . inlineListToLaTeX)
               meta
+  initSt <- get
+  let mathIds = extractMetaStringList $ lookupMeta "identifiersForMath" meta
+  put initSt{ stMathIds = mathIds }
   let (blocks'', lastHeader) = if writerCiteMethod options == Citeproc then
                                  (blocks', [])
                                else case last blocks' of
@@ -663,7 +668,11 @@ inlineToLaTeX (Cite cits lst) = do
      Natbib   -> citationsToNatbib cits
      Biblatex -> citationsToBiblatex cits
      _        -> inlineListToLaTeX lst
-
+inlineToLaTeX (NumRef numref raw) = do
+  let refId = numRefId numref
+  case numRefStyle numref of
+    PlainNumRef -> return $ text $ "\\ref{" ++ refId ++ "}"
+    ParenthesesNumRef -> return $ text $ "\\eqref{" ++ refId ++ "}"
 inlineToLaTeX (Code (_,classes,_) str) = do
   opts <- gets stOptions
   case () of

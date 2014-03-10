@@ -70,11 +70,13 @@ data WriterState = WriterState
     , stQuotes           :: Bool    -- ^ <q> tag is used
     , stHighlighting     :: Bool    -- ^ Syntax highlighting is used
     , stSecNum           :: [Int]   -- ^ Number of current section
+    , stMathIds          :: [String]
     }
 
 defaultWriterState :: WriterState
 defaultWriterState = WriterState {stNotes= [], stMath = False, stQuotes = False,
-                                  stHighlighting = False, stSecNum = []}
+                                  stHighlighting = False, stSecNum = [],
+                                  stMathIds = []}
 
 -- Helpers to render HTML with the appropriate function.
 
@@ -116,6 +118,9 @@ pandocToHtml opts (Pandoc meta blocks) = do
               (fmap renderHtml . blockListToHtml opts)
               (fmap renderHtml . inlineListToHtml opts)
               meta
+  initSt <- get
+  let mathIds = extractMetaStringList $ lookupMeta "identifiersForMath" meta
+  put initSt{ stMathIds = mathIds }
   let stringifyHTML = escapeStringForXML . stringify
   let authsMeta = map stringifyHTML $ docAuthors meta
   let dateMeta  = stringifyHTML $ docDate meta
@@ -812,6 +817,18 @@ inlineToHtml opts inline =
                         return $ if writerHtml5 opts
                                     then result ! customAttribute "data-cites" (toValue citationIds)
                                     else result
+    (NumRef numref raw) -> do st <- get
+                              let toMath lab = return $ mathToMathJax opts InlineMath lab
+                              let refId = numRefId numref
+                              let isMathId = refId `elem` (stMathIds st)
+                              if isMathId
+                                then case numRefStyle numref of
+                                     PlainNumRef -> toMath $ "\\ref{" ++ refId ++ "}"
+                                     ParenthesesNumRef -> toMath $ "\\eqref{" ++ refId ++ "}"
+                                else case numRefStyle numref of
+                                     PlainNumRef -> inlineListToHtml opts (numRefLabel numref)
+                                     ParenthesesNumRef -> inlineListToHtml opts
+                                        ([Str "("] ++ numRefLabel numref ++ [Str ")"])
 
 blockListToNote :: WriterOptions -> String -> [Block] -> State WriterState Html
 blockListToNote opts ref blocks =

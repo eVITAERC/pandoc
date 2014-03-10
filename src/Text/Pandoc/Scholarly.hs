@@ -41,6 +41,8 @@ module Text.Pandoc.Scholarly (classIsMath,
                               insertClass,
                               insertIfNoneKeyVal,
                               insertReplaceKeyVal,
+                              extractMetaStringList,
+                              extractMetaString
                              )
 where
 
@@ -98,6 +100,18 @@ lookupKey key (_, _, keyval) = M.lookup key $ M.fromList keyval
 getImageAttr :: Inline -> Attr
 getImageAttr (Image attr _ _) = attr
 getImageAttr _ = nullAttr
+
+--
+-- Writer state helpers (useful for cross-references)
+--
+
+extractMetaStringList :: Maybe MetaValue -> [String]
+extractMetaStringList (Just (MetaList idList)) = map extractMetaString idList
+extractMetaStringList _ = []
+
+extractMetaString :: MetaValue -> String
+extractMetaString (MetaString str) = str
+extractMetaString _ = ""
 
 ---
 --- Parser functions for Scholarly DisplayMath

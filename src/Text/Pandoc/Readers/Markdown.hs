@@ -328,8 +328,9 @@ parseMarkdown = do
   blocks <- parseBlocks
   st <- getState
   let meta = runF (stateMeta' st) st
+  let meta' = B.setMeta "identifiersForMath" (map (\x -> MetaString x) $ idsForMath $ stateXRefIdents st) meta
   let Pandoc _ bs = B.doc $ runF blocks st
-  return $ Pandoc meta bs
+  return $ Pandoc meta' bs
 
 addWarning :: Maybe SourcePos -> String -> MarkdownParser ()
 addWarning mbpos msg =
@@ -1954,7 +1955,6 @@ scholarlyInlineMath = return . B.math <$>
 scholarlyDisplayMath :: MarkdownParser (F Inlines)
 scholarlyDisplayMath = try $ do
   eqnList <- many1InSeparateLines (fencedCodeEquation <|> doubleDollarEquation)
-  state <- getState
   let (eqn, idList) = case eqnList of
                          singleEqn:[] -> processSingleEqn singleEqn
                          _            -> processMultiEqn eqnList
@@ -2023,6 +2023,7 @@ doubleDollarEquation = try $ do
 
 scholarlyFigure :: MarkdownParser (F Blocks)
 scholarlyFigure = try $ do
+  ensureScholarlyMarkdown
   many1 (char '#')
   notFollowedBy $ guardEnabled Ext_fancy_lists >>
                   (char '.' <|> char ')') -- this would be a list
@@ -2061,46 +2062,41 @@ scholarlySubfigureRow = try $ do
 --
 
 scholarlyXRef :: MarkdownParser (F Inlines)
-scholarlyXRef = scholarlyPlainXRef <|> scholarlyParensXRef
+scholarlyXRef = ensureScholarlyMarkdown >>
+                  (scholarlyPlainXRef <|> scholarlyParensXRef)
 
 scholarlyPlainXRef :: MarkdownParser (F Inlines)
 scholarlyPlainXRef = try $ do
-  char '['
-  char '#'
-  label <- identifier
-  char ']'
+  label <- string "[#" >> identifier >>~ char ']'
   return $ do
     xRefs <- asksF stateXRefIdents
-    if label `elem` (idsForMath xRefs)
-      then return $ B.math ("\\ref{" ++ label ++ "}")
-      else return $ B.str (getNumericalLabel label xRefs)
+    let defNumLabel = [Str $ getNumericalLabel label xRefs]
+    let refStyle = NumberedReference label PlainNumRef defNumLabel
+    return $ B.numRef refStyle $ "[#" ++ label ++ "]"
 
 scholarlyParensXRef :: MarkdownParser (F Inlines)
 scholarlyParensXRef = try $ do
-  char '('
-  char '#'
-  label <- identifier
-  char ')'
+  label <- string "(#" >> identifier >>~ char ')'
   return $ do
     xRefs <- asksF stateXRefIdents
-    if label `elem` (idsForMath xRefs)
-      then return $ B.math ("\\eqref{" ++ label ++ "}")
-      else return $ B.str ("(" ++ (getNumericalLabel label xRefs) ++ ")")
+    let defNumLabel = [Str $ getNumericalLabel label xRefs]
+    let refStyle = NumberedReference label ParenthesesNumRef defNumLabel
+    return $ B.numRef refStyle $ "(#" ++ label ++ ")"
 
 --
 -- Scholarly Markdown statements
 --
 
-scholarlyFencedBlocks :: MarkdownParser (F Blocks)
-scholarlyFencedBlocks = try $ do
-  start <- satisfy isHruleChar
-  count 2 (char start)
-  newline
-  level <- many1 (char '#') >>= return . length
-  notFollowedBy $ guardEnabled Ext_fancy_lists >>
-                  (char '.' <|> char ')') -- this would be a list
-  skipSpaces
-  return mempty
+-- scholarlyStatements :: MarkdownParser (F Blocks)
+-- scholarlyStatements = try $ do
+--   start <- satisfy isHruleChar
+--   count 2 (char start)
+--   newline
+--   level <- many1 (char '#') >>= return . length
+--   notFollowedBy $ guardEnabled Ext_fancy_lists >>
+--                   (char '.' <|> char ')') -- this would be a list
+--   skipSpaces
+--   return mempty
 
 
 --
