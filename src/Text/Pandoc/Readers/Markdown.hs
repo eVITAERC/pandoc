@@ -2072,7 +2072,7 @@ scholarlyPlainXRef = try $ do
   return $ do
     xRefs <- asksF stateXRefIdents
     if label `elem` (idsForMath xRefs)
-      then return $ B.math ("\\ref(" ++ label ++ ")")
+      then return $ B.math ("\\ref{" ++ label ++ "}")
       else return $ B.str (getNumericalLabel label xRefs)
 
 scholarlyParensXRef :: MarkdownParser (F Inlines)
@@ -2084,7 +2084,7 @@ scholarlyParensXRef = try $ do
   return $ do
     xRefs <- asksF stateXRefIdents
     if label `elem` (idsForMath xRefs)
-      then return $ B.math ("\\eqref(" ++ label ++ ")")
+      then return $ B.math ("\\eqref{" ++ label ++ "}")
       else return $ B.str ("(" ++ (getNumericalLabel label xRefs) ++ ")")
 
 --
