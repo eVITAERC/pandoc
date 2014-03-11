@@ -100,6 +100,10 @@ pandocToLaTeX options (Pandoc meta blocks) = do
   let isInternalLink (Link _ ('#':xs,_))  = [xs]
       isInternalLink _                    = []
   modify $ \s -> s{ stInternalLinks = query isInternalLink blocks' }
+  -- see if there are images
+  let isGraphic (Image _ _ _)  = [True]
+      isGraphic _              = []
+  modify $ \s -> s{ stGraphics = not $ null $ query isGraphic blocks' }
   let template = writerTemplate options
   -- set stBook depending on documentclass
   let bookClasses = ["memoir","book","report","scrreprt","scrbook"]
@@ -313,20 +317,10 @@ blockToLaTeX (Div (_,classes,_) bs) = do
 blockToLaTeX (Plain lst) =
   inlineListToLaTeX $ dropWhile isLineBreakOrSpace lst
 -- title beginning with fig: indicates that the image is a figure
-blockToLaTeX (Para [Image attr txt (src,'f':'i':'g':':':tit)]) = do
-  capt <- if null txt
-             then return empty
-             else (\c -> "\\caption" <> braces c) `fmap` inlineListToLaTeX txt
-  img <- inlineToLaTeX (Image attr txt (src,tit))
-  return $ "\\begin{figure}[htbp]" $$ "\\centering" $$ img $$
-           capt $$ "\\end{figure}"
-blockToLaTeX (Figure _ _ txt) = do
-  capt <- if null txt
-             then return empty
-             else (\c -> "\\caption" <> braces c) `fmap` inlineListToLaTeX txt
-  return $ "\\begin{figure}[htbp]" $$ "\\centering" $$
-           capt $$ "\\end{figure}"
--- . . . indicates pause in beamer slides
+-- the identifiers in attr will be lifted to the Figure block
+blockToLaTeX (Para [Image attr txt (src,'f':'i':'g':':':tit)]) =
+  figureToLaTeX attr [[Image (setIdentifier "" attr) [] (src,tit)]] txt
+blockToLaTeX (Figure attr subfigRows txt) = figureToLaTeX attr subfigRows txt
 blockToLaTeX (Para [Str ".",Space,Str ".",Space,Str "."]) = do
   beamer <- writerBeamer `fmap` gets stOptions
   if beamer
@@ -668,7 +662,7 @@ inlineToLaTeX (Cite cits lst) = do
      Natbib   -> citationsToNatbib cits
      Biblatex -> citationsToBiblatex cits
      _        -> inlineListToLaTeX lst
-inlineToLaTeX (NumRef numref raw) = do
+inlineToLaTeX (NumRef numref _raw) = do
   let refId = numRefId numref
   case numRefStyle numref of
     PlainNumRef -> return $ text $ "\\ref{" ++ refId ++ "}"
@@ -743,12 +737,8 @@ inlineToLaTeX (Link txt (src, _)) =
                 return $ text ("\\href{" ++ src' ++ "}{") <>
                          contents <> char '}'
 inlineToLaTeX (Image attr _ (source, _)) = do
-  modify $ \s -> s{ stGraphics = True }
-  let source' = if isURI source
-                   then source
-                   else unEscapeString source
-  source'' <- stringToLaTeX URLString source'
-  return $ imageWithAttrToLatex "\\textwidth" attr source''
+  source' <- handleImageSrc source
+  return $ imageWithAttrToLatex "\\textwidth" attr source'
 inlineToLaTeX (Note contents) = do
   inMinipage <- gets stInMinipage
   modify (\s -> s{stInNote = True})
@@ -865,8 +855,61 @@ getListingsLanguage :: [String] -> Maybe String
 getListingsLanguage [] = Nothing
 getListingsLanguage (x:xs) = toListingsLanguage x <|> getListingsLanguage xs
 
+-- Handles writing figure floats
+figureToLaTeX ::  Attr -> [[Inline]] -> [Inline] -> State WriterState Doc
+figureToLaTeX attr subfigRows caption = do
+  let ident = getIdentifier attr
+  let (subfigRows', snglImg) = case subfigRows of
+                                    [[Image a _ c]] -> ([[Image a [] c]], True)
+                                    _ -> (subfigRows, False)
+  let subfigIds = case (safeRead $ fromMaybe [] $ lookupKey "subfigIds" attr) :: Maybe [String] of
+                      Just a -> a
+                      Nothing -> [""]
+  let showSubfigLabel = any (not . null) subfigIds -- show subfig labels (a), (b), etc
+  let subfiglist = intercalate [LineBreak] subfigRows'
+  let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
+  let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
+  -- | this requires the "caption" package which is provided by "subfig"
+  let capstar = if (not addCaptPrefix) then text "*" else empty
+  let fullWidth = "\\textwidth"
+  capt <- if null caption && not addCaptPrefix
+             then return empty
+             else (\c -> "\\caption" <> capstar <> braces c) `fmap` inlineListToLaTeX caption
+  img <- mapM (subfigsToLaTeX fullWidth snglImg) subfiglist
+  let label = if (not $ null ident) then ("\\label" <> braces (text ident)) else empty
+  let disableSubfigLabel = if showSubfigLabel || snglImg
+                              then empty
+                              else "\\captionsetup" <> brackets (text "subfigure")
+                                   <> braces (text "labelformat=empty")
+  return $ "\\begin{figure}[htbp]" $$ "\\centering" $$ disableSubfigLabel
+           $$ foldl ($$) empty img $$ capt $$ label $$ "\\end{figure}"
+
+-- Handles writing figure subfloats (using the subfig package)
+-- (requires "fullWidth" argument, which is a command that defines 100% width
+-- of container, such as @\\textwidth@)
+subfigsToLaTeX ::  String -> Bool -> Inline -> State WriterState Doc
+subfigsToLaTeX _ _ LineBreak = inlineToLaTeX LineBreak
+subfigsToLaTeX fullWidth singleImage (Image attr txt (src,_)) = do
+  let ident = getIdentifier attr
+  capt <- if null txt
+             then return empty
+             else inlineListToLaTeX txt
+  let label = if (not $ null ident) then ("\\label" <> braces (text ident)) else empty
+  src' <- handleImageSrc src
+  let img = imageWithAttrToLatex fullWidth attr src'
+  return $ if singleImage
+              then img <> label
+              else "\\subfloat" <> brackets capt <> braces (img <> label)
+
+handleImageSrc :: String -> State WriterState String
+handleImageSrc source =
+  let source' = if isURI source
+                   then source
+                   else unEscapeString source
+  in stringToLaTeX URLString source'
+
 -- Extracts dimension attributes and include in the @includegraphics@ directive
--- (required "fullWidth" argument, which is a command that defines 100% width
+-- (requires "fullWidth" argument, which is a command that defines 100% width
 -- of container, such as @\\textwidth@)
 imageWithAttrToLatex :: String -> Attr -> String -> Doc
 imageWithAttrToLatex fullWidth attr src =

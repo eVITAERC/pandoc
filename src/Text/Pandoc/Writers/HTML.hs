@@ -46,7 +46,7 @@ import Numeric ( showHex )
 import Data.Char ( ord, toLower )
 import Data.List ( isPrefixOf, intersperse, intercalate )
 import Data.String ( fromString )
-import Data.Maybe ( catMaybes, fromMaybe, fromJust )
+import Data.Maybe ( catMaybes, fromMaybe )
 import Control.Monad.State
 import Text.Blaze.Html hiding(contents)
 import Text.Blaze.Internal(preEscapedString)
@@ -408,16 +408,16 @@ treatAsImage fp =
 figureToHtml :: WriterOptions -> Attr -> [[Inline]] -> [Inline] -> State WriterState Html
 figureToHtml opts attr subfigRows caption = do
   let ident = getIdentifier attr
-  let subfigRows' = case subfigRows of
-                      [[Image a b c]] -> [[Image a [] c]]
+  let subfigRows' = case subfigRows of -- check for single-image figure
+                      [[Image a _ c]] -> [[Image a [] c]]
                       _ -> subfigRows
   let subfigIds = case (safeRead $ fromMaybe [] $ lookupKey "subfigIds" attr) :: Maybe [String] of
                       Just a -> a
                       Nothing -> [""]
-  let appendLabel = any (not . null) subfigIds
+  let appendLabel = any (not . null) subfigIds -- show subfig labels (a), (b), etc
   let subfiglist = intercalate [LineBreak] subfigRows'
   let subfigs = evalState (mapM (subfigsToHtml opts appendLabel) subfiglist) 1
-  let myNumLabel = fromJust $ lookupKey "numLabel" attr
+  let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
   let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
   let captPrefix = if addCaptPrefix then [Strong [Str "Figure",Space,Str myNumLabel],Space]
                                     else []
@@ -431,6 +431,8 @@ figureToHtml opts attr subfigRows caption = do
 
 -- | Transforms a list of subfigures to tags. The State monad implements the counter for automatic subfigure-numbering
 subfigsToHtml :: WriterOptions -> Bool -> Inline -> State Int Html
+subfigsToHtml opts _ LineBreak = do
+  return $ if writerHtml5 opts then H5.br else H.br
 subfigsToHtml opts appendLabel (Image attr txt (s,tit)) = do
   currentIndex <- get
   put (currentIndex + 1)
@@ -443,13 +445,11 @@ subfigsToHtml opts appendLabel (Image attr txt (s,tit)) = do
                   then mempty
                   else evalState (inlineListToHtml opts $
                        if appendLabel then (sublabel ++ txt) else txt) defaultWriterState
-  let img = foldl (!) H5.img [A.src $ toValue s]
+  let img = H5.img ! (A.src $ toValue s) !? (tit /="", A.title $ toValue tit)
   return $ H5.figure
               !? (ident /= "", prefixedId opts ident)
               ! A.style (toValue ("display: inline-block; " ++ size :: String))
               $ mconcat[nl opts, img, H5.figcaption $ subcap, nl opts]
-subfigsToHtml opts appendCounter LineBreak = do
-  return $ if writerHtml5 opts then H5.br else H.br
 
 -- | Convert Pandoc block element to HTML.
 blockToHtml :: WriterOptions -> Block -> State WriterState Html
@@ -818,18 +818,18 @@ inlineToHtml opts inline =
                         return $ if writerHtml5 opts
                                     then result ! customAttribute "data-cites" (toValue citationIds)
                                     else result
-    (NumRef numref raw) -> do st <- get
-                              let toMath lab = return $ mathToMathJax opts InlineMath lab
-                              let refId = numRefId numref
-                              let isMathId = refId `elem` (stMathIds st)
-                              if isMathId
-                                then case numRefStyle numref of
-                                     PlainNumRef -> toMath $ "\\ref{" ++ refId ++ "}"
-                                     ParenthesesNumRef -> toMath $ "\\eqref{" ++ refId ++ "}"
-                                else case numRefStyle numref of
-                                     PlainNumRef -> inlineListToHtml opts (numRefLabel numref)
-                                     ParenthesesNumRef -> inlineListToHtml opts
-                                        ([Str "("] ++ numRefLabel numref ++ [Str ")"])
+    (NumRef numref _raw) -> do st <- get
+                               let toMath lab = return $ mathToMathJax opts InlineMath lab
+                               let refId = numRefId numref
+                               let isMathId = refId `elem` (stMathIds st)
+                               if isMathId
+                                 then case numRefStyle numref of
+                                      PlainNumRef -> toMath $ "\\ref{" ++ refId ++ "}"
+                                      ParenthesesNumRef -> toMath $ "\\eqref{" ++ refId ++ "}"
+                                 else case numRefStyle numref of
+                                      PlainNumRef -> inlineListToHtml opts (numRefLabel numref)
+                                      ParenthesesNumRef -> inlineListToHtml opts
+                                         ([Str "("] ++ numRefLabel numref ++ [Str ")"])
 
 blockListToNote :: WriterOptions -> String -> [Block] -> State WriterState Html
 blockListToNote opts ref blocks =
@@ -862,7 +862,7 @@ mathToMathJax opts mathType mathCode =
       let isMathDef = "math_def" `elem` (getClasses attr)
       in mconcat [nl opts,
                   H.div ! A.class_ "math displayMath" !?
-                     (isMathDef, A.style $ toValue ("visibility: hidden;" :: String)) $
+                     (isMathDef, A.style $ toValue ("visibility: hidden; height: 0px;" :: String)) $
                      mconcat [toHtml ("\\[" :: String), nl opts,
                               toHtml $ dispMathToLaTeX attr mathCode,
                               nl opts, toHtml ("\\]" :: String)],
