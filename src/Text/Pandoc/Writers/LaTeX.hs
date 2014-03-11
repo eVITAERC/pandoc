@@ -865,7 +865,8 @@ figureToLaTeX attr subfigRows caption = do
   let subfigIds = case (safeRead $ fromMaybe [] $ lookupKey "subfigIds" attr) :: Maybe [String] of
                       Just a -> a
                       Nothing -> [""]
-  let showSubfigLabel = any (not . null) subfigIds -- show subfig labels (a), (b), etc
+  -- show subfig labels (a), (b), etc
+  let showSubfigLabel = any (not . null) subfigIds && not (hasClass "nonumber" attr)
   let subfiglist = intercalate [LineBreak] subfigRows'
   let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
   let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
