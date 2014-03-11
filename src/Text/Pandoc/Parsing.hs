@@ -899,7 +899,7 @@ data ParserState = ParserState
 data XRefIdentifiers = XRefIdentifiers
     { idsForMath       :: [String],   -- Equations
       idsForFigure     :: [String],   -- Figures
-      idsForSubfigure  :: [[String]], -- Subfigures (corresp. with figures)
+      idsForSubfigure  :: [([String], Int)], -- Subfigures (corresp. with numerical label of a figure)
       idsForTables     :: [String], -- Tables
       idsForAlgorithms :: [String], -- Algorithms, Listings
       idsForStatements :: [String]  -- Theorems, Definitons, Examples, etc
@@ -909,25 +909,34 @@ defaultXRefIdentifiers :: XRefIdentifiers
 defaultXRefIdentifiers =
   XRefIdentifiers { idsForMath       = [],
                     idsForFigure     = [],
-                    idsForSubfigure  = [[]],
+                    idsForSubfigure  = [],
                     idsForTables     = [],
                     idsForAlgorithms = [],
                     idsForStatements = []}
 
+-- | Generate a default numerical label for numbered cross-references
 getNumericalLabel :: String -> XRefIdentifiers -> String
 getNumericalLabel ident ids
-  | ident `elem` (idsForMath ids) = show $ fromJust (elemIndex ident $ idsForMath ids)
-  | ident `elem` (idsForFigure ids) = show $ fromJust (elemIndex ident $ idsForFigure ids)
-  | any (ident `elem`) (idsForSubfigure ids) =
-      let numFig = fromJust $ findIndex (ident `elem`) (idsForSubfigure ids)
-          numSubfig = fromJust $ elemIndex ident ((idsForSubfigure ids) !! numFig)
-      in if length ((idsForSubfigure ids) !! numFig) == 1
+  | ident `elem` (idsForMath ids) = numInIdList ident $ idsForMath ids
+  | ident `elem` (idsForFigure ids) = numInIdList ident $ idsForFigure ids
+  | any ((ident `elem`) . fst) (idsForSubfigure ids) =
+      let figId = fromJust $ findIndex ((ident `elem`) . fst) $ idsForSubfigure ids
+          numSubfig = fromJust $ elemIndex ident $ fst ((idsForSubfigure ids) !! figId)
+          numFig = snd ((idsForSubfigure ids) !! figId)
+      in if length (fst $ (idsForSubfigure ids) !! figId) == 1
             then (show numFig)
             else (show numFig) ++ (alphEnum (numSubfig+1))
-  | ident `elem` (idsForTables ids) = show $ fromJust (elemIndex ident $ idsForTables ids)
-  | ident `elem` (idsForAlgorithms ids) = show $ fromJust (elemIndex ident $ idsForAlgorithms ids)
-  | ident `elem` (idsForStatements ids) = show $ fromJust (elemIndex ident $ idsForStatements ids)
+  | ident `elem` (idsForTables ids) = numInIdList ident $ idsForTables ids
+  | ident `elem` (idsForAlgorithms ids) = numInIdList ident $ idsForAlgorithms ids
+  | ident `elem` (idsForStatements ids) = numInIdList ident $ idsForStatements ids
   | otherwise = "#" ++ ident
+
+-- | Show index in list stripped of empty entries
+numInIdList :: String -> [String] -> String
+numInIdList ident idList =
+  case (elemIndex ident $ filter (/= "") idList) of
+       Just index -> show index
+       Nothing -> ""
 
 instance Default ParserState where
   def = defaultParserState

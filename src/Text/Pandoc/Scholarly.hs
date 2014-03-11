@@ -35,6 +35,7 @@ module Text.Pandoc.Scholarly (classIsMath,
                               getImageAttr,
                               getIdentifier,
                               getClasses,
+                              hasClass,
                               getKeyVals,
                               lookupKey,
                               setIdentifier,
@@ -84,6 +85,9 @@ insertReplaceKeyVal keyval attr = insertWithKeyVal (\x _ -> x) keyval attr
 
 getClasses :: Attr -> [String]
 getClasses (_, classes, _) = classes
+
+hasClass :: String -> Attr -> Bool
+hasClass cls (_, classes, _) = cls `elem` classes
 
 getIdentifier :: Attr -> String
 getIdentifier (identifier, _, _) = identifier

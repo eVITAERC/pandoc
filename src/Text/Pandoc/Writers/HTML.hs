@@ -417,12 +417,13 @@ figureToHtml opts attr subfigRows caption = do
   let appendLabel = any (not . null) subfigIds
   let subfiglist = intercalate [LineBreak] subfigRows'
   let subfigs = evalState (mapM (subfigsToHtml opts appendLabel) subfiglist) 1
-  let addCaptPrefix = not (null ident) && not (null caption)
   let myNumLabel = fromJust $ lookupKey "numLabel" attr
+  let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
   let captPrefix = if addCaptPrefix then [Strong [Str "Figure",Space,Str myNumLabel],Space]
                                     else []
+  -- | TODO: disable entire caption if not needed
   let tocapt = H5.figcaption
-  capt <- if null caption
+  capt <- if null (captPrefix ++ caption)
              then return mempty
              else inlineListToHtml opts (captPrefix ++ caption)
   return $ H5.figure !? (ident /= "", prefixedId opts ident) $ mconcat

@@ -2038,15 +2038,29 @@ scholarlyFigure = try $ do
                                          else "multiFigure"
   state <- getState
   let xrefIds = stateXRefIdents state
-  let myNumLabel = show $ (length $ idsForFigure xrefIds) + 1
-  let newXrefIds = xrefIds{ idsForFigure = (idsForFigure xrefIds) ++ [getIdentifier attr],
-                            idsForSubfigure = (idsForSubfigure xrefIds) ++ [allIds] }
+  -- need to display a numerical id if there is need to refer to subfigs
+  -- unless forcibly disabled by class ".nonumber"
+  let needId = ( any (/= "") allIds || (getIdentifier attr) /= "" )
+               && not (hasClass "nonumber" attr)
+  -- this identifier is only used in the list of reference ids for numbering
+  let myIdentifier = if needId && (getIdentifier attr) == ""
+                        then "#"
+                        else if not (hasClass "nonumber" attr)
+                              then getIdentifier attr
+                              else ""
+  let myNumLabel = if needId
+                      then (length $ filter (/= "") $ idsForFigure xrefIds) + 1
+                      else 0 -- will never be displayed anyways
+  let newXrefIds = xrefIds{ idsForFigure = (idsForFigure xrefIds) ++ [myIdentifier],
+                            idsForSubfigure = (idsForSubfigure xrefIds) ++ [(allIds, myNumLabel)] }
   updateState $ \s -> s{ stateXRefIdents = newXrefIds }
-  let attr' = insertReplaceKeyVal ("subfigIds", show allIds) attr
-  let attr'' = insertReplaceKeyVal ("numLabel", myNumLabel) attr'
-  let attr''' = insertClass figClass attr''
+  let attrActions = [ insertClass figClass
+                    , insertReplaceKeyVal ("subfigIds", show allIds)
+                    , insertReplaceKeyVal ("numLabel", show myNumLabel)
+                    ]
   let subfigRows' = map fst subfigRows
-  return $ liftM2 (B.figure attr''') (sequence subfigRows') caption
+  let attr' = foldr ($) attr attrActions
+  return $ liftM2 (B.figure attr') (sequence subfigRows') caption
 
 scholarlySubfigureRow :: MarkdownParser (F Inlines, [String])
 scholarlySubfigureRow = try $ do
