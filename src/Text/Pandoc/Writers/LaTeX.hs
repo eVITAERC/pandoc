@@ -884,7 +884,7 @@ figureToLaTeX attr subfigRows caption = do
                               else "\\captionsetup" <> brackets (text "subfigure")
                                    <> braces (text "labelformat=empty")
   return $ "\\begin{figure}[htbp]" $$ "\\centering" $$ disableSubfigLabel
-           $$ foldl ($$) empty img $$ capt $$ label $$ "\\end{figure}"
+           $$ foldl ($$) empty img $$ capt <> label $$ "\\end{figure}"
 
 -- Handles writing figure subfloats (using the subfig package)
 -- (requires "fullWidth" argument, which is a command that defines 100% width
@@ -901,7 +901,7 @@ subfigsToLaTeX fullWidth singleImage (Image attr txt (src,_)) = do
   let img = imageWithAttrToLatex fullWidth attr src'
   return $ if singleImage
               then img <> label
-              else "\\subfloat" <> brackets capt <> braces (img <> label)
+              else "\\subfloat" <> brackets (capt <> label) <> braces img
 
 handleImageSrc :: String -> State WriterState String
 handleImageSrc source =
