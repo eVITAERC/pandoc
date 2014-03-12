@@ -887,7 +887,8 @@ figureToLaTeX attr subfigRows caption = do
   let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
   -- | this requires the "caption" package which is provided by "subfig"
   let capstar = if (not addCaptPrefix) then text "*" else empty
-  let fullWidth = "\\textwidth"
+  let widestar = if hasClass "wide" attr then text "*" else empty
+  let fullWidth = "\\hsize"
   capt <- if null caption
              then return empty
              else (\c -> "\\caption" <> capstar <> braces c) `fmap` inlineListToLaTeX caption
@@ -898,8 +899,8 @@ figureToLaTeX attr subfigRows caption = do
                               then empty
                               else "\\captionsetup" <> brackets (text "subfigure")
                                    <> braces (text "labelformat=empty")
-  return $ "\\begin{figure}[htbp]" $$ "\\centering" $$ disableSubfigLabel
-           $$ foldl ($$) empty img $$ capt' <> label $$ "\\end{figure}"
+  return $ "\\begin{figure" <> widestar <> "}[htbp]" $$ "\\centering" $$ disableSubfigLabel
+           $$ foldl ($$) empty img $$ capt' <> label $$ "\\end{figure" <> widestar <> "}"
 
 -- Handles writing figure subfloats (using the subfig package)
 -- (requires "fullWidth" argument, which is a command that defines 100% width
@@ -917,6 +918,7 @@ subfigsToLaTeX fullWidth singleImage (Image attr txt (src,_)) = do
   return $ if singleImage
               then img <> label
               else "\\subfloat" <> brackets (capt <> label) <> braces img
+subfigsToLaTeX _ _ _ = return empty
 
 handleImageSrc :: String -> State WriterState String
 handleImageSrc source =
@@ -975,14 +977,15 @@ algorithmToLaTeX attr alg _fallback caption = do
   let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
   -- | this requires the "caption" package which is provided by "subfig"
   let capstar = if (not addCaptPrefix) then text "*" else empty
+  let widestar = if hasClass "wide" attr then text "*" else empty
   capt <- if null caption
              then return empty
              else (\c -> "\\caption" <> capstar <> braces c) `fmap` inlineListToLaTeX caption
   let capt' = if null caption && not addCaptPrefix then empty else capt
   algorithm <- mapM blockToLaTeX alg
   let label = if (not $ null ident) then ("\\label" <> braces (text ident)) else empty
-  return $ "\\begin{scholmdAlgorithm}[htbp]" $$ foldl ($$) empty algorithm
-           $$ capt' <> label $$ "\\end{scholmdAlgorithm}"
+  return $ "\\begin{scholmdAlgorithm" <> widestar <> "}[htbp]" $$ foldl ($$) empty algorithm
+           $$ capt' <> label $$ "\\end{scholmdAlgorithm" <> widestar <> "}"
 
 -- Handles writing algorithm/pseudocode floats
 tableFloatToLaTeX ::  Attr -> [Block] -> FloatFallback -> [Inline] -> State WriterState Doc
@@ -993,14 +996,15 @@ tableFloatToLaTeX attr tabl _fallback caption = do
   let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
   -- | this requires the "caption" package which is provided by "subfig"
   let capstar = if (not addCaptPrefix) then text "*" else empty
+  let widestar = if hasClass "wide" attr then text "*" else empty
   capt <- if null caption
              then return empty
              else (\c -> "\\caption" <> capstar <> braces c) `fmap` inlineListToLaTeX caption
   let capt' = if null caption && not addCaptPrefix then empty else capt
   table <- mapM tableToTabular tabl
   let label = if (not $ null ident) then ("\\label" <> braces (text ident)) else empty
-  return $ "\\begin{table}[htbp]" $$ "\\centering" $$ foldl ($$) empty table
-           $$ capt' <> label $$ "\\end{table}"
+  return $ "\\begin{table" <> widestar <> "}[htbp]" $$ "\\centering" $$ foldl ($$) empty table
+           $$ capt' <> label $$ "\\end{table" <> widestar <> "}"
 
 -- Specifically for table floats
 tableToTabular :: Block -> State WriterState Doc
@@ -1018,3 +1022,4 @@ tableToTabular (Table _caption aligns widths heads rows) = do
          $$ vcat rows'
          $$ "\\bottomrule"
          $$ "\\end{tabular}"
+tableToTabular _ = return empty
