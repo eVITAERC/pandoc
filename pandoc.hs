@@ -825,8 +825,8 @@ readMetaValue s = case decode (UTF8.fromString s) of
 -- Returns usage message
 usageMessage :: String -> [OptDescr (Opt -> IO Opt)] -> String
 usageMessage programName = usageInfo
-  (programName ++ " [OPTIONS] [FILES]" ++ 
-     "\nInput formats:  " ++ (wrapWords 16 78 $ readers'names) ++ 
+  (programName ++ " [OPTIONS] [FILES]" ++
+     "\nInput formats:  " ++ (wrapWords 16 78 $ readers'names) ++
        '\n' : replicate 16 ' ' ++
        "[* markdown_scholarly only supports the following output formats:" ++
        '\n' : replicate 19 ' ' ++
