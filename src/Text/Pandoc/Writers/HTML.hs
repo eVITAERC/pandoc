@@ -427,9 +427,9 @@ figureToHtml opts attr subfigRows caption = do
   let tocapt = H5.figcaption
   capt <- if null (captPrefix ++ caption)
              then return mempty
-             else inlineListToHtml opts (captPrefix ++ caption)
+             else liftM (tocapt) $ inlineListToHtml opts (captPrefix ++ caption)
   return $ H5.figure !? (ident /= "", prefixedId opts ident) $ mconcat
-                      [nl opts, mconcat subfigs, nl opts, tocapt capt, nl opts]
+                      [nl opts, mconcat subfigs, nl opts, capt, nl opts]
 
 -- | Transforms a list of subfigures to tags. The State monad implements the counter for automatic subfigure-numbering
 subfigsToHtml :: WriterOptions -> Bool -> Inline -> State Int Html
@@ -445,13 +445,13 @@ subfigsToHtml opts appendLabel (Image attr txt (s,tit)) = do
   let sublabel = [Str ("(" ++ (alphEnum currentIndex) ++ ")"), Space]
   let subcap = if null txt
                   then mempty
-                  else evalState (inlineListToHtml opts $
+                  else H5.figcaption $ evalState (inlineListToHtml opts $
                        if appendLabel then (sublabel ++ txt) else txt) defaultWriterState
   let img = H5.img ! (A.src $ toValue s) !? (tit /="", A.title $ toValue tit)
   return $ H5.figure
               !? (ident /= "", prefixedId opts ident)
               ! A.style (toValue ("display: inline-block; " ++ size :: String))
-              $ mconcat[nl opts, img, H5.figcaption $ subcap, nl opts]
+              $ mconcat[nl opts, img, subcap, nl opts]
 
 -- | Convert Pandoc block element to HTML.
 blockToHtml :: WriterOptions -> Block -> State WriterState Html
@@ -592,6 +592,8 @@ blockToHtml opts (Table capt aligns widths headers rows') = do
                zipWithM (tableRowToHtml opts aligns) [1..] rows'
   return $ H.table $ nl opts >> captionDoc >> coltags >> head' >>
                    body' >> nl opts
+blockToHtml opts (Algorithm attr alg fallback caption) =
+  algorithmToHtml opts attr alg fallback caption
 
 tableRowToHtml :: WriterOptions
                -> [Alignment]
@@ -869,3 +871,21 @@ mathToMathJax opts mathType mathCode =
                               toHtml $ dispMathToLaTeX attr mathCode,
                               nl opts, toHtml ("\\]" :: String)],
                    nl opts]
+
+algorithmToHtml :: WriterOptions -> Attr -> [Block] -> FloatFallback -> [Inline]
+                -> State WriterState Html
+algorithmToHtml opts attr alg _fallback caption = do
+  let ident = getIdentifier attr
+  let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
+  let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
+  let captPrefix = if addCaptPrefix then [Strong [Str "Algorithm",Space,Str myNumLabel],Space]
+                                    else []
+  -- | TODO: disable entire caption if not needed
+  let tocapt = H5.figcaption
+  capt <- if null (captPrefix ++ caption)
+             then return mempty
+             else liftM (tocapt) $ inlineListToHtml opts (captPrefix ++ caption)
+  algorithm <- mapM (blockToHtml opts) alg
+  return $ H5.figure ! A.class_ "algorithm"
+                     !? (ident /= "", prefixedId opts ident)
+                     $ mconcat [nl opts, mconcat algorithm, nl opts, capt, nl opts]

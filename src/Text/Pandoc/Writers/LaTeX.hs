@@ -62,6 +62,9 @@ data WriterState =
               , stStrikeout     :: Bool          -- true if document has strikeout
               , stUrl           :: Bool          -- true if document has visible URL link
               , stGraphics      :: Bool          -- true if document contains images
+              , stFloats        :: Bool          -- true if document contains floats
+              , stSubfigs       :: Bool          -- true if document contains subfigures
+              , stAlgorithms    :: Bool          -- true if document contains algorithm floats
               , stLHS           :: Bool          -- true if document has literate haskell code
               , stBook          :: Bool          -- true if document uses book or memoir class
               , stCsquotes      :: Bool          -- true if document uses csquotes
@@ -81,7 +84,9 @@ writeLaTeX options document =
                 stVerbInNote = False,
                 stTable = False, stStrikeout = False,
                 stUrl = False, stGraphics = False,
-                stLHS = False, stBook = writerChapters options,
+                stFloats = False, stSubfigs = False,
+                stAlgorithms = False, stLHS = False,
+                stBook = (writerChapters options) && not (writerScholarly options),
                 stCsquotes = False, stHighlighting = False,
                 stIncremental = writerIncremental options,
                 stInternalLinks = [], stUsesEuro = False,
@@ -163,6 +168,9 @@ pandocToLaTeX options (Pandoc meta blocks) = do
                   defField "numbersections" (writerNumberSections options) $
                   defField "lhs" (stLHS st) $
                   defField "graphics" (stGraphics st) $
+                  defField "floats" (stFloats st) $
+                  defField "subfigures" (stSubfigs st) $
+                  defField "algorithms" (stAlgorithms st) $
                   defField "book-class" (stBook st) $
                   defField "euro" (stUsesEuro st) $
                   defField "listings" (writerListings options || stLHS st) $
@@ -321,7 +329,6 @@ blockToLaTeX (Plain lst) =
 -- the identifiers in attr will be lifted to the Figure block
 blockToLaTeX (Para [Image attr txt (src,'f':'i':'g':':':tit)]) =
   figureToLaTeX attr [[Image (setIdentifier "" attr) [] (src,tit)]] txt
-blockToLaTeX (Figure attr subfigRows txt) = figureToLaTeX attr subfigRows txt
 blockToLaTeX (Para [Str ".",Space,Str ".",Space,Str "."]) = do
   beamer <- writerBeamer `fmap` gets stOptions
   if beamer
@@ -483,6 +490,9 @@ blockToLaTeX (Table caption aligns widths heads rows) = do
          $$ "\\bottomrule"
          $$ capt
          $$ "\\end{longtable}"
+blockToLaTeX (Figure attr subfigRows txt) = figureToLaTeX attr subfigRows txt
+blockToLaTeX (Algorithm attr alg fallback caption) =
+  algorithmToLaTeX attr alg fallback caption
 
 toColDescriptor :: Alignment -> String
 toColDescriptor align =
@@ -859,10 +869,12 @@ getListingsLanguage (x:xs) = toListingsLanguage x <|> getListingsLanguage xs
 -- Handles writing figure floats
 figureToLaTeX ::  Attr -> [[Inline]] -> [Inline] -> State WriterState Doc
 figureToLaTeX attr subfigRows caption = do
+  modify $ \s -> s{ stFloats = True }
   let ident = getIdentifier attr
   let (subfigRows', snglImg) = case subfigRows of
                                     [[Image a _ c]] -> ([[Image a [] c]], True)
                                     _ -> (subfigRows, False)
+  when (not snglImg) $ modify $ \s -> s{ stSubfigs = True }
   let subfigIds = case (safeRead $ fromMaybe [] $ lookupKey "subfigIds" attr) :: Maybe [String] of
                       Just a -> a
                       Nothing -> [""]
@@ -874,9 +886,10 @@ figureToLaTeX attr subfigRows caption = do
   -- | this requires the "caption" package which is provided by "subfig"
   let capstar = if (not addCaptPrefix) then text "*" else empty
   let fullWidth = "\\textwidth"
-  capt <- if null caption && not addCaptPrefix
+  capt <- if null caption
              then return empty
              else (\c -> "\\caption" <> capstar <> braces c) `fmap` inlineListToLaTeX caption
+  let capt' = if null caption && not addCaptPrefix then empty else capt
   img <- mapM (subfigsToLaTeX fullWidth snglImg) subfiglist
   let label = if (not $ null ident) then ("\\label" <> braces (text ident)) else empty
   let disableSubfigLabel = if showSubfigLabel || snglImg
@@ -884,7 +897,7 @@ figureToLaTeX attr subfigRows caption = do
                               else "\\captionsetup" <> brackets (text "subfigure")
                                    <> braces (text "labelformat=empty")
   return $ "\\begin{figure}[htbp]" $$ "\\centering" $$ disableSubfigLabel
-           $$ foldl ($$) empty img $$ capt <> label $$ "\\end{figure}"
+           $$ foldl ($$) empty img $$ capt' <> label $$ "\\end{figure}"
 
 -- Handles writing figure subfloats (using the subfig package)
 -- (requires "fullWidth" argument, which is a command that defines 100% width
@@ -950,3 +963,21 @@ filterLength fullWidth len =
 
 validLaTeXUnits :: [String]
 validLaTeXUnits = ["mm","cm","in","pt","em","ex","%"]
+
+-- Handles writing algorithm/pseudocode floats
+algorithmToLaTeX ::  Attr -> [Block] -> FloatFallback -> [Inline] -> State WriterState Doc
+algorithmToLaTeX attr alg _fallback caption = do
+  modify $ \s -> s{ stAlgorithms = True, stFloats = True }
+  let ident = getIdentifier attr
+  let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
+  let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
+  -- | this requires the "caption" package which is provided by "subfig"
+  let capstar = if (not addCaptPrefix) then text "*" else empty
+  capt <- if null caption
+             then return empty
+             else (\c -> "\\caption" <> capstar <> braces c) `fmap` inlineListToLaTeX caption
+  let capt' = if null caption && not addCaptPrefix then empty else capt
+  algorithm <- mapM blockToLaTeX alg
+  let label = if (not $ null ident) then ("\\label" <> braces (text ident)) else empty
+  return $ "\\begin{scholmdAlgorithm}[htbp]" $$ foldl ($$) empty algorithm
+           $$ capt' <> label $$ "\\end{scholmdAlgorithm}"

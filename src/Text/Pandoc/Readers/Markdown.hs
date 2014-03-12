@@ -454,7 +454,8 @@ block = do
                -- note: bulletList needs to be before header because of
                -- the possibility of empty list items: -
                , bulletList
-               , scholarlyFigure -- starts with an ATX header
+               , scholarlyFigure -- scholmd floats start with an ATX header
+               , scholarlyAlgorithm
                , header
                , lhsCodeBlock
                , rawTeXBlock
@@ -2028,10 +2029,11 @@ scholarlyFigure = try $ do
   notFollowedBy $ guardEnabled Ext_fancy_lists >>
                   (char '.' <|> char ')') -- this would be a list
   skipSpaces
-  string "Figure:" >> skipSpaces
-  attr <- atxClosing
+  string "Figure:" >> skipMany (noneOf "{\n")
+  attr <- option nullAttr attributes
+  blankline
   subfigRows <- many1 scholarlySubfigureRow
-  caption <- option mempty (trimInlinesF . mconcat <$> many1 inline)
+  caption <- option mempty (notFollowedBy blankline >> trimInlinesF . mconcat <$> many1 inline)
   blanklines
   let allIds = concat $ map snd subfigRows
   let figClass = if (length allIds == 1) then "singleFigure"
@@ -2117,6 +2119,21 @@ scholarlyParensXRef = try $ do
 -- Scholarly Markdown algorithm
 --
 
+-- | A version of lineBlockLines that doesn't consume all subsequent blanklines
+lineBlockLines' :: MarkdownParser [String]
+lineBlockLines' = try $ do
+  lines' <- many1 lineBlockLine
+  skipMany $ try (char '|' >> blankline)
+  return lines'
+
+-- | A version of lineBlock that doesn't consume all subsequent blanklines
+lineBlock' :: MarkdownParser (F Blocks)
+lineBlock' = try $ do
+  guardEnabled Ext_line_blocks
+  lines' <- lineBlockLines' >>=
+            mapM (parseFromString (trimInlinesF . mconcat <$> many inline))
+  return $ B.para <$> (mconcat $ intersperse (return B.linebreak) lines')
+
 scholarlyAlgorithm :: MarkdownParser (F Blocks)
 scholarlyAlgorithm = try $ do
   ensureScholarlyMarkdown
@@ -2124,10 +2141,11 @@ scholarlyAlgorithm = try $ do
   notFollowedBy $ guardEnabled Ext_fancy_lists >>
                   (char '.' <|> char ')') -- this would be a list
   skipSpaces
-  string "Algorithm:" >> skipSpaces
-  attr <- atxClosing
-  alg <- lineBlock
-  caption <- option mempty (trimInlinesF . mconcat <$> many1 inline)
+  string "Algorithm:" >> skipMany (noneOf "{\n")
+  attr <- option nullAttr attributes
+  blankline
+  alg <- many1 lineBlock'
+  caption <- option mempty (notFollowedBy blankline >> trimInlinesF . mconcat <$> many1 inline)
   blanklines
   state <- getState
   let xrefIds = stateXRefIdents state
@@ -2144,7 +2162,10 @@ scholarlyAlgorithm = try $ do
   updateState $ \s -> s{ stateXRefIdents = newXrefIds }
   let attrActions = [ insertReplaceKeyVal ("numLabel", show myNumLabel) ]
   let attr' = foldr ($) attr attrActions
-  return $ B.algorithmFloat attr' alg (FloatFallback Space "") caption
+  return $ do
+    alg' <- mconcat alg
+    caption' <- caption
+    return $ B.algorithmFloat attr' alg' (B.floatFallback B.space "") caption'
 
 --
 -- Scholarly Markdown tables
