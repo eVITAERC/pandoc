@@ -328,7 +328,8 @@ parseMarkdown = do
   blocks <- parseBlocks
   st <- getState
   let meta = runF (stateMeta' st) st
-  let meta' = B.setMeta "identifiersForMath" (map (\x -> MetaString x) $ idsForMath $ stateXRefIdents st) meta
+  let meta' = B.setMeta "identifiersForMath"
+               (map (\x -> MetaString x) $ idsForMath $ stateXRefIdents st) meta
   let Pandoc _ bs = B.doc $ runF blocks st
   return $ Pandoc meta' bs
 
@@ -456,6 +457,8 @@ block = do
                , bulletList
                , scholarlyFigure -- scholmd floats start with an ATX header
                , scholarlyAlgorithm
+               , scholarlyTable
+               , scholarlyAbstract
                , header
                , lhsCodeBlock
                , rawTeXBlock
@@ -1935,6 +1938,12 @@ many1InSeparateLines parser = try $ do
   rest <- many $ try (blankline >> parser)
   return (first:rest)
 
+-- float captions either start immediately,
+-- or is separated by a blank line and begins with non-indented @':'@
+floatCaptionStart :: MarkdownParser ()
+floatCaptionStart = try (notFollowedBy blankline)
+                    <|> try (blankline >> skipNonindentSpaces >> char ':' >> return ())
+
 --
 -- Scholarly Markdown math extensions
 --
@@ -2031,9 +2040,9 @@ scholarlyFigure = try $ do
   skipSpaces
   string "Figure:" >> skipMany (noneOf "{\n")
   attr <- option nullAttr attributes
-  blankline
+  blankline >> optional blankline
   subfigRows <- many1 scholarlySubfigureRow
-  caption <- option mempty (notFollowedBy blankline >> trimInlinesF . mconcat <$> many1 inline)
+  caption <- option mempty (floatCaptionStart >> trimInlinesF . mconcat <$> many1 inline)
   blanklines
   let allIds = concat $ map snd subfigRows
   let figClass = if (length allIds == 1) then "singleFigure"
@@ -2143,22 +2152,19 @@ scholarlyAlgorithm = try $ do
   skipSpaces
   string "Algorithm:" >> skipMany (noneOf "{\n")
   attr <- option nullAttr attributes
-  blankline
+  blankline >> optional blankline
   alg <- many1 lineBlock'
-  caption <- option mempty (notFollowedBy blankline >> trimInlinesF . mconcat <$> many1 inline)
+  caption <- option mempty (floatCaptionStart >> trimInlinesF . mconcat <$> many1 inline)
   blanklines
   state <- getState
   let xrefIds = stateXRefIdents state
   -- numbering can be forcibly disabled by class ".nonumber"
-  let needId = not (hasClass "nonumber" attr) || (getIdentifier attr) /= ""
-  -- this identifier is only used in the list of reference ids for numbering
-  let myIdentifier = if needId && (getIdentifier attr) == ""
-                        then "#"
-                        else getIdentifier attr
+  let needId = not (hasClass "nonumber" attr) && (getIdentifier attr) /= ""
+  let myIdentifier = getIdentifier attr
   let myNumLabel = if needId
                       then (length $ filter (/= "") $ idsForAlgorithms xrefIds) + 1
                       else 0 -- will never be displayed anyways
-  let newXrefIds = xrefIds{ idsForAlgorithms = (idsForFigure xrefIds) ++ [myIdentifier] }
+  let newXrefIds = xrefIds{ idsForAlgorithms = (idsForAlgorithms xrefIds) ++ [myIdentifier] }
   updateState $ \s -> s{ stateXRefIdents = newXrefIds }
   let attrActions = [ insertReplaceKeyVal ("numLabel", show myNumLabel) ]
   let attr' = foldr ($) attr attrActions
@@ -2171,4 +2177,73 @@ scholarlyAlgorithm = try $ do
 -- Scholarly Markdown tables
 --
 
+-- version of table that doesn't parse caption
+table' :: MarkdownParser (F Blocks)
+table' = try $ do
+  (aligns, widths, heads, lns) <-
+         try (guardEnabled Ext_pipe_tables >> scanForPipe >> pipeTable) <|>
+         try (guardEnabled Ext_multiline_tables >>
+                multilineTable False) <|>
+         try (guardEnabled Ext_simple_tables >>
+                (simpleTable True <|> simpleTable False)) <|>
+         try (guardEnabled Ext_multiline_tables >>
+                multilineTable True) <|>
+         try (guardEnabled Ext_grid_tables >>
+                (gridTable False <|> gridTable True)) <?> "table"
+  return $ do
+    heads' <- heads
+    lns' <- lns
+    return $ B.table mempty (zip aligns widths) heads' lns'
 
+-- This is a floated table that has an Id and can be cross-referenced
+scholarlyTable :: MarkdownParser (F Blocks)
+scholarlyTable = try $ do
+  ensureScholarlyMarkdown
+  many1 (char '#')
+  notFollowedBy $ guardEnabled Ext_fancy_lists >>
+                  (char '.' <|> char ')') -- this would be a list
+  skipSpaces
+  string "Table:" >> skipMany (noneOf "{\n")
+  attr <- option nullAttr attributes
+  blankline >> optional blankline
+  tabl <- table'
+  caption <- option mempty (floatCaptionStart >> trimInlinesF . mconcat <$> many1 inline)
+  blanklines
+  state <- getState
+  let xrefIds = stateXRefIdents state
+  -- numbering can be forcibly disabled by class ".nonumber"
+  let needId = not (hasClass "nonumber" attr) && (getIdentifier attr) /= ""
+  let myIdentifier = getIdentifier attr
+  let myNumLabel = if needId
+                      then (length $ filter (/= "") $ idsForTables xrefIds) + 1
+                      else 0 -- will never be displayed anyways
+  let newXrefIds = xrefIds{ idsForTables = (idsForTables xrefIds) ++ [myIdentifier] }
+  updateState $ \s -> s{ stateXRefIdents = newXrefIds }
+  let attrActions = [ insertReplaceKeyVal ("numLabel", show myNumLabel) ]
+  let attr' = foldr ($) attr attrActions
+  return $ do
+    tabl' <- tabl
+    caption' <- caption
+    return $ B.tableFloat attr' tabl' (B.floatFallback B.space "") caption'
+
+
+--
+-- Abstract
+--
+
+-- Parses one paragraph as abstract, no more and no less, then
+-- set as metadata
+scholarlyAbstract :: MarkdownParser (F Blocks)
+scholarlyAbstract = try $ do
+  ensureScholarlyMarkdown
+  many1 (char '#')
+  notFollowedBy $ guardEnabled Ext_fancy_lists >>
+                  (char '.' <|> char ')') -- this would be a list
+  skipSpaces
+  string "Abstract:" >> blanklines
+  abstract <- para
+  let meta' = do
+              abstract' <- abstract
+              return $ B.setMeta "abstract" abstract' nullMeta
+  updateState $ \st -> st{ stateMeta' = stateMeta' st <> meta' }
+  return $ return mempty

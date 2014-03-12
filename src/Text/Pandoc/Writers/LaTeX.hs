@@ -493,6 +493,8 @@ blockToLaTeX (Table caption aligns widths heads rows) = do
 blockToLaTeX (Figure attr subfigRows txt) = figureToLaTeX attr subfigRows txt
 blockToLaTeX (Algorithm attr alg fallback caption) =
   algorithmToLaTeX attr alg fallback caption
+blockToLaTeX (TableFloat attr tabl fallback caption) =
+  tableFloatToLaTeX attr tabl fallback caption
 
 toColDescriptor :: Alignment -> String
 toColDescriptor align =
@@ -981,3 +983,38 @@ algorithmToLaTeX attr alg _fallback caption = do
   let label = if (not $ null ident) then ("\\label" <> braces (text ident)) else empty
   return $ "\\begin{scholmdAlgorithm}[htbp]" $$ foldl ($$) empty algorithm
            $$ capt' <> label $$ "\\end{scholmdAlgorithm}"
+
+-- Handles writing algorithm/pseudocode floats
+tableFloatToLaTeX ::  Attr -> [Block] -> FloatFallback -> [Inline] -> State WriterState Doc
+tableFloatToLaTeX attr tabl _fallback caption = do
+  modify $ \s -> s{ stTable = True, stFloats = True }
+  let ident = getIdentifier attr
+  let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
+  let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
+  -- | this requires the "caption" package which is provided by "subfig"
+  let capstar = if (not addCaptPrefix) then text "*" else empty
+  capt <- if null caption
+             then return empty
+             else (\c -> "\\caption" <> capstar <> braces c) `fmap` inlineListToLaTeX caption
+  let capt' = if null caption && not addCaptPrefix then empty else capt
+  table <- mapM tableToTabular tabl
+  let label = if (not $ null ident) then ("\\label" <> braces (text ident)) else empty
+  return $ "\\begin{table}[htbp]" $$ "\\centering" $$ foldl ($$) empty table
+           $$ capt' <> label $$ "\\end{table}"
+
+-- Specifically for table floats
+tableToTabular :: Block -> State WriterState Doc
+tableToTabular (Table _caption aligns widths heads rows) = do
+  headers <- if all null heads
+                then return empty
+                else ($$ "\\midrule") `fmap`
+                      (tableRowToLaTeX True aligns widths) heads
+  rows' <- mapM (tableRowToLaTeX False aligns widths) rows
+  let colDescriptors = text $ concat $ map toColDescriptor aligns
+  return $ "\\begin{tabular}" <>
+              braces (colDescriptors)
+         $$ "\\toprule\\addlinespace"
+         $$ headers
+         $$ vcat rows'
+         $$ "\\bottomrule"
+         $$ "\\end{tabular}"

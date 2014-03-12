@@ -46,7 +46,7 @@ import Numeric ( showHex )
 import Data.Char ( ord, toLower )
 import Data.List ( isPrefixOf, intersperse, intercalate )
 import Data.String ( fromString )
-import Data.Maybe ( catMaybes, fromMaybe )
+import Data.Maybe ( catMaybes, fromMaybe, isJust, isNothing )
 import Control.Monad.State
 import Text.Blaze.Html hiding(contents)
 import Text.Blaze.Internal(preEscapedString)
@@ -114,11 +114,13 @@ pandocToHtml :: WriterOptions
              -> Pandoc
              -> State WriterState (Html, Value)
 pandocToHtml opts (Pandoc meta blocks) = do
+  -- make sure title is set for abstract section
   metadata <- metaToJSON opts
               (fmap renderHtml . blockListToHtml opts)
               (fmap renderHtml . inlineListToHtml opts)
               meta
   initSt <- get
+  -- these ids will be handled by MathJax if scholmd
   let mathIds = extractMetaStringList $ lookupMeta "identifiersForMath" meta
   put initSt{ stMathIds = mathIds }
   let stringifyHTML = escapeStringForXML . stringify
@@ -179,6 +181,10 @@ pandocToHtml opts (Pandoc meta blocks) = do
                   maybe id (defField "toc" . renderHtml) toc $
                   defField "author-meta" authsMeta $
                   maybe id (defField "date-meta") (normalizeDate dateMeta) $
+                  (if (isJust $ lookupMeta "abstract" meta)
+                      && (isNothing $ lookupMeta "abstract-title" meta)
+                      then defField "abstract-title" ("Abstract" :: String)
+                      else id) $
                   defField "pagetitle" (stringifyHTML $ docTitle meta) $
                   defField "idprefix" (writerIdentifierPrefix opts) $
                   -- these should maybe be set in pandoc.hs
@@ -421,7 +427,7 @@ figureToHtml opts attr subfigRows caption = do
   let subfigs = evalState (mapM (subfigsToHtml opts appendLabel) subfiglist) 1
   let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
   let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
-  let captPrefix = if addCaptPrefix then [Strong [Str "Figure",Space,Str myNumLabel],Space]
+  let captPrefix = if addCaptPrefix then [Strong [Str "Figure\160",Str myNumLabel],Space]
                                     else []
   -- | TODO: disable entire caption if not needed
   let tocapt = H5.figcaption
@@ -594,6 +600,8 @@ blockToHtml opts (Table capt aligns widths headers rows') = do
                    body' >> nl opts
 blockToHtml opts (Algorithm attr alg fallback caption) =
   algorithmToHtml opts attr alg fallback caption
+blockToHtml opts (TableFloat attr tabl fallback caption) =
+  tableFloatToHtml opts attr tabl fallback caption
 
 tableRowToHtml :: WriterOptions
                -> [Alignment]
@@ -878,7 +886,7 @@ algorithmToHtml opts attr alg _fallback caption = do
   let ident = getIdentifier attr
   let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
   let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
-  let captPrefix = if addCaptPrefix then [Strong [Str "Algorithm",Space,Str myNumLabel],Space]
+  let captPrefix = if addCaptPrefix then [Strong [Str "Algorithm\160",Str myNumLabel],Space]
                                     else []
   -- | TODO: disable entire caption if not needed
   let tocapt = H5.figcaption
@@ -889,3 +897,21 @@ algorithmToHtml opts attr alg _fallback caption = do
   return $ H5.figure ! A.class_ "algorithm"
                      !? (ident /= "", prefixedId opts ident)
                      $ mconcat [nl opts, mconcat algorithm, nl opts, capt, nl opts]
+
+tableFloatToHtml :: WriterOptions -> Attr -> [Block] -> FloatFallback -> [Inline]
+                 -> State WriterState Html
+tableFloatToHtml opts attr tabl _fallback caption = do
+  let ident = getIdentifier attr
+  let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
+  let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
+  let captPrefix = if addCaptPrefix then [Strong [Str "Table\160",Str myNumLabel],Space]
+                                    else []
+  -- | TODO: disable entire caption if not needed
+  let tocapt = H5.figcaption
+  capt <- if null (captPrefix ++ caption)
+             then return mempty
+             else liftM (tocapt) $ inlineListToHtml opts (captPrefix ++ caption)
+  table <- mapM (blockToHtml opts) tabl
+  return $ H5.figure ! A.class_ "tableFloat"
+                     !? (ident /= "", prefixedId opts ident)
+                     $ mconcat [nl opts, mconcat table, nl opts, capt, nl opts]
