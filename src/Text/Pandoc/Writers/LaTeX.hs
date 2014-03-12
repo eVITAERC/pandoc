@@ -153,6 +153,7 @@ pandocToLaTeX options (Pandoc meta blocks) = do
                   defField "documentclass" (if writerBeamer options
                                                then ("beamer" :: String)
                                                else if writerChapters options
+                                                       && not (writerScholarly options)
                                                     then "book"
                                                     else "article") $
                   defField "verbatim-in-note" (stVerbInNote st) $

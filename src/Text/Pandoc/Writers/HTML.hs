@@ -148,13 +148,14 @@ pandocToHtml opts (Pandoc meta blocks) = do
                                        ! A.type_ "text/javascript"
                                        $ mempty
                            MathJax url ->
-                              H.script ! A.src (toValue url)
-                                       ! A.type_ "text/javascript"
-                                       $ case writerSlideVariant opts of
-                                              SlideousSlides ->
-                                                 preEscapedString
-                                                 "MathJax.Hub.Queue([\"Typeset\",MathJax.Hub]);"
-                                              _ -> mempty
+                              if url == "" then mempty
+                                 else H.script ! A.src (toValue url)
+                                               ! A.type_ "text/javascript"
+                              $ case writerSlideVariant opts of
+                                     SlideousSlides ->
+                                        preEscapedString
+                                        "MathJax.Hub.Queue([\"Typeset\",MathJax.Hub]);"
+                                     _ -> mempty
                            JsMath (Just url) ->
                               H.script ! A.src (toValue url)
                                        ! A.type_ "text/javascript"

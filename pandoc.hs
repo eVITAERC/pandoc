@@ -47,7 +47,8 @@ import System.Exit ( exitWith, ExitCode (..) )
 import System.FilePath
 import System.Console.GetOpt
 import Data.Char ( toLower )
-import Data.List ( intercalate, isPrefixOf, sort )
+import Data.List ( intercalate, isPrefixOf, sort, (\\) )
+import Data.Maybe ( isNothing )
 import System.Directory ( getAppUserDataDirectory, findExecutable )
 import System.IO ( stdout, stderr )
 import System.IO.Error ( isDoesNotExistError )
@@ -68,8 +69,10 @@ import qualified Data.Yaml as Yaml
 import qualified Data.Text as T
 
 copyrightMessage :: String
-copyrightMessage = "\nCopyright (C) 2006-2013 John MacFarlane\n" ++
-                    "Web:  http://johnmacfarlane.net/pandoc\n" ++
+copyrightMessage = "\nCopyright (C) 2014 Tim T.Y. Lin\n" ++
+                    "This work is based on Pandoc:\n" ++
+                    "   Copyright (C) 2006-2013 John MacFarlane\n" ++
+                    "   Web:  http://johnmacfarlane.net/pandoc\n" ++
                     "This is free software; see the source for copying conditions.  There is no\n" ++
                     "warranty, not even for merchantability or fitness for a particular purpose."
 
@@ -137,6 +140,7 @@ data Opt = Opt
     , optHighlightStyle    :: Style   -- ^ Style to use for highlighted code
     , optChapters          :: Bool    -- ^ Use chapter for top-level sects
     , optHTMLMathMethod    :: HTMLMathMethod -- ^ Method to print HTML math
+    , optUseMathJaxCDN     :: Bool    -- ^ Use MathJax from CDN in standalone
     , optReferenceODT      :: Maybe FilePath -- ^ Path of reference.odt
     , optReferenceDocx     :: Maybe FilePath -- ^ Path of reference.docx
     , optEpubStylesheet    :: Maybe String   -- ^ EPUB stylesheet
@@ -193,6 +197,7 @@ defaultOpts = Opt
     , optHighlightStyle        = pygments
     , optChapters              = False
     , optHTMLMathMethod        = PlainMath
+    , optUseMathJaxCDN         = True
     , optReferenceODT          = Nothing
     , optReferenceDocx         = Nothing
     , optEpubStylesheet        = Nothing
@@ -750,10 +755,17 @@ options =
                   (\arg opt -> do
                       let url' = case arg of
                                       Just u   -> u
-                                      Nothing  -> "http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
+                                      Nothing  -> ""
                       return opt { optHTMLMathMethod = MathJax url'})
                   "URL")
                  "" -- "Use MathJax for HTML math"
+
+    , Option "" ["no-mathjax-cdn"]
+                 (NoArg
+                  (\opt -> return opt { optUseMathJaxCDN = False }))
+                 "" -- suppress inclusion of MathJax script from CDN
+                 -- useful for offline or preventing conflict with buildscripts
+                 -- explicit declaration of any math method overrides this
 
     , Option "" ["gladtex"]
                  (NoArg
@@ -813,14 +825,19 @@ readMetaValue s = case decode (UTF8.fromString s) of
 -- Returns usage message
 usageMessage :: String -> [OptDescr (Opt -> IO Opt)] -> String
 usageMessage programName = usageInfo
-  (programName ++ " [OPTIONS] [FILES]" ++ "\nInput formats:  " ++
-  (wrapWords 16 78 $ readers'names) ++ "\nOutput formats: " ++
-  (wrapWords 16 78 $ writers'names) ++
-     '\n' : replicate 16 ' ' ++
-     "[*for pdf output, use latex or beamer and -o FILENAME.pdf]\nOptions:")
+  (programName ++ " [OPTIONS] [FILES]" ++ 
+     "\nInput formats:  " ++ (wrapWords 16 78 $ readers'names) ++ 
+       '\n' : replicate 16 ' ' ++
+       "[* markdown_scholarly only supports the following output formats:" ++
+       '\n' : replicate 19 ' ' ++
+       "html5, latex, dzslides, revealjs, beamer]" ++
+     "\nOutput formats: " ++ (wrapWords 16 78 $ writers'names) ++
+       '\n' : replicate 16 ' ' ++
+       "[* for pdf output, use latex or beamer and -o FILENAME.pdf]\nOptions:")
   where
     writers'names = sort $ "pdf*" : map fst writers
-    readers'names = sort $ map fst readers
+    readers'names = sort $ "markdown_scholarly*" :
+                      ((map fst readers) \\ ["markdown_scholarly"])
 
 -- Determine default reader based on source file extensions
 defaultReaderName :: String -> [FilePath] -> String
@@ -934,6 +951,7 @@ main = do
               , optHighlightStyle        = highlightStyle
               , optChapters              = chapters
               , optHTMLMathMethod        = mathMethod
+              , optUseMathJaxCDN         = useMathJaxCDN
               , optReferenceODT          = referenceODT
               , optReferenceDocx         = referenceDocx
               , optEpubStylesheet        = epubStylesheet
@@ -993,12 +1011,25 @@ main = do
                            in  defaultReaderName fallback sources
                       else readerName
 
-  let writerName' = if null writerName
-                      then defaultWriterName outputFile
-                      else case writerName of
-                                "epub2"   -> "epub"
-                                "html4"   -> "html"
-                                x         -> x
+  let scholarlyMode = if readerName' == "markdown_scholarly"
+                         then True
+                         else False
+
+  let writerNameTmp = if null writerName
+                         then defaultWriterName outputFile
+                         else case writerName of
+                                   "epub2"   -> "epub"
+                                   "html4"   -> "html"
+                                   "html"    -> if scholarlyMode then "html5"
+                                                                 else "html"
+                                   x         -> x
+
+  -- ScholMD only implemented for html5
+  let writerName' = if not scholarlyMode
+                       then writerNameTmp
+                       else case writerNameTmp of
+                            "html" -> "html5"
+                            _ -> writerNameTmp
 
   let pdfOutput = map toLower (takeExtension outputFile) == ".pdf"
 
@@ -1023,8 +1054,47 @@ main = do
 
   let standalone' = standalone || not (isTextFormat writerName') || pdfOutput
 
-  templ <- case templatePath of
-                _ | not standalone' -> return ""
+  -- Begin Scholarly Markdown specific settings
+  when scholarlyMode $ do
+    unless (writerName' `elem` ["html5","dzslides","revealjs","latex","beamer"])
+      $ err 101 "Scholarly Markdown currently only renders to html5 or latex/pdf"
+    case mathMethod of
+         MathJax _ -> return ()
+         PlainMath -> return ()
+         _ -> warn "Scholarly Markdown relies on MathJax for HTML output, switching to MathJax..."
+              >> return ()
+
+  let (templatePath', standalone'') = if scholarlyMode && isNothing templatePath
+       then if not standalone'
+               then if writerName' == "html5" -- always use
+                       then (Just "schmdTemplate_bodyOnly.html5", True)
+                       else (Nothing, False)
+               else case writerName' of
+                    "html5" -> (Just "schmdTemplate.html5", True)
+                    "latex" -> (Just "schmdTemplate.latex", True)
+                    _       -> (Nothing, True)
+       else (templatePath, standalone')
+
+  let mathJaxCDNaddr = "http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
+
+  let checkMathJaxCDN (MathJax "") = if useMathJaxCDN
+                                        then MathJax mathJaxCDNaddr
+                                        else MathJax ""
+      checkMathJaxCDN (MathJax a) = MathJax a
+      checkMathJaxCDN _ = checkMathJaxCDN (MathJax "") -- force using MathJax
+
+  let mathMethod' = if not scholarlyMode
+                       then mathMethod
+                       else checkMathJaxCDN mathMethod
+
+  -- ScholMD always assume h1=Chapter, h2=Section, etc...
+  let chapters' = if scholarlyMode && writerName' == "latex"
+                     then True
+                     else chapters
+  -- End Scholarly Markdown specific settings
+
+  templ <- case templatePath' of
+                _ | not standalone'' -> return ""
                 Nothing -> do
                            deftemp <- getDefaultTemplate datadir writerName'
                            case deftemp of
@@ -1045,7 +1115,7 @@ main = do
                                                      in throwIO e')
                                        else throwIO e)
 
-  variables' <- case mathMethod of
+  variables' <- case mathMethod' of
                       LaTeXMathML Nothing -> do
                          s <- readDataFileUTF8 datadir "LaTeXMathML.js"
                          return $ ("mathml-script", s) : variables
@@ -1074,7 +1144,7 @@ main = do
 
   let readerOpts = def{ readerSmart = smart || (texLigatures &&
                           (laTeXOutput || "context" `isPrefixOf` writerName'))
-                      , readerStandalone = standalone'
+                      , readerStandalone = standalone''
                       , readerParseRaw = parseRaw
                       , readerColumns = columns
                       , readerTabStop = tabStop
@@ -1085,12 +1155,12 @@ main = do
                       , readerTrace = trace
                       }
 
-  let writerOptions = def { writerStandalone       = standalone',
+  let writerOptions = def { writerStandalone       = standalone'',
                             writerTemplate         = templ,
                             writerVariables        = variables'',
                             writerTabStop          = tabStop,
                             writerTableOfContents  = toc,
-                            writerHTMLMathMethod   = mathMethod,
+                            writerHTMLMathMethod   = mathMethod',
                             writerIncremental      = incremental,
                             writerCiteMethod       = citeMethod,
                             writerIgnoreNotes      = False,
@@ -1106,7 +1176,7 @@ main = do
                             writerUserDataDir      = datadir,
                             writerHtml5            = html5,
                             writerHtmlQTags        = htmlQTags,
-                            writerChapters         = chapters,
+                            writerChapters         = chapters',
                             writerListings         = listings,
                             writerBeamer           = False,
                             writerSlideLevel       = slideLevel,
@@ -1120,7 +1190,8 @@ main = do
                             writerEpubChapterLevel = epubChapterLevel,
                             writerTOCDepth         = epubTOCDepth,
                             writerReferenceODT     = referenceODT,
-                            writerReferenceDocx    = referenceDocx
+                            writerReferenceDocx    = referenceDocx,
+                            writerScholarly        = scholarlyMode
                           }
 
   when (not (isTextFormat writerName') && outputFile == "-") $
@@ -1173,7 +1244,7 @@ main = do
                    Right pdf -> writeBinary pdf
                    Left err' -> err 43 $ UTF8.toStringLazy err'
       | otherwise -> selfcontain (f writerOptions doc2 ++
-                                  ['\n' | not standalone'])
+                                  ['\n' | not standalone''])
                       >>= writerFn outputFile . handleEntities
           where htmlFormat = writerName' `elem`
                                ["html","html+lhs","html5","html5+lhs",
