@@ -2117,6 +2117,35 @@ scholarlyParensXRef = try $ do
 -- Scholarly Markdown algorithm
 --
 
+scholarlyAlgorithm :: MarkdownParser (F Blocks)
+scholarlyAlgorithm = try $ do
+  ensureScholarlyMarkdown
+  many1 (char '#')
+  notFollowedBy $ guardEnabled Ext_fancy_lists >>
+                  (char '.' <|> char ')') -- this would be a list
+  skipSpaces
+  string "Algorithm:" >> skipSpaces
+  attr <- atxClosing
+  alg <- lineBlock
+  caption <- option mempty (trimInlinesF . mconcat <$> many1 inline)
+  blanklines
+  state <- getState
+  let xrefIds = stateXRefIdents state
+  -- numbering can be forcibly disabled by class ".nonumber"
+  let needId = not (hasClass "nonumber" attr) || (getIdentifier attr) /= ""
+  -- this identifier is only used in the list of reference ids for numbering
+  let myIdentifier = if needId && (getIdentifier attr) == ""
+                        then "#"
+                        else getIdentifier attr
+  let myNumLabel = if needId
+                      then (length $ filter (/= "") $ idsForAlgorithms xrefIds) + 1
+                      else 0 -- will never be displayed anyways
+  let newXrefIds = xrefIds{ idsForAlgorithms = (idsForFigure xrefIds) ++ [myIdentifier] }
+  updateState $ \s -> s{ stateXRefIdents = newXrefIds }
+  let attrActions = [ insertReplaceKeyVal ("numLabel", show myNumLabel) ]
+  let attr' = foldr ($) attr attrActions
+  return $ B.algorithmFloat attr' alg (FloatFallback Space "") caption
+
 --
 -- Scholarly Markdown tables
 --
