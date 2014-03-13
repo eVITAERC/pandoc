@@ -449,7 +449,7 @@ subfigsToHtml opts appendLabel (Image attr txt (s,tit)) = do
                   Just width -> "width: " ++ width
                   Nothing -> ""
   let sublabel = [Str ("(" ++ (alphEnum currentIndex) ++ ")"), Space]
-  let subcap = if null txt
+  let subcap = if (null txt && not appendLabel)
                   then mempty
                   else H5.figcaption $ evalState (inlineListToHtml opts $
                        if appendLabel then (sublabel ++ txt) else txt) defaultWriterState

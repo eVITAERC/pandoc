@@ -1363,7 +1363,7 @@ inline = choice [ whitespace
                 , code
                 , strongOrEmph
                 , note
-                , scholarlyXRef
+                , scholarlyXRef -- before links to avoid it being parsed
                 , cite
                 , link
                 , image

@@ -936,7 +936,7 @@ getNumericalLabel ident ids
 numInIdList :: String -> [String] -> String
 numInIdList ident idList =
   case (elemIndex ident $ filter (/= "") idList) of
-       Just index -> show index
+       Just index -> show (index + 1) -- elemIndex starts from zero
        Nothing -> ""
 
 instance Default ParserState where
