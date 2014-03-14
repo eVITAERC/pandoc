@@ -110,7 +110,8 @@ getImageAttr _ = nullAttr
 --
 
 extractMetaStringList :: Maybe MetaValue -> [String]
-extractMetaStringList (Just (MetaList idList)) = map extractMetaString idList
+extractMetaStringList (Just (MetaList lst)) = map extractMetaString lst
+extractMetaStringList (Just (MetaString str)) = [str]
 extractMetaStringList _ = []
 
 extractMetaString :: MetaValue -> String

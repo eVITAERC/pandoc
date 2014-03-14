@@ -710,6 +710,12 @@ options =
                   (\opt -> return opt { optCiteMethod = Biblatex }))
                  "" -- "Use biblatex cite commands in LaTeX output"
 
+    , Option "" ["citeproc"]
+                 (NoArg
+                  (\opt -> return opt { optFilters =
+                                          "pandoc-citeproc" : optFilters opt }))
+                  "" -- add pandoc-citeproc to list of filters
+
     , Option "m" ["latexmathml", "asciimathml"]
                  (OptArg
                   (\arg opt ->

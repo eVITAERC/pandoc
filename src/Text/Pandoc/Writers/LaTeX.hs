@@ -38,6 +38,7 @@ import Text.Pandoc.Scholarly
 import Text.Pandoc.Templates
 import Text.Printf ( printf )
 import Network.URI ( isURI, unEscapeString )
+import System.FilePath ( dropExtension )
 import Data.List ( (\\), isSuffixOf, isInfixOf,
                    isPrefixOf, intercalate, intersperse )
 import Data.Char ( toLower, isPunctuation, isAscii, isLetter, isDigit, ord )
@@ -136,6 +137,9 @@ pandocToLaTeX options (Pandoc meta blocks) = do
   let (blocks'', lastHeader) = if writerCiteMethod options == Citeproc then
                                  (blocks', [])
                                else case last blocks' of
+                                 Header 2 _ il | writerChapters options
+                                                 && writerScholarly options
+                                                    -> (init blocks', il)
                                  Header 1 _ il -> (init blocks', il)
                                  _             -> (blocks', [])
   blocks''' <- if writerBeamer options
@@ -143,6 +147,16 @@ pandocToLaTeX options (Pandoc meta blocks) = do
                   else return blocks''
   body <- mapM (elementToLaTeX options) $ hierarchicalize blocks'''
   (biblioTitle :: String) <- liftM (render colwidth) $ inlineListToLaTeX lastHeader
+  let metaInlinesToString ils = case ils of
+                                  (MetaInlines s) -> liftM (render colwidth) $
+                                                       inlineListToLaTeX s
+                                  _ -> return ""
+  (biblioFiles :: [String]) <- case lookupMeta "bibliography" meta of
+                                    Just s@(MetaInlines _) ->
+                                           liftM (:[]) $ metaInlinesToString s
+                                    Just (MetaList lst) ->
+                                         mapM metaInlinesToString lst
+                                    Nothing -> return []
   let main = render colwidth $ vsep body
   st <- get
   titleMeta <- stringToLaTeX TextString $ stringify $ docTitle meta
@@ -183,8 +197,13 @@ pandocToLaTeX options (Pandoc meta blocks) = do
                       else id) $
                   (case writerCiteMethod options of
                          Natbib   -> defField "biblio-title" biblioTitle .
+                                     defField "biblio-files"
+                                       (intercalate "," $ map dropExtension $
+                                          biblioFiles) .
                                      defField "natbib" True
                          Biblatex -> defField "biblio-title" biblioTitle .
+                                     defField "biblio-files"
+                                       (intercalate "," biblioFiles) .
                                      defField "biblatex" True
                          _        -> id) $
                   metadata
