@@ -617,6 +617,13 @@ specialAttr = do
 
 codeBlockFenced :: MarkdownParser (F Blocks)
 codeBlockFenced = try $ do
+  (attr, contents) <- codeBlockFenced'
+  blanklines
+  return $ return $ B.codeBlockWith attr contents
+
+-- Does not parse blanklines afterward
+codeBlockFenced' :: MarkdownParser (Attr, String)
+codeBlockFenced' = try $ do
   c <- try (guardEnabled Ext_fenced_code_blocks >> lookAhead (char '~'))
      <|> (guardEnabled Ext_backtick_code_blocks >> lookAhead (char '`'))
   size <- blockDelimiter (== c) Nothing
@@ -627,19 +634,24 @@ codeBlockFenced = try $ do
   guard $ not (classIsMath attr)
   blankline
   contents <- manyTill anyLine (blockDelimiter (== c) (Just size))
-  blanklines
-  return $ return $ B.codeBlockWith attr $ intercalate "\n" contents
+  blankline
+  return (attr, intercalate "\n" contents)
 
 codeBlockIndented :: MarkdownParser (F Blocks)
 codeBlockIndented = do
+  (attr, contents) <- codeBlockIndented'
+  optional blanklines
+  return $ return $ B.codeBlockWith attr contents
+
+-- Does not parse blanklines afterward
+codeBlockIndented' :: MarkdownParser (Attr, String)
+codeBlockIndented' = do
   contents <- many1 (indentedLine <|>
                      try (do b <- blanklines
                              l <- indentedLine
                              return $ b ++ l))
-  optional blanklines
   classes <- getOption readerIndentedCodeClasses
-  return $ return $ B.codeBlockWith ("", classes, []) $
-           stripTrailingNewlines $ concat contents
+  return (("", classes, []), stripTrailingNewlines $ concat contents)
 
 lhsCodeBlock :: MarkdownParser (F Blocks)
 lhsCodeBlock = do
@@ -2251,7 +2263,7 @@ scholarlyCodeBlock = try $ do
   string "Code:" >> skipMany (noneOf "{\n")
   attr <- option nullAttr attributes
   blankline >> optional blankline
-  codeblock <- codeBlockFenced <|> codeBlockIndented
+  (codeAttr, codeContent) <- codeBlockFenced' <|> codeBlockIndented'
   caption <- option mempty (floatCaptionStart >> trimInlinesF . mconcat <$> many1 inline)
   blanklines
   state <- getState
@@ -2266,10 +2278,10 @@ scholarlyCodeBlock = try $ do
   updateState $ \s -> s{ stateXRefIdents = newXrefIds }
   let attrActions = [ insertReplaceKeyVal ("numLabel", show myNumLabel) ]
   let attr' = foldr ($) attr attrActions
+  let codeblock = B.codeBlockWith codeAttr codeContent
   return $ do
-    codeblock' <- codeblock
     caption' <- caption
-    return $ B.codeFloat attr' codeblock' (B.floatFallback B.space "") caption'
+    return $ B.codeFloat attr' codeblock (B.floatFallback B.space "") caption'
 
 
 --
