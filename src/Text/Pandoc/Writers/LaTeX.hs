@@ -73,7 +73,9 @@ data WriterState =
               , stIncremental   :: Bool          -- true if beamer lists should be displayed bit by bit
               , stInternalLinks :: [String]      -- list of internal link targets
               , stUsesEuro      :: Bool          -- true if euro symbol used
-              , stMathIds       :: [String]      -- list of math identifiers
+              , stMathIds       :: [String]      -- list of math identifiers,
+              , stLastHeight    :: Maybe String  -- last img height value
+              , stLastWidth     :: Maybe String  -- last img width value
               }
 
 -- | Convert Pandoc to LaTeX.
@@ -91,7 +93,8 @@ writeLaTeX options document =
                 stCsquotes = False, stHighlighting = False,
                 stIncremental = writerIncremental options,
                 stInternalLinks = [], stUsesEuro = False,
-                stMathIds = [] }
+                stMathIds = [], stLastHeight = Nothing,
+                stLastWidth = Nothing }
 
 pandocToLaTeX :: WriterOptions -> Pandoc -> State WriterState String
 pandocToLaTeX options (Pandoc meta blocks) = do
@@ -947,7 +950,8 @@ subfigsToLaTeX fullWidth singleImage (Image attr txt (src,_)) = do
              else inlineListToLaTeX txt
   let label = if (not $ null ident) then ("\\label" <> braces (text ident)) else empty
   src' <- handleImageSrc src
-  let img = imageWithAttrToLatex fullWidth attr src'
+  attr' <- setWidthFromHistory attr
+  let img = imageWithAttrToLatex fullWidth attr' src'
   return $ if singleImage
               then img <> label
               else "\\subfloat" <> brackets (capt <> label) <> braces img
@@ -959,6 +963,18 @@ handleImageSrc source =
                    then source
                    else unEscapeString source
   in stringToLaTeX URLString source'
+
+setWidthFromHistory :: Attr -> State WriterState Attr
+setWidthFromHistory attr = do
+  let attrWidth = fromMaybe "" $ lookupKey "width" attr
+  st <- get
+  let lastWidth = fromMaybe "" $ stLastWidth st
+  let replaceWidth = attrWidth == "same" || attrWidth == "^"
+  let currWidth = if replaceWidth
+                     then lastWidth
+                     else attrWidth
+  when (not $ null currWidth) $ put st { stLastWidth = Just currWidth }
+  return $ insertReplaceKeyVal ("width",currWidth) attr
 
 -- Extracts dimension attributes and include in the @includegraphics@ directive
 -- (requires "fullWidth" argument, which is a command that defines 100% width

@@ -71,12 +71,15 @@ data WriterState = WriterState
     , stHighlighting     :: Bool    -- ^ Syntax highlighting is used
     , stSecNum           :: [Int]   -- ^ Number of current section
     , stMathIds          :: [String]
+    , stLastHeight       :: Maybe String  -- last img height value
+    , stLastWidth        :: Maybe String  -- last img width value
     }
 
 defaultWriterState :: WriterState
 defaultWriterState = WriterState {stNotes= [], stMath = False, stQuotes = False,
                                   stHighlighting = False, stSecNum = [],
-                                  stMathIds = []}
+                                  stMathIds = [], stLastHeight = Nothing,
+                                  stLastWidth = Nothing }
 
 -- Helpers to render HTML with the appropriate function.
 
@@ -412,6 +415,21 @@ treatAsImage fp =
   let ext = map toLower $ drop 1 $ takeExtension fp
   in  null ext || ext `elem` imageExts
 
+setImageWidthFromHistory :: Inline -> State WriterState Inline
+setImageWidthFromHistory (Image attr b c) = do
+  let attrWidth = fromMaybe "" $ lookupKey "width" attr
+  st <- get
+  let lastWidth = fromMaybe "" $ stLastWidth st
+  let replaceWidth = attrWidth == "same" || attrWidth == "^"
+  let currWidth = if replaceWidth
+                     then lastWidth
+                     else attrWidth
+  when (not $ null currWidth) $ put st { stLastWidth = Just currWidth }
+  let attr' = insertReplaceKeyVal ("width",currWidth) attr
+  return $ Image attr' b c
+setImageWidthFromHistory x = return x
+
+
 figureToHtml :: WriterOptions -> Attr -> [[Inline]] -> [Inline] -> State WriterState Html
 figureToHtml opts attr subfigRows caption = do
   let ident = getIdentifier attr
@@ -424,7 +442,9 @@ figureToHtml opts attr subfigRows caption = do
   -- show subfig labels (a), (b), etc
   let appendLabel = any (not . null) subfigIds && not (hasClass "nonumber" attr)
   let subfiglist = intercalate [LineBreak] subfigRows'
-  let subfigs = evalState (mapM (subfigsToHtml opts appendLabel) subfiglist) 1
+  -- need to expand the "same" or "^" keyword for width
+  subfiglist' <- mapM (setImageWidthFromHistory) subfiglist
+  let subfigs = evalState (mapM (subfigsToHtml opts appendLabel) subfiglist') 1
   let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
   let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
   let captPrefix = if addCaptPrefix then [Strong [Str "Figure\160",Str myNumLabel],Space]
