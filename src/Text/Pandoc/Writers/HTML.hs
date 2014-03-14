@@ -458,6 +458,7 @@ subfigsToHtml opts appendLabel (Image attr txt (s,tit)) = do
               !? (ident /= "", prefixedId opts ident)
               ! A.style (toValue ("display: inline-block; " ++ size :: String))
               $ mconcat[nl opts, img, subcap, nl opts]
+subfigsToHtml _ _ _ = return mempty
 
 -- | Convert Pandoc block element to HTML.
 blockToHtml :: WriterOptions -> Block -> State WriterState Html
