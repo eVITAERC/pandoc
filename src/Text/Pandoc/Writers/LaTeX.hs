@@ -156,7 +156,7 @@ pandocToLaTeX options (Pandoc meta blocks) = do
                                            liftM (:[]) $ metaInlinesToString s
                                     Just (MetaList lst) ->
                                          mapM metaInlinesToString lst
-                                    Nothing -> return []
+                                    _ -> return []
   let main = render colwidth $ vsep body
   st <- get
   titleMeta <- stringToLaTeX TextString $ stringify $ docTitle meta
@@ -554,7 +554,7 @@ tableCellToLaTeX header (width, align, blocks) = do
                AlignCenter  -> "\\centering"
                AlignDefault -> "\\raggedright"
   return $ ("\\begin{minipage}" <> valign <>
-            braces (text (printf "%.2f\\columnwidth" width)) <>
+            braces (text (printf "%.2f\\hsize" width)) <>
             (halign <> cr <> cellContents <> cr) <> "\\end{minipage}")
           $$ case notes of
                   [] -> empty
@@ -953,15 +953,15 @@ imageWithAttrToLatex :: String -> Attr -> String -> Doc
 imageWithAttrToLatex fullWidth attr src =
   let keyval' = M.fromList $ getKeyVals attr
       width = case M.lookup "width" keyval' of
-                Just len -> filterLength fullWidth len
-                Nothing  -> case M.lookup "max-width" keyval' of
-                  Just len -> filterLength fullWidth len
-                  Nothing  -> ""
+                   Just len -> filterLength fullWidth len
+                   Nothing  -> case M.lookup "max-width" keyval' of
+                                    Just len -> filterLength fullWidth len
+                                    Nothing  -> ""
       hight = case M.lookup "height" keyval' of
-                Just len -> filterLength fullWidth len
-                Nothing  -> case M.lookup "max-height" keyval' of
-                  Just len -> filterLength fullWidth len
-                  Nothing  -> ""
+                   Just len -> filterLength fullWidth len
+                   Nothing  -> case M.lookup "max-height" keyval' of
+                                    Just len -> filterLength fullWidth len
+                                    Nothing  -> ""
       width' = if (null width) then "" else ("width=" ++ width)
       hight' = if (null hight) then "" else ("height=" ++ hight)
       keepAspectRatio = if (not (null width) && not (null hight))
@@ -978,11 +978,12 @@ imageWithAttrToLatex fullWidth attr src =
 -- of container, such as @\\textwidth@)
 filterLength :: String -> String -> String
 filterLength fullWidth len =
-  if any (`isSuffixOf` len) validLaTeXUnits
-     then if ("%" `isSuffixOf` len)
-          then "0." ++ (init len) ++ fullWidth -- does not deal with non-Int
-          else len
-     else ""
+  case reads len :: [(Float, String)] of
+       (val,"%"):_ -> (printf "%.3f" (val/100)) ++ fullWidth
+       (val,unit):_ | unit `elem` validLaTeXUnits ->
+                            (printf "%.3f" val) ++ unit
+       _ -> ""
+
 
 validLaTeXUnits :: [String]
 validLaTeXUnits = ["mm","cm","in","pt","em","ex","%"]
