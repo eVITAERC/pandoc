@@ -844,15 +844,19 @@ inlineToHtml opts inline =
     (NumRef numref _raw) -> do st <- get
                                let toMath lab = return $ mathToMathJax opts InlineMath lab
                                let refId = numRefId numref
+                               let refLinkTitl = "cross-reference link"
                                let isMathId = refId `elem` (stMathIds st)
                                if isMathId
                                  then case numRefStyle numref of
                                       PlainNumRef -> toMath $ "\\ref{" ++ refId ++ "}"
                                       ParenthesesNumRef -> toMath $ "\\eqref{" ++ refId ++ "}"
                                  else case numRefStyle numref of
-                                      PlainNumRef -> inlineListToHtml opts (numRefLabel numref)
-                                      ParenthesesNumRef -> inlineListToHtml opts
-                                         ([Str "("] ++ numRefLabel numref ++ [Str ")"])
+                                      PlainNumRef -> inlineListToHtml opts $
+                                        [ Link (numRefLabel numref)
+                                            ('#' : numRefId numref, refLinkTitl) ]
+                                      ParenthesesNumRef -> inlineListToHtml opts $
+                                        [ Link ([Str "("] ++ numRefLabel numref ++ [Str ")"])
+                                            ('#' : numRefId numref, refLinkTitl) ]
 
 blockListToNote :: WriterOptions -> String -> [Block] -> State WriterState Html
 blockListToNote opts ref blocks =
