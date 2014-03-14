@@ -653,7 +653,17 @@ blockListToHtml opts lst =
 -- | Convert list of Pandoc inline elements to HTML.
 inlineListToHtml :: WriterOptions -> [Inline] -> State WriterState Html
 inlineListToHtml opts lst =
-  mapM (inlineToHtml opts) lst >>= return . mconcat
+  mapM (inlineToHtml opts) (prependNbsp lst) >>= return . mconcat
+  -- ## prependNbsp
+  -- usually numbered cross-references should be prepended with
+  -- a nonbreaking space, so we do that, except when a bunch of
+  -- them appears in a comma-separated list
+  where prependNbsp [] = []
+        prependNbsp (Str "," : Space : NumRef a as : xs) =
+          Str "," : Space : NumRef a as : prependNbsp xs
+        prependNbsp (Str a : Space : NumRef b bs : xs) =
+          Str (a ++ "\160") : NumRef b bs : prependNbsp xs
+        prependNbsp (x:xs) = x : prependNbsp xs
 
 -- | Convert Pandoc inline element to HTML.
 inlineToHtml :: WriterOptions -> Inline -> State WriterState Html

@@ -643,11 +643,16 @@ sectionHeader unnumbered ref level lst = do
 inlineListToLaTeX :: [Inline]  -- ^ Inlines to convert
                   -> State WriterState Doc
 inlineListToLaTeX lst =
-  mapM inlineToLaTeX (fixLineInitialSpaces lst)
+  mapM inlineToLaTeX (prependNbsp $ fixLineInitialSpaces lst)
     >>= return . hcat
+    -- ## fixLineInitialSpaces
     -- nonbreaking spaces (~) in LaTeX don't work after line breaks,
     -- so we turn nbsps after hard breaks to \hspace commands.
     -- this is mostly used in verse.
+    -- ## prependNbsp
+    -- usually numbered cross-references should be prepended with
+    -- a nonbreaking space, so we do that, except when a bunch of
+    -- them appears in a comma-separated list
  where fixLineInitialSpaces [] = []
        fixLineInitialSpaces (LineBreak : Str s@('\160':_) : xs) =
          LineBreak : fixNbsps s ++ fixLineInitialSpaces xs
@@ -655,6 +660,12 @@ inlineListToLaTeX lst =
        fixNbsps s = let (ys,zs) = span (=='\160') s
                     in  replicate (length ys) hspace ++ [Str zs]
        hspace = RawInline "latex" "\\hspace*{0.333em}"
+       prependNbsp [] = []
+       prependNbsp (Str "," : Space : NumRef a as : xs) =
+         Str "," : Space : NumRef a as : prependNbsp xs
+       prependNbsp (Str a : Space : NumRef b bs : xs) =
+         Str (a ++ "\160") : NumRef b bs : prependNbsp xs
+       prependNbsp (x:xs) = x : prependNbsp xs
 
 isQuoted :: Inline -> Bool
 isQuoted (Quoted _ _) = True
