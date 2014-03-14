@@ -187,7 +187,9 @@ pandocToLaTeX options (Pandoc meta blocks) = do
                   defField "algorithms" (stAlgorithms st) $
                   defField "book-class" (stBook st) $
                   defField "euro" (stUsesEuro st) $
-                  defField "listings" (writerListings options || stLHS st) $
+                  defField "listings" (writerListings options
+                                       || writerScholarly options
+                                       || stLHS st ) $
                   defField "beamer" (writerBeamer options) $
                   defField "mainlang" (maybe "" (reverse . takeWhile (/=',') . reverse)
                                 (lookup "lang" $ writerVariables options)) $
@@ -514,7 +516,8 @@ blockToLaTeX (Algorithm attr alg fallback caption) =
   algorithmToLaTeX attr alg fallback caption
 blockToLaTeX (TableFloat attr tabl fallback caption) =
   tableFloatToLaTeX attr tabl fallback caption
-
+blockToLaTeX (CodeFloat attr code fallback caption) =
+  codeFloatToLaTeX attr code fallback caption
 toColDescriptor :: Alignment -> String
 toColDescriptor align =
   case align of
@@ -1013,9 +1016,9 @@ algorithmToLaTeX attr alg _fallback caption = do
              then return empty
              else (\c -> "\\caption" <> capstar <> braces c) `fmap` inlineListToLaTeX caption
   let capt' = if null caption && not addCaptPrefix then empty else capt
-  algorithm <- mapM blockToLaTeX alg
+  algorithm <- blockListToLaTeX alg
   let label = if (not $ null ident) then ("\\label" <> braces (text ident)) else empty
-  return $ "\\begin{scholmdAlgorithm" <> widestar <> "}[htbp]" $$ foldl ($$) empty algorithm
+  return $ "\\begin{scholmdAlgorithm" <> widestar <> "}[htbp]" $$ algorithm
            $$ capt' <> label $$ "\\end{scholmdAlgorithm" <> widestar <> "}"
 
 -- Handles writing algorithm/pseudocode floats
@@ -1054,3 +1057,49 @@ tableToTabular (Table _caption aligns widths heads rows) = do
          $$ "\\bottomrule"
          $$ "\\end{tabular}"
 tableToTabular _ = return empty
+
+-- Handles writing code-block/listing floats
+-- (Scholarly automatically uses Listings for floating block)
+codeFloatToLaTeX ::  Attr -> [Block] -> FloatFallback -> [Inline] -> State WriterState Doc
+codeFloatToLaTeX attr codeblock _fallback caption = do
+  modify $ \s -> s{ stFloats = True }
+  let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
+  let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
+  let codeblock' = dropWhile notCodeBlock codeblock
+  codeToListingsFloat (head codeblock') attr caption addCaptPrefix
+
+notCodeBlock :: Block -> Bool
+notCodeBlock (CodeBlock _ _) = False
+notCodeBlock _ = True
+
+codeToListingsFloat :: Block -> Attr -> [Inline] -> Bool -> State WriterState Doc
+codeToListingsFloat (CodeBlock (_,classes,keyvalAttr) str) attrib caption captPref = do
+  let ident = getIdentifier attrib
+  let params = (case getListingsLanguage classes of
+                     Just l  -> [ "language=" ++ l ]
+                     Nothing -> []) ++
+               [ "numbers=left" | "numberLines" `elem` classes
+                  || "number" `elem` classes
+                  || "number-lines" `elem` classes ] ++
+               [ (if key == "startFrom"
+                     then "firstnumber"
+                     else key) ++ "=" ++ attr |
+                     (key,attr) <- keyvalAttr ] ++
+               (if ident == ""
+                     then []
+                     else [ "label=" ++ toLabel ident ]) ++
+               (if not captPref
+                   then [ "nolol=true" ]
+                   else []) ++
+               (if not (hasClass "wide" attrib)
+                   then [ "float=htbp" ]
+                   else [ "float=*htbp" ] )
+  capt <- if null caption
+             then return empty
+             else (\c -> "caption=" <> braces c) `fmap` inlineListToLaTeX caption
+  let printParams
+        | null params = empty
+        | otherwise   = brackets $ hcat (intersperse ", " $ capt:(map text params) )
+  return $ flush ("\\begin{lstlisting}" <> printParams $$ text str $$
+           "\\end{lstlisting}") $$ cr
+codeToListingsFloat _ _ _ _ = return empty

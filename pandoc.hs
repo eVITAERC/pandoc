@@ -1097,6 +1097,13 @@ main = do
   let chapters' = if scholarlyMode && writerName' == "latex"
                      then True
                      else chapters
+
+  -- ScholMD always assume, if not specified, that the default
+  -- image file extension is PDF
+  let defaultImageExtension' = if scholarlyMode && null defaultImageExtension
+                                  then "pdf"
+                                  else defaultImageExtension
+
   -- End Scholarly Markdown specific settings
 
   templ <- case templatePath' of
@@ -1157,7 +1164,7 @@ main = do
                       , readerOldDashes = oldDashes
                       , readerIndentedCodeClasses = codeBlockClasses
                       , readerApplyMacros = not laTeXOutput
-                      , readerDefaultImageExtension = defaultImageExtension
+                      , readerDefaultImageExtension = defaultImageExtension'
                       , readerTrace = trace
                       }
 

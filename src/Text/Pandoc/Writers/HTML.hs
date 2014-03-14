@@ -603,6 +603,8 @@ blockToHtml opts (Algorithm attr alg fallback caption) =
   algorithmToHtml opts attr alg fallback caption
 blockToHtml opts (TableFloat attr tabl fallback caption) =
   tableFloatToHtml opts attr tabl fallback caption
+blockToHtml opts (CodeFloat attr code fallback caption) =
+  codeFloatToHtml opts attr code fallback caption
 
 tableRowToHtml :: WriterOptions
                -> [Alignment]
@@ -908,10 +910,10 @@ algorithmToHtml opts attr alg _fallback caption = do
   capt <- if null (captPrefix ++ caption)
              then return mempty
              else liftM (tocapt) $ inlineListToHtml opts (captPrefix ++ caption)
-  algorithm <- mapM (blockToHtml opts) alg
+  algorithm <- blockListToHtml opts alg
   return $ H5.figure ! A.class_ "algorithm"
                      !? (ident /= "", prefixedId opts ident)
-                     $ mconcat [nl opts, mconcat algorithm, nl opts, capt, nl opts]
+                     $ mconcat [nl opts, algorithm, nl opts, capt, nl opts]
 
 tableFloatToHtml :: WriterOptions -> Attr -> [Block] -> FloatFallback -> [Inline]
                  -> State WriterState Html
@@ -926,7 +928,25 @@ tableFloatToHtml opts attr tabl _fallback caption = do
   capt <- if null (captPrefix ++ caption)
              then return mempty
              else liftM (tocapt) $ inlineListToHtml opts (captPrefix ++ caption)
-  table <- mapM (blockToHtml opts) tabl
+  table <- blockListToHtml opts tabl
   return $ H5.figure ! A.class_ "tableFloat"
                      !? (ident /= "", prefixedId opts ident)
-                     $ mconcat [nl opts, mconcat table, nl opts, capt, nl opts]
+                     $ mconcat [nl opts, table, nl opts, capt, nl opts]
+
+codeFloatToHtml :: WriterOptions -> Attr -> [Block] -> FloatFallback -> [Inline]
+                 -> State WriterState Html
+codeFloatToHtml opts attr codeblk _fallback caption = do
+  let ident = getIdentifier attr
+  let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
+  let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
+  let captPrefix = if addCaptPrefix then [Strong [Str "Listing\160",Str myNumLabel],Space]
+                                    else []
+  -- | TODO: disable entire caption if not needed
+  let tocapt = H5.figcaption
+  capt <- if null (captPrefix ++ caption)
+             then return mempty
+             else liftM (tocapt) $ inlineListToHtml opts (captPrefix ++ caption)
+  codeblock <- blockListToHtml opts codeblk
+  return $ H5.figure ! A.class_ "codeFloat"
+                     !? (ident /= "", prefixedId opts ident)
+                     $ mconcat [nl opts, codeblock, nl opts, capt, nl opts]

@@ -449,6 +449,7 @@ block = do
   tr <- getOption readerTrace
   pos <- getPosition
   res <- choice [ mempty <$ blanklines
+               , scholarlyCodeBlock
                , codeBlockFenced
                , yamlMetaBlock
                , guardEnabled Ext_latex_macros *> (macro >>= return . return)
@@ -1529,9 +1530,14 @@ subscript = fmap B.subscript <$> try (do
   mconcat <$> many1Till (notFollowedBy spaceChar >> inline) (char '~'))
 
 whitespace :: MarkdownParser (F Inlines)
-whitespace = spaceChar >> return <$> (lb <|> regsp) <?> "whitespace"
-  where lb = spaceChar >> skipMany spaceChar >> option B.space (endline >> return B.linebreak)
-        regsp = skipMany spaceChar >> return B.space
+whitespace = spaceChar >> return <$> (lb <|> nbsp <|> regsp) <?> "whitespace"
+  where lb = try (spaceChar >> skipMany spaceChar >> endline >> return B.linebreak)
+        regsp = try (skipMany spaceChar >> return B.space)
+        nbsp = try $ do
+               st <- getState
+               guard (stateKeepSpacing st)
+               spList <- many spaceChar
+               return $ B.str $ replicate ((length spList) + 1) '\160'
 
 nonEndline :: Parser [Char] st Char
 nonEndline = satisfy (/='\n')
@@ -2135,11 +2141,16 @@ lineBlockLines' = try $ do
   return lines'
 
 -- | A version of lineBlock that doesn't consume all subsequent blanklines
+-- | and also converts all spaces to non-breaking (some demands this)
 lineBlock' :: MarkdownParser (F Blocks)
 lineBlock' = try $ do
   guardEnabled Ext_line_blocks
+  st <- getState
+  let currSpacingSt = (stateKeepSpacing st)
+  setState $ st{ stateKeepSpacing = True }
   lines' <- lineBlockLines' >>=
             mapM (parseFromString (trimInlinesF . mconcat <$> many inline))
+  setState $ st{ stateKeepSpacing = currSpacingSt }
   return $ B.para <$> (mconcat $ intersperse (return B.linebreak) lines')
 
 scholarlyAlgorithm :: MarkdownParser (F Blocks)
@@ -2224,6 +2235,41 @@ scholarlyTable = try $ do
     tabl' <- tabl
     caption' <- caption
     return $ B.tableFloat attr' tabl' (B.floatFallback B.space "") caption'
+
+--
+-- Scholarly Markdown code block floats
+--
+
+-- This is a floated code block that has an Id and can be cross-referenced
+scholarlyCodeBlock :: MarkdownParser (F Blocks)
+scholarlyCodeBlock = try $ do
+  ensureScholarlyMarkdown
+  many1 (char '#')
+  notFollowedBy $ guardEnabled Ext_fancy_lists >>
+                  (char '.' <|> char ')') -- this would be a list
+  skipSpaces
+  string "Code:" >> skipMany (noneOf "{\n")
+  attr <- option nullAttr attributes
+  blankline >> optional blankline
+  codeblock <- codeBlockFenced <|> codeBlockIndented
+  caption <- option mempty (floatCaptionStart >> trimInlinesF . mconcat <$> many1 inline)
+  blanklines
+  state <- getState
+  let xrefIds = stateXRefIdents state
+  -- numbering can be forcibly disabled by class ".nonumber"
+  let needId = not (hasClass "nonumber" attr) && (getIdentifier attr) /= ""
+  let myIdentifier = getIdentifier attr
+  let myNumLabel = if needId
+                      then (length $ filter (/= "") $ idsForCodeBlocks xrefIds) + 1
+                      else 0 -- will never be displayed anyways
+  let newXrefIds = xrefIds{ idsForCodeBlocks = (idsForCodeBlocks xrefIds) ++ [myIdentifier] }
+  updateState $ \s -> s{ stateXRefIdents = newXrefIds }
+  let attrActions = [ insertReplaceKeyVal ("numLabel", show myNumLabel) ]
+  let attr' = foldr ($) attr attrActions
+  return $ do
+    codeblock' <- codeblock
+    caption' <- caption
+    return $ B.codeFloat attr' codeblock' (B.floatFallback B.space "") caption'
 
 
 --
