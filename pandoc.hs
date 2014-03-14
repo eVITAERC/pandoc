@@ -798,7 +798,8 @@ options =
                   (\_ -> do
                      prg <- getProgName
                      defaultDatadir <- getAppUserDataDirectory "pandoc"
-                     UTF8.hPutStrLn stdout (prg ++ " " ++ pandocVersion ++
+                     UTF8.hPutStrLn stdout (prg ++
+                       " 0.0.0-alpha, incorporating Pandoc " ++ pandocVersion ++
                        compileInfo ++ "\nDefault user data directory: " ++
                        defaultDatadir ++ copyrightMessage)
                      exitWith ExitSuccess ))
