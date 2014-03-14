@@ -1438,7 +1438,7 @@ code = try $ do
                       notFollowedBy (char '`')))
   attr <- option ([],[],[]) (try $ guardEnabled Ext_inline_code_attributes >>
                                    optional whitespace >> attributes)
-  return $ return $ B.codeWith attr $ trim $ concat result
+  return $ return $ B.codeWith attr $ concat result
 
 
 -- Parses plain inline or display math without additional attributes
