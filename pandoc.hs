@@ -713,7 +713,7 @@ options =
     , Option "" ["citeproc"]
                  (NoArg
                   (\opt -> return opt { optFilters =
-                                          "pandoc-citeproc" : optFilters opt }))
+                                          "scholpandoc-citeproc" : optFilters opt }))
                   "" -- add pandoc-citeproc to list of filters
 
     , Option "m" ["latexmathml", "asciimathml"]
@@ -996,8 +996,8 @@ main = do
   let filters' = case M.lookup "bibliography" metadata of
                        Just _ | optCiteMethod opts /= Natbib &&
                                 optCiteMethod opts /= Biblatex &&
-                                all (\f -> takeBaseName f /= "pandoc-citeproc")
-                                filters -> "pandoc-citeproc" : filters
+                                all (\f -> takeBaseName f /= "scholpandoc-citeproc")
+                                filters -> "scholpandoc-citeproc" : filters
                        _                -> filters
   let plugins = map externalFilter filters'
 
@@ -1074,15 +1074,15 @@ main = do
   let (templatePath', standalone'') = if scholarlyMode && isNothing templatePath
        then if not standalone'
                then if writerName' == "html5" -- always use
-                       then (Just "schmdTemplate_bodyOnly.html5", True)
+                       then (Just "scholmdTemplate_bodyOnly.html5", True)
                        else (Nothing, False)
                else case writerName' of
-                    "html5" -> (Just "schmdTemplate.html5", True)
-                    "latex" -> (Just "schmdTemplate.latex", True)
+                    "html5" -> (Just "scholmdTemplate.html5", True)
+                    "latex" -> (Just "scholmdTemplate.latex", True)
                     _       -> (Nothing, True)
        else (templatePath, standalone')
 
-  let mathJaxCDNaddr = "http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
+  let mathJaxCDNaddr = "http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML-full"
 
   let checkMathJaxCDN (MathJax "") = if useMathJaxCDN
                                         then MathJax mathJaxCDNaddr
