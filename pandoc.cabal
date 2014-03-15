@@ -65,6 +65,9 @@ Data-Files:
                  data/templates/default.org,
                  data/templates/default.epub,
                  data/templates/default.epub3,
+                 data/templates/scholmdTemplate.html5,
+                 data/templates/scholmdTemplate_bodyOnly.html5,
+                 data/templates/scholmdTemplate.latex,
                  -- data for ODT writer
                  data/reference.odt,
                  -- data for docx writer
