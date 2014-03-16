@@ -887,6 +887,7 @@ data ParserState = ParserState
       stateExamples        :: M.Map String Int, -- ^ Map from example labels to numbers
       stateHasChapters     :: Bool,          -- ^ True if \chapter encountered
       stateMacros          :: [Macro],       -- ^ List of macros defined so far
+      stateMathDefs        :: String,        -- ^ not-parsed LaTeX math macros
       stateRstDefaultRole  :: String,        -- ^ Current rST default interpreted text role
       stateRstCustomRoles  :: M.Map String (String, Maybe String, Attr -> (String, Attr)), -- ^ Current rST custom text roles
       -- Triple represents: 1) Base role, 2) Optional format (only for :raw:
@@ -1003,6 +1004,7 @@ defaultParserState =
                   stateExamples        = M.empty,
                   stateHasChapters     = False,
                   stateMacros          = [],
+                  stateMathDefs        = "",
                   stateRstDefaultRole  = "title-reference",
                   stateRstCustomRoles  = M.empty,
                   stateKeepSpacing     = False,

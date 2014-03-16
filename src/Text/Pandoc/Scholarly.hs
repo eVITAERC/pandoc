@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 Utility functions for Scholarly Markdown extensions.
 -}
 module Text.Pandoc.Scholarly (classIsMath,
+                              classIsMathDef,
                               processSingleEqn,
                               processMultiEqn,
                               dispMathToLaTeX,
@@ -59,6 +60,9 @@ type AttributedMath = (Attr, String)
 -- true only if some element of classes start with "math"
 classIsMath :: Attr -> Bool
 classIsMath (_,classes,_) = any ("math" `isPrefixOf`) classes
+
+classIsMathDef :: Attr -> Bool
+classIsMathDef (_,classes,_) = any ((==) "math_def") classes
 
 --
 -- Attribute manipulation functions

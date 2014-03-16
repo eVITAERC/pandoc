@@ -328,8 +328,10 @@ parseMarkdown = do
   blocks <- parseBlocks
   st <- getState
   let meta = runF (stateMeta' st) st
-  let meta' = B.setMeta "identifiersForMath"
-               (map (\x -> MetaString x) $ idsForMath $ stateXRefIdents st) meta
+  let meta' = B.setMeta "latexMacrosForMath" (MetaString $ stateMathDefs st) $
+              B.setMeta "identifiersForMath"
+                (map (\x -> MetaString x) $ idsForMath $ stateXRefIdents st) $
+              meta
   let Pandoc _ bs = B.doc $ runF blocks st
   return $ Pandoc meta' bs
 
@@ -1982,14 +1984,22 @@ scholarlyInlineMath = return . B.math <$>
 scholarlyDisplayMath :: MarkdownParser (F Inlines)
 scholarlyDisplayMath = try $ do
   eqnList <- many1InSeparateLines (fencedCodeEquation <|> doubleDollarEquation)
-  let (eqn, idList) = case eqnList of
-                         singleEqn:[] -> processSingleEqn singleEqn
-                         _            -> processMultiEqn eqnList
-  state <- getState
-  let xrefIds = stateXRefIdents state
-  let newXrefIds = xrefIds{ idsForMath = (idsForMath xrefIds) ++ idList }
-  updateState $ \s -> s{ stateXRefIdents = newXrefIds }
-  return $ return $ uncurry B.displayMathWith eqn
+  mapM addMathDefsToState eqnList
+  -- filter out all the mathdefs
+  let eqnList' = filter (not . classIsMathDef . fst) eqnList
+  -- it's possible that we consumed all the eqns as definitions
+  let processedEqn = case eqnList' of
+                          []           -> Nothing
+                          singleEqn:[] -> Just (processSingleEqn singleEqn)
+                          _            -> Just (processMultiEqn eqnList')
+  case processedEqn of
+    Just (eqn, idList) -> do
+         state <- getState
+         let xrefIds = stateXRefIdents state
+         let newXrefIds = xrefIds{ idsForMath = (idsForMath xrefIds) ++ idList }
+         updateState $ \s -> s{ stateXRefIdents = newXrefIds }
+         return $ return $ uncurry B.displayMathWith eqn
+    Nothing -> return $ return $ mempty
 
 -- ensures that displayMath are delimited by blanklines
 scholarlyDisplayMath' :: MarkdownParser (F Inlines)
@@ -2037,12 +2047,15 @@ doubleDollarEquation = try $ do
             <|> try (skipSpaces >> inBraces (char '#' >> identifier))
           return $ (label,[cls],[])
   guard $ classIsMath attr
-  blankline
+  blanklines
   contents <- manyTill anyLine delimitr
   return (attr, intercalate "\n" contents)
 
--- TODO: mathDefinitions :: ScholarlyParser (F Inlines)
--- not sure if needed?
+addMathDefsToState :: AttributedMath -> MarkdownParser ()
+addMathDefsToState (attr, mathDef) = do
+  when (classIsMathDef attr) $ updateState
+      (\s -> s{ stateMathDefs = (stateMathDefs s) ++ mathDef ++ "\n" })
+  return ()
 
 --
 -- Scholarly Markdown figures

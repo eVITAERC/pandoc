@@ -46,7 +46,7 @@ import Numeric ( showHex )
 import Data.Char ( ord, toLower )
 import Data.List ( isPrefixOf, intersperse, intercalate )
 import Data.String ( fromString )
-import Data.Maybe ( catMaybes, fromMaybe, isJust, isNothing )
+import Data.Maybe ( catMaybes, fromMaybe, fromJust, isJust, isNothing )
 import Control.Monad.State
 import Text.Blaze.Html hiding(contents)
 import Text.Blaze.Internal(preEscapedString)
@@ -123,7 +123,7 @@ pandocToHtml opts (Pandoc meta blocks) = do
               (fmap renderHtml . inlineListToHtml opts)
               meta
   initSt <- get
-  -- these ids will be handled by MathJax if scholmd
+  -- these ids will be handled by MathJax if in Scholarly Markdown
   let mathIds = extractMetaStringList $ lookupMeta "identifiersForMath" meta
   put initSt{ stMathIds = mathIds }
   let stringifyHTML = escapeStringForXML . stringify
@@ -142,6 +142,7 @@ pandocToHtml opts (Pandoc meta blocks) = do
   st <- get
   let notes = reverse (stNotes st)
   let thebody = blocks' >> footnoteSection opts notes
+  let mathDefs = lookupMeta "latexMacrosForMath" meta
   let  math = if stMath st
                 then case writerHTMLMathMethod opts of
                            LaTeXMathML (Just url) ->
@@ -179,6 +180,10 @@ pandocToHtml opts (Pandoc meta blocks) = do
                       else id) $
                   (if stMath st
                       then defField "math" (renderHtml math)
+                      else id) $
+                  (if isJust mathDefs
+                      then defField "math-macros"
+                             (extractMetaString $ fromJust mathDefs)
                       else id) $
                   defField "quotes" (stQuotes st) $
                   maybe id (defField "toc" . renderHtml) toc $

@@ -42,7 +42,7 @@ import System.FilePath ( dropExtension )
 import Data.List ( (\\), isSuffixOf, isInfixOf,
                    isPrefixOf, intercalate, intersperse )
 import Data.Char ( toLower, isPunctuation, isAscii, isLetter, isDigit, ord )
-import Data.Maybe ( fromMaybe )
+import Data.Maybe ( fromMaybe , isJust, fromJust )
 import qualified Data.Map as M
 import Control.Applicative ((<|>))
 import Control.Monad.State
@@ -137,6 +137,7 @@ pandocToLaTeX options (Pandoc meta blocks) = do
   initSt <- get
   let mathIds = extractMetaStringList $ lookupMeta "identifiersForMath" meta
   put initSt{ stMathIds = mathIds }
+  let mathDefs = lookupMeta "latexMacrosForMath" meta
   let (blocks'', lastHeader) = if writerCiteMethod options == Citeproc then
                                  (blocks', [])
                                else case last blocks' of
@@ -196,6 +197,10 @@ pandocToLaTeX options (Pandoc meta blocks) = do
                   defField "beamer" (writerBeamer options) $
                   defField "mainlang" (maybe "" (reverse . takeWhile (/=',') . reverse)
                                 (lookup "lang" $ writerVariables options)) $
+                  (if isJust mathDefs
+                      then defField "math-macros"
+                             (extractMetaString $ fromJust mathDefs)
+                      else id) $
                   (if stHighlighting st
                       then defField "highlighting-macros" (styleToLaTeX
                                 $ writerHighlightStyle options )
