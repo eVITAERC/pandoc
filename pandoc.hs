@@ -47,7 +47,7 @@ import System.Exit ( exitWith, ExitCode (..) )
 import System.FilePath
 import System.Console.GetOpt
 import Data.Char ( toLower )
-import Data.List ( intercalate, isPrefixOf, sort, (\\) )
+import Data.List ( intercalate, isPrefixOf, isSuffixOf, sort, (\\) )
 import Data.Maybe ( isNothing )
 import System.Directory ( getAppUserDataDirectory, findExecutable )
 import System.IO ( stdout, stderr )
@@ -238,7 +238,10 @@ options =
 
     , Option "tw" ["to","write"]
                  (ReqArg
-                  (\arg opt -> return opt { optWriter = map toLower arg })
+                  (\arg opt -> if ("_bodyonly" `isSuffixOf` (map toLower arg))
+                      then return opt { optWriter = map toLower arg
+                                      , optStandalone = False }
+                      else return opt { optWriter = map toLower arg })
                   "FORMAT")
                  ""
 
@@ -267,10 +270,20 @@ options =
                   (\opt -> return opt { optParseRaw = True }))
                  "" -- "Parse untranslatable HTML codes and LaTeX environments as raw"
 
+    , Option "" ["no-parse-raw"]
+                 (NoArg
+                  (\opt -> return opt { optParseRaw = False }))
+                 "" -- "Disable parsing of untranslatable HTML codes and LaTeX environments as raw"
+
     , Option "S" ["smart"]
                  (NoArg
                   (\opt -> return opt { optSmart = True }))
                  "" -- "Use smart quotes, dashes, and ellipses"
+
+    , Option "" ["no-smart"]
+                 (NoArg
+                  (\opt -> return opt { optSmart = False }))
+                 "" -- "Disable smart quotes, dashes, and ellipses"
 
     , Option "" ["old-dashes"]
                  (NoArg
@@ -330,6 +343,11 @@ options =
                  (NoArg
                   (\opt -> return opt { optStandalone = True }))
                  "" -- "Include needed header and footer on output"
+
+    , Option "" ["no-standalone"]
+                 (NoArg
+                  (\opt -> return opt { optStandalone = False }))
+                 "" -- "Exclude needed header and footer on output"
 
     , Option "" ["template"]
                  (ReqArg
@@ -914,6 +932,7 @@ main = do
   rawArgs <- liftM (map UTF8.decodeArg) getArgs
   prg <- getProgName
   let compatMode = (prg == "hsmarkdown")
+  let scholarlyPandoc = (prg == "scholpandoc")
 
   let (actions, args, errors) = if compatMode
                                   then ([], rawArgs, [])
@@ -928,7 +947,13 @@ main = do
                                         , optWriter = "html"
                                         , optEmailObfuscation =
                                            ReferenceObfuscation }
-                       else defaultOpts
+                       else if scholarlyPandoc
+                            then defaultOpts { optReader = "markdown_scholarly"
+                                             , optSmart = True
+                                             , optParseRaw = True
+                                             , optStandalone = True
+                                             }
+                            else defaultOpts
 
   -- thread option data structure through all supplied option actions
   opts <- foldl (>>=) (return defaultOpts') actions
