@@ -241,8 +241,11 @@ yamlMetaBlock = try $ do
                          H.foldrWithKey (\k v m ->
                               if ignorable k
                                  then m
-                                 else B.setMeta (T.unpack k)
-                                            (yamlToMeta opts v) m)
+                                 else if yamlStringKeys k
+                                         then B.setMeta (T.unpack k)
+                                                (yamlToMetaString v) m
+                                         else B.setMeta (T.unpack k)
+                                                (yamlToMeta opts v) m)
                            nullMeta hashmap
                 Right Yaml.Null -> return $ return nullMeta
                 Right _ -> do
@@ -297,6 +300,20 @@ yamlToMeta opts (Yaml.Object o) = MetaMap $ H.foldrWithKey (\k v m ->
                                            (yamlToMeta opts v) m)
                                M.empty o
 yamlToMeta _ _ = MetaString ""
+
+-- Useful for things like bibliography filenames, will always treat as
+-- either a String, or Lists (of Lists..) of Strings
+yamlToMetaString :: Yaml.Value -> MetaValue
+yamlToMetaString (Yaml.String t) = MetaString (T.unpack t)
+yamlToMetaString (Yaml.Array xs) = B.toMetaValue $
+                                     map yamlToMetaString $
+                                     V.toList xs
+yamlToMetaString _ = MetaString ""
+
+-- List of meta keys to treat as pure strings
+yamlStringKeys :: Text -> Bool
+yamlStringKeys t = (T.unpack t) `elem`
+                      ["bibliography"]
 
 stopLine :: MarkdownParser ()
 stopLine = try $ (string "---" <|> string "...") >> blankline >> return ()

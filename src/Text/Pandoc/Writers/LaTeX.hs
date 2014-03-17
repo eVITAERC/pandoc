@@ -151,16 +151,7 @@ pandocToLaTeX options (Pandoc meta blocks) = do
                   else return blocks''
   body <- mapM (elementToLaTeX options) $ hierarchicalize blocks'''
   (biblioTitle :: String) <- liftM (render colwidth) $ inlineListToLaTeX lastHeader
-  let metaInlinesToString ils = case ils of
-                                  (MetaInlines s) -> liftM (render colwidth) $
-                                                       inlineListToLaTeX s
-                                  _ -> return ""
-  (biblioFiles :: [String]) <- case lookupMeta "bibliography" meta of
-                                    Just s@(MetaInlines _) ->
-                                           liftM (:[]) $ metaInlinesToString s
-                                    Just (MetaList lst) ->
-                                         mapM metaInlinesToString lst
-                                    _ -> return []
+  let biblioFiles = extractMetaStringList $ lookupMeta "bibliography" meta
   let main = render colwidth $ vsep body
   st <- get
   titleMeta <- stringToLaTeX TextString $ stringify $ docTitle meta
