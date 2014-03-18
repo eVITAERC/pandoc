@@ -1,0 +1,11 @@
+0.0.1-alpha
+
+- Fixed a bug where templates files are not compiled into the binary, resulting in complaints about "can't find file ..."
+
+- Display math equations that uses the class `math_def` instead of `math` are now appended to a global variable called `$math-macros$`. In the updated templates this is placed in the header, and enables LaTeX declarations that only work in the header.
+
+- ScholarlyPandoc now has the following arguments enabled by default: `-f markdown_scholarly --smart --parse-raw --standalone`. Renaming the executable to anything other than `scholpandoc` reverts this behavior.
+
+0.0.0-alpha
+
+- Initial Release
