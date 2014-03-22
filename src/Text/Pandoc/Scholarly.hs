@@ -53,16 +53,17 @@ import Text.Pandoc.Definition
 import Text.Pandoc.Shared
 import Text.Pandoc.Parsing hiding (tableWith)
 import Control.Arrow
+import Control.Monad (void)
 import qualified Data.Map as M
 
 type AttributedMath = (Attr, String)
 
 -- true only if some element of classes start with "math"
 classIsMath :: Attr -> Bool
-classIsMath (_,classes,_) = any ("math" `isPrefixOf`) classes
+classIsMath (_,classes,_) = any (`elem` ["math", "math_def", "math_plain"]) classes
 
 classIsMathDef :: Attr -> Bool
-classIsMathDef (_,classes,_) = any ((==) "math_def") classes
+classIsMathDef (_,classes,_) = "math_def" `elem` classes
 
 --
 -- Attribute manipulation functions
@@ -82,10 +83,10 @@ insertWithKeyVal f (key, val) (ident, classes, keyval) =
   in (ident, classes, M.toList newKeyValMap)
 
 insertIfNoneKeyVal :: (String, String) -> Attr -> Attr
-insertIfNoneKeyVal keyval attr = insertWithKeyVal (\_ x -> x) keyval attr
+insertIfNoneKeyVal = insertWithKeyVal (\_ x -> x)
 
 insertReplaceKeyVal :: (String, String) -> Attr -> Attr
-insertReplaceKeyVal keyval attr = insertWithKeyVal (\x _ -> x) keyval attr
+insertReplaceKeyVal = insertWithKeyVal const
 
 getClasses :: Attr -> [String]
 getClasses (_, classes, _) = classes
@@ -158,7 +159,7 @@ processMultiEqn eqnList =
 -- Skipped classes: [math_plain]
 ensureMultilineEnv :: AttributedMath -> AttributedMath
 ensureMultilineEnv eqn@(attr, content)
-  | "math_plain" `elem` (getClasses attr) = eqn
+  | "math_plain" `elem` getClasses attr = eqn
   | hasTeXLinebreak content = if hasTeXAlignment content
                                  then (attr, wrapInLatexEnv "aligned" content)
                                  else (attr, wrapInLatexEnv "split" content)
@@ -193,7 +194,7 @@ concatMultiEquations eqnList =
        intercalate "\\\\\n" eqnContents )
 
 wrapInLatexEnv :: String -> String -> String
-wrapInLatexEnv envName content = intercalate "\n" $
+wrapInLatexEnv envName content = intercalate "\n"
             ["\\begin{" ++ envName ++ "}", content, "\\end{" ++ envName ++ "}"]
 
 -- Scan for occurance of @'\\'@ in non-commented parts,
@@ -202,8 +203,8 @@ hasTeXLinebreak :: String -> Bool
 hasTeXLinebreak content =
   case parse (skipMany (try ignoreLinebreak
                         <|> try (char '\\' >> notFollowedBy (char '\\') >> return [])
-                        <|> try (noneOf ['\\'] >> return []))
-               >> (string "\\\\" >> return ())) [] content of
+                        <|> try (noneOf "\\" >> return []))
+               >> void (string "\\\\")) [] content of
        Left _  -> False
        Right _ -> True
 
@@ -213,24 +214,24 @@ hasTeXAlignment :: String -> Bool
 hasTeXAlignment content =
   case parse (skipMany (try ignoreLinebreak
                         <|>  try (string "\\&")
-                        <|>  try (noneOf ['&'] >> return []))
-              >> (char '&' >> return ())) [] content of
+                        <|>  try (noneOf "&" >> return []))
+              >> void (char '&')) [] content of
        Left _  -> False
        Right _ -> True
 
-skipTeXComment :: Parser [Char] st [Char]
+skipTeXComment :: Parser String st String
 skipTeXComment = try $ do
   char '%'
   manyTill anyChar $ try $ newline <|> (eof >> return '\n')
   return []
 
-skipTexEnvironment :: String -> Parser [Char] st [Char]
+skipTexEnvironment :: String -> Parser String st String
 skipTexEnvironment envName = try $ do
   string ("\\begin{" ++ envName ++ "}")
   manyTill anyChar $ try $ string ("\\end{" ++ envName ++ "}")
   return []
 
-ignoreLinebreak :: Parser [Char] st [Char]
+ignoreLinebreak :: Parser String st String
 ignoreLinebreak = try (string "\\%")
                   <|>  skipTeXComment
                   <|>  skipTexEnvironment "split"

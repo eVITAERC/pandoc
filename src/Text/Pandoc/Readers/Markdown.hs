@@ -2001,7 +2001,7 @@ scholarlyInlineMath = return . B.math <$>
 scholarlyDisplayMath :: MarkdownParser (F Inlines)
 scholarlyDisplayMath = try $ do
   eqnList <- many1InSeparateLines (fencedCodeEquation <|> doubleDollarEquation)
-  mapM addMathDefsToState eqnList
+  mapM_ addMathDefsToState eqnList
   -- filter out all the mathdefs
   let eqnList' = filter (not . classIsMathDef . fst) eqnList
   -- it's possible that we consumed all the eqns as definitions
@@ -2013,10 +2013,10 @@ scholarlyDisplayMath = try $ do
     Just (eqn, idList) -> do
          state <- getState
          let xrefIds = stateXRefIdents state
-         let newXrefIds = xrefIds{ idsForMath = (idsForMath xrefIds) ++ idList }
+         let newXrefIds = xrefIds{ idsForMath = idsForMath xrefIds ++ idList }
          updateState $ \s -> s{ stateXRefIdents = newXrefIds }
          return $ return $ uncurry B.displayMathWith eqn
-    Nothing -> return $ return $ mempty
+    Nothing -> return $ return mempty
 
 -- ensures that displayMath are delimited by blanklines
 scholarlyDisplayMath' :: MarkdownParser (F Inlines)
@@ -2044,7 +2044,7 @@ fencedCodeEquation = try $ do
                label <- option [] $
                  try (optional blankline >> skipSpaces >> char '#' >> identifier)
                  <|> try (skipSpaces >> inBraces (char '#' >> identifier))
-               return $ (label,[cls],[])
+               return (label,[cls],[])
   guard $ classIsMath attr
   blankline
   contents <- manyTill anyLine (blockDelimiter (== c) (Just size))
@@ -2062,7 +2062,7 @@ doubleDollarEquation = try $ do
           label <- option [] $
             try (optional blankline >> skipSpaces >> char '#' >> identifier)
             <|> try (skipSpaces >> inBraces (char '#' >> identifier))
-          return $ (label,[cls],[])
+          return (label,[cls],[])
   guard $ classIsMath attr
   blanklines
   contents <- manyTill anyLine delimitr
@@ -2071,7 +2071,7 @@ doubleDollarEquation = try $ do
 addMathDefsToState :: AttributedMath -> MarkdownParser ()
 addMathDefsToState (attr, mathDef) = do
   when (classIsMathDef attr) $ updateState
-      (\s -> s{ stateMathDefs = (stateMathDefs s) ++ mathDef ++ "\n" })
+      (\s -> s{ stateMathDefs = stateMathDefs s ++ mathDef ++ "\n" })
   return ()
 
 --
@@ -2091,26 +2091,25 @@ scholarlyFigure = try $ do
   subfigRows <- many1 scholarlySubfigureRow
   caption <- option mempty (floatCaptionStart >> trimInlinesF . mconcat <$> many1 inline)
   blanklines
-  let allIds = concat $ map snd subfigRows
-  let figClass = if (length allIds == 1) then "singleFigure"
-                                         else "multiFigure"
+  let allIds = concatMap snd subfigRows
+  let figClass = if length allIds == 1 then "singleFigure"
+                                       else "multiFigure"
   state <- getState
   let xrefIds = stateXRefIdents state
   -- need to display a numerical id if there is need to refer to subfigs
   -- unless forcibly disabled by class ".nonumber"
-  let needId = ( any (/= "") allIds || (getIdentifier attr) /= "" )
+  let needId = ( any (/= "") allIds || getIdentifier attr /= "" )
                && not (hasClass "nonumber" attr)
   -- this identifier is only used in the list of reference ids for numbering
-  let myIdentifier = if needId && (getIdentifier attr) == ""
-                        then "#"
-                        else if not (hasClass "nonumber" attr)
-                              then getIdentifier attr
-                              else ""
+  let myIdentifier
+	    | needId && getIdentifier attr == "" = "#"
+	    | not (hasClass "nonumber" attr) = getIdentifier attr
+	    | otherwise = ""
   let myNumLabel = if needId
-                      then (length $ filter (/= "") $ idsForFigure xrefIds) + 1
+                      then length (filter (/= "") $ idsForFigure xrefIds) + 1
                       else 0 -- will never be displayed anyways
-  let newXrefIds = xrefIds{ idsForFigure = (idsForFigure xrefIds) ++ [myIdentifier],
-                            idsForSubfigure = (idsForSubfigure xrefIds) ++ [(allIds, myNumLabel)] }
+  let newXrefIds = xrefIds{ idsForFigure = idsForFigure xrefIds ++ [myIdentifier],
+                            idsForSubfigure = idsForSubfigure xrefIds ++ [(allIds, myNumLabel)] }
   updateState $ \s -> s{ stateXRefIdents = newXrefIds }
   let attrActions = [ insertClass figClass
                     , insertReplaceKeyVal ("subfigIds", show allIds)
@@ -2188,12 +2187,12 @@ lineBlock' :: MarkdownParser (F Blocks)
 lineBlock' = try $ do
   guardEnabled Ext_line_blocks
   st <- getState
-  let currSpacingSt = (stateKeepSpacing st)
+  let currSpacingSt = stateKeepSpacing st
   setState $ st{ stateKeepSpacing = True }
   lines' <- lineBlockLines' >>=
             mapM (parseFromString (trimInlinesF . mconcat <$> many inline))
   setState $ st{ stateKeepSpacing = currSpacingSt }
-  return $ B.para <$> (mconcat $ intersperse (return B.linebreak) lines')
+  return $ B.para <$> mconcat (intersperse (return B.linebreak) lines')
 
 scholarlyAlgorithm :: MarkdownParser (F Blocks)
 scholarlyAlgorithm = try $ do
@@ -2211,12 +2210,12 @@ scholarlyAlgorithm = try $ do
   state <- getState
   let xrefIds = stateXRefIdents state
   -- numbering can be forcibly disabled by class ".nonumber"
-  let needId = not (hasClass "nonumber" attr) && (getIdentifier attr) /= ""
+  let needId = not (hasClass "nonumber" attr) && getIdentifier attr /= ""
   let myIdentifier = getIdentifier attr
   let myNumLabel = if needId
-                      then (length $ filter (/= "") $ idsForAlgorithms xrefIds) + 1
+                      then length (filter (/= "") $ idsForAlgorithms xrefIds) + 1
                       else 0 -- will never be displayed anyways
-  let newXrefIds = xrefIds{ idsForAlgorithms = (idsForAlgorithms xrefIds) ++ [myIdentifier] }
+  let newXrefIds = xrefIds{ idsForAlgorithms = idsForAlgorithms xrefIds ++ [myIdentifier] }
   updateState $ \s -> s{ stateXRefIdents = newXrefIds }
   let attrActions = [ insertReplaceKeyVal ("numLabel", show myNumLabel) ]
   let attr' = foldr ($) attr attrActions
@@ -2264,12 +2263,12 @@ scholarlyTable = try $ do
   state <- getState
   let xrefIds = stateXRefIdents state
   -- numbering can be forcibly disabled by class ".nonumber"
-  let needId = not (hasClass "nonumber" attr) && (getIdentifier attr) /= ""
+  let needId = not (hasClass "nonumber" attr) && getIdentifier attr /= ""
   let myIdentifier = getIdentifier attr
   let myNumLabel = if needId
-                      then (length $ filter (/= "") $ idsForTables xrefIds) + 1
+                      then length (filter (/= "") $ idsForTables xrefIds) + 1
                       else 0 -- will never be displayed anyways
-  let newXrefIds = xrefIds{ idsForTables = (idsForTables xrefIds) ++ [myIdentifier] }
+  let newXrefIds = xrefIds{ idsForTables = idsForTables xrefIds ++ [myIdentifier] }
   updateState $ \s -> s{ stateXRefIdents = newXrefIds }
   let attrActions = [ insertReplaceKeyVal ("numLabel", show myNumLabel) ]
   let attr' = foldr ($) attr attrActions
@@ -2299,12 +2298,12 @@ scholarlyCodeBlock = try $ do
   state <- getState
   let xrefIds = stateXRefIdents state
   -- numbering can be forcibly disabled by class ".nonumber"
-  let needId = not (hasClass "nonumber" attr) && (getIdentifier attr) /= ""
+  let needId = not (hasClass "nonumber" attr) && getIdentifier attr /= ""
   let myIdentifier = getIdentifier attr
   let myNumLabel = if needId
-                      then (length $ filter (/= "") $ idsForCodeBlocks xrefIds) + 1
+                      then length (filter (/= "") $ idsForCodeBlocks xrefIds) + 1
                       else 0 -- will never be displayed anyways
-  let newXrefIds = xrefIds{ idsForCodeBlocks = (idsForCodeBlocks xrefIds) ++ [myIdentifier] }
+  let newXrefIds = xrefIds{ idsForCodeBlocks = idsForCodeBlocks xrefIds ++ [myIdentifier] }
   updateState $ \s -> s{ stateXRefIdents = newXrefIds }
   let attrActions = [ insertReplaceKeyVal ("numLabel", show myNumLabel) ]
   let attr' = foldr ($) attr attrActions
