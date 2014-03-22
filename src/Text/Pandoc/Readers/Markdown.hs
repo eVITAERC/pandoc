@@ -1387,10 +1387,10 @@ table = try $ do
 --
 
 inline :: MarkdownParser (F Inlines)
-inline = choice [ whitespace
+inline = choice [ scholarlyMath -- before endline and whitespace to detect el
+                , whitespace
                 , bareURL
                 , str
-                , scholarlyMath -- before endline to accomodate displayMath
                 , endline
                 , code
                 , strongOrEmph
