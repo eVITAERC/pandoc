@@ -47,7 +47,7 @@ import System.Exit ( exitWith, ExitCode (..) )
 import System.FilePath
 import System.Console.GetOpt
 import Data.Char ( toLower )
-import Data.List ( intercalate, isPrefixOf, isSuffixOf, sort, (\\) )
+import Data.List ( intercalate, isPrefixOf, sort, (\\) )
 import Data.Maybe ( isNothing )
 import System.Directory ( getAppUserDataDirectory, findExecutable )
 import System.IO ( stdout, stderr )
@@ -238,10 +238,13 @@ options =
 
     , Option "tw" ["to","write"]
                  (ReqArg
-                  (\arg opt -> if ("_bodyonly" `isSuffixOf` (map toLower arg))
-                      then return opt { optWriter = map toLower arg
-                                      , optStandalone = False }
-                      else return opt { optWriter = map toLower arg })
+                  (\arg opt -> case T.stripSuffix (T.pack "_bodyonly")
+                                            (T.pack $ map toLower arg) of
+                               Just arg' -> return
+                                            opt { optWriter = T.unpack arg'
+                                                , optStandalone = False }
+                               Nothing   -> return
+                                            opt { optWriter = map toLower arg })
                   "FORMAT")
                  ""
 
