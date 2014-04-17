@@ -1974,10 +1974,10 @@ many1InSeparateLines parser = try $ do
   rest <- many $ try (blankline >> parser)
   return (first:rest)
 
--- float captions either start immediately,
--- or is separated by a blank line and begins with non-indented @':'@
+-- float captions either start immediately and optionally begins with non-indented @':'@,
+-- or is separated by a blank line and must begin with non-indented @':'@
 floatCaptionStart :: MarkdownParser ()
-floatCaptionStart = try (notFollowedBy blankline)
+floatCaptionStart = try (notFollowedBy blankline >> skipNonindentSpaces >> optional (char ':') >> return ())
                     <|> try (blankline >> skipNonindentSpaces >> char ':' >> return ())
 
 --
@@ -2122,8 +2122,8 @@ scholarlyFigure = try $ do
 scholarlySubfigureRow :: MarkdownParser (F Inlines, [String])
 scholarlySubfigureRow = try $ do
   subfigs <- many1InSeparateLines image
-  optional $ try (skipSpaces >> char '\\' >> skipSpaces)
-  newline
+  optional $ try (skipSpaces >> char '\\')
+  blankline
   let ids = [ (getIdentifier . getImageAttr) $
               head $ B.toList $ runF x defaultParserState | x <- subfigs ]
   return (mconcat subfigs, ids)
