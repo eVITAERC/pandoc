@@ -2102,9 +2102,9 @@ scholarlyFigure = try $ do
                && not (hasClass "nonumber" attr)
   -- this identifier is only used in the list of reference ids for numbering
   let myIdentifier
-	    | needId && getIdentifier attr == "" = "#"
-	    | not (hasClass "nonumber" attr) = getIdentifier attr
-	    | otherwise = ""
+        | needId && getIdentifier attr == "" = "#"
+        | not (hasClass "nonumber" attr) = getIdentifier attr
+        | otherwise = ""
   let myNumLabel = if needId
                       then length (filter (/= "") $ idsForFigure xrefIds) + 1
                       else 0 -- will never be displayed anyways
