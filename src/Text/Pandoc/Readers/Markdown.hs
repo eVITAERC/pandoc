@@ -1974,6 +1974,14 @@ many1InSeparateLines parser = try $ do
   rest <- many $ try (blankline >> parser)
   return (first:rest)
 
+-- float attributes ignore all characters between @'Floatname:'@
+-- and a terminating attribute block.
+floatAttribute :: MarkdownParser Attr
+floatAttribute = do
+  manyTill anyChar $ lookAhead (try (optional attributes >> blankline))
+  attr <- option nullAttr attributes
+  return attr
+
 -- float captions either start immediately and optionally begins with non-indented @':'@,
 -- or is separated by a blank line and must begin with non-indented @':'@
 floatCaptionStart :: MarkdownParser ()
@@ -2085,8 +2093,8 @@ scholarlyFigure = try $ do
   notFollowedBy $ guardEnabled Ext_fancy_lists >>
                   (char '.' <|> char ')') -- this would be a list
   skipSpaces
-  string "Figure:" >> skipMany (noneOf "{\n")
-  attr <- option nullAttr attributes
+  string "Figure:"
+  attr <- floatAttribute
   blankline >> optional blankline
   subfigRows <- many1 scholarlySubfigureRow
   caption <- option mempty (floatCaptionStart >> trimInlinesF . mconcat <$> many1 inline)
@@ -2201,8 +2209,8 @@ scholarlyAlgorithm = try $ do
   notFollowedBy $ guardEnabled Ext_fancy_lists >>
                   (char '.' <|> char ')') -- this would be a list
   skipSpaces
-  string "Algorithm:" >> skipMany (noneOf "{\n")
-  attr <- option nullAttr attributes
+  string "Algorithm:"
+  attr <- floatAttribute
   blankline >> optional blankline
   alg <- many1 lineBlock'
   caption <- option mempty (floatCaptionStart >> trimInlinesF . mconcat <$> many1 inline)
@@ -2254,8 +2262,8 @@ scholarlyTable = try $ do
   notFollowedBy $ guardEnabled Ext_fancy_lists >>
                   (char '.' <|> char ')') -- this would be a list
   skipSpaces
-  string "Table:" >> skipMany (noneOf "{\n")
-  attr <- option nullAttr attributes
+  string "Table:"
+  attr <- floatAttribute
   blankline >> optional blankline
   tabl <- table'
   caption <- option mempty (floatCaptionStart >> trimInlinesF . mconcat <$> many1 inline)
@@ -2289,8 +2297,8 @@ scholarlyCodeBlock = try $ do
   notFollowedBy $ guardEnabled Ext_fancy_lists >>
                   (char '.' <|> char ')') -- this would be a list
   skipSpaces
-  string "Code:" >> skipMany (noneOf "{\n")
-  attr <- option nullAttr attributes
+  string "Code:"
+  attr <- floatAttribute
   blankline >> optional blankline
   (codeAttr, codeContent) <- codeBlockFenced' <|> codeBlockIndented'
   caption <- option mempty (floatCaptionStart >> trimInlinesF . mconcat <$> many1 inline)
