@@ -48,7 +48,7 @@ module Text.Pandoc.Scholarly (classIsMath,
                              )
 where
 
-import Data.List ( intercalate, isPrefixOf )
+import Data.List ( intercalate )
 import Text.Pandoc.Definition
 import Text.Pandoc.Shared
 import Text.Pandoc.Parsing hiding (tableWith)
