@@ -869,21 +869,21 @@ inlineToHtml opts inline =
                                     then result ! customAttribute "data-cites" (toValue citationIds)
                                     else result
     (NumRef numref _raw) -> do st <- get
-                               let toMath lab = return $ mathToMathJax opts InlineMath lab
+                               let toMath lab = mathToMathJax opts InlineMath lab
                                let refId = numRefId numref
-                               let refLinkTitl = "cross-reference link"
+                               let refLinkClass = "scholmd-crossref"
+                               let refText = case numRefStyle numref of
+                                               PlainNumRef -> numRefLabel numref
+                                               ParenthesesNumRef -> [Str "("] ++
+                                                          numRefLabel numref ++ [Str ")"]
+                               refTextHtml <- inlineListToHtml opts refText
                                let isMathId = refId `elem` (stMathIds st)
-                               if isMathId
-                                 then case numRefStyle numref of
-                                      PlainNumRef -> toMath $ "\\ref{" ++ refId ++ "}"
-                                      ParenthesesNumRef -> toMath $ "\\eqref{" ++ refId ++ "}"
-                                 else case numRefStyle numref of
-                                      PlainNumRef -> inlineListToHtml opts $
-                                        [ Link (numRefLabel numref)
-                                            ('#' : numRefId numref, refLinkTitl) ]
-                                      ParenthesesNumRef -> inlineListToHtml opts $
-                                        [ Link ([Str "("] ++ numRefLabel numref ++ [Str ")"])
-                                            ('#' : numRefId numref, refLinkTitl) ]
+                               let link = if isMathId
+                                             then case numRefStyle numref of
+                                                    PlainNumRef -> toMath $ "\\ref{" ++ refId ++ "}"
+                                                    ParenthesesNumRef -> toMath $ "\\eqref{" ++ refId ++ "}"
+                                             else H.a ! A.href (toValue $ '#' : refId) $ refTextHtml
+                               return $ H.span ! A.class_ refLinkClass $ link
 
 blockListToNote :: WriterOptions -> String -> [Block] -> State WriterState Html
 blockListToNote opts ref blocks =
