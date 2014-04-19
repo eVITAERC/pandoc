@@ -434,10 +434,51 @@ setImageWidthFromHistory (Image attr b c) = do
   return $ Image attr' b c
 setImageWidthFromHistory x = return x
 
+scholmdFloat :: WriterOptions -> String -> String -> Html -> Html
+             -> State WriterState Html
+scholmdFloat opts cls ident content capt = do
+  let content' = H.div ! A.class_ "scholmd-float-content" $ content
+  return $ H5.figure ! A.class_ (toValue ("scholmd-float " ++ cls))
+                     !? (ident /= "", prefixedId opts ident)
+             $ mconcat [nl opts, content', capt, nl opts]
+
+scholmdFloatCaption :: WriterOptions -> String -> String -> Maybe String -> [Inline]
+                    -> State WriterState Html
+scholmdFloatCaption opts cls prefix label text = do
+  prefixHtml <- liftM (H.span ! A.class_ "scholmd-caption-head-prefix")
+                  $ inlineToHtml opts $ Str prefix
+  labelHtml <- case label of
+                 Nothing -> return mempty
+                 Just lab -> liftM (H.span ! A.class_ "scholmd-caption-head-label")
+                               $ inlineToHtml opts $ Str lab
+  let headerHtml = case label of
+                   Just _ -> H.span ! A.class_ "scholmd-caption-head"
+                               $ mconcat [prefixHtml, labelHtml]
+                   Nothing -> mempty
+  textHtml <- if (null text)
+                 then return mempty
+                 else liftM (H.span ! A.class_ "scholmd-caption-text")
+                        $ inlineListToHtml opts text
+  return $ if (isNothing label) && (null text)
+              then mempty
+              else mconcat [ nl opts,
+                             H.div ! A.class_ (toValue cls) $ H5.figcaption
+                             $ mconcat [headerHtml, textHtml] ]
+
+-- main caption for floats
+scholmdFloatMainCaption :: WriterOptions -> String -> Maybe String -> [Inline]
+                        -> State WriterState Html
+scholmdFloatMainCaption opts = scholmdFloatCaption opts "scholmd-float-caption"
+
+-- caption for subfigures
+scholmdFloatSubfigCaption :: WriterOptions -> Maybe String -> [Inline]
+                          -> State WriterState Html
+scholmdFloatSubfigCaption opts = scholmdFloatCaption opts "scholmd-float-subcaption" ""
 
 figureToHtml :: WriterOptions -> Attr -> [[Inline]] -> [Inline] -> State WriterState Html
 figureToHtml opts attr subfigRows caption = do
   let ident = getIdentifier attr
+  let numLabel = lookupKey "numLabel" attr
   let subfigRows' = case subfigRows of -- check for single-image figure
                       [[Image a _ c]] -> [[Image a [] c]]
                       _ -> subfigRows
@@ -450,22 +491,16 @@ figureToHtml opts attr subfigRows caption = do
   -- need to expand the "same" or "^" keyword for width
   subfiglist' <- mapM (setImageWidthFromHistory) subfiglist
   let subfigs = evalState (mapM (subfigsToHtml opts appendLabel) subfiglist') 1
-  let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
-  let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
-  let captPrefix = if addCaptPrefix then [Strong [Str "Figure\160",Str myNumLabel],Space]
-                                    else []
-  -- | TODO: disable entire caption if not needed
-  let tocapt = H5.figcaption
-  capt <- if null (captPrefix ++ caption)
-             then return mempty
-             else liftM (tocapt) $ inlineListToHtml opts (captPrefix ++ caption)
-  return $ H5.figure !? (ident /= "", prefixedId opts ident) $ mconcat
-                      [nl opts, mconcat subfigs, nl opts, capt, nl opts]
+  currWriterState <- get
+  let floatContent = mconcat $ map ((flip evalState) currWriterState) subfigs
+  let floatClass = "scholmd-figure"
+  floatCaption <- scholmdFloatMainCaption opts "Figure" numLabel caption
+  scholmdFloat opts floatClass ident floatContent floatCaption
 
 -- | Transforms a list of subfigures to tags. The State monad implements the counter for automatic subfigure-numbering
-subfigsToHtml :: WriterOptions -> Bool -> Inline -> State Int Html
+subfigsToHtml :: WriterOptions -> Bool -> Inline -> State Int (State WriterState Html)
 subfigsToHtml opts _ LineBreak = do
-  return $ if writerHtml5 opts then H5.br else H.br
+  return $ return $ if writerHtml5 opts then H5.br else H.br
 subfigsToHtml opts appendLabel (Image attr txt (s,tit)) = do
   currentIndex <- get
   put (currentIndex + 1)
@@ -473,17 +508,17 @@ subfigsToHtml opts appendLabel (Image attr txt (s,tit)) = do
   let size = case lookupKey "width" attr of
                   Just width -> "width: " ++ width
                   Nothing -> ""
-  let sublabel = [Str ("(" ++ (alphEnum currentIndex) ++ ")"), Space]
-  let subcap = if (null txt && not appendLabel)
-                  then mempty
-                  else H5.figcaption $ evalState (inlineListToHtml opts $
-                       if appendLabel then (sublabel ++ txt) else txt) defaultWriterState
+  let sublabel = if appendLabel
+                    then Just $ "(" ++ (alphEnum currentIndex) ++ ")"
+                    else Nothing
+  let subcap = scholmdFloatSubfigCaption opts sublabel txt
   let img = H5.img ! (A.src $ toValue s) !? (tit /="", A.title $ toValue tit)
-  return $ H5.figure
-              !? (ident /= "", prefixedId opts ident)
-              ! A.style (toValue ("display: inline-block; " ++ size :: String))
-              $ mconcat[nl opts, img, subcap, nl opts]
-subfigsToHtml _ _ _ = return mempty
+  let content = liftM (\sc -> mconcat[nl opts, img, sc, nl opts]) subcap
+  let subfigContext = H5.figure ! A.class_ "scholmd-subfig"
+                        !? (ident /= "", prefixedId opts ident)
+                        ! A.style (toValue ("display: inline-block; " ++ size :: String))
+  return $ liftM subfigContext content
+subfigsToHtml _ _ _ = return $ return mempty
 
 -- | Convert Pandoc block element to HTML.
 blockToHtml :: WriterOptions -> Block -> State WriterState Html
@@ -788,7 +823,12 @@ inlineToHtml opts inline =
                                         Left  _ -> inlineListToHtml opts
                                                    (readTeXMath' t str) >>= return .
                                                      (H.span ! A.class_ "math")
-                               MathJax _ -> return $ mathToMathJax opts t str
+                               MathJax _ -> if writerScholarly opts
+                                               then return $ mathToMathJax opts t str
+                                               else return $ H.span ! A.class_ "math" $ toHtml $
+                                                    case t of
+                                                      InlineMath  -> "\\(" ++ str ++ "\\)"
+                                                      DisplayMath _ -> "\\[" ++ str ++ "\\]"
                                PlainMath -> do
                                   x <- inlineListToHtml opts (readTeXMath' t str)
                                   let m = H.span ! A.class_ "math" $ x
