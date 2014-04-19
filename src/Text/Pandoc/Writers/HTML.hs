@@ -864,7 +864,10 @@ inlineToHtml opts inline =
                                       _          -> link
     (Cite cits il)-> do contents <- inlineListToHtml opts il
                         let citationIds = unwords $ map citationId cits
-                        let result = H.span ! A.class_ "scholmd-citation" $ contents
+                        let citeClass = if writerScholarly opts
+                                           then "scholmd-citation"
+                                           else "citation"
+                        let result = H.span ! A.class_ citeClass $ contents
                         return $ if writerHtml5 opts
                                     then result ! customAttribute "data-cites" (toValue citationIds)
                                     else result
