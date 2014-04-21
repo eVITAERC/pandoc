@@ -436,10 +436,10 @@ setImageWidthFromHistory x = return x
 
 scholmdFloat :: WriterOptions -> String -> String -> Html -> Html
              -> State WriterState Html
-scholmdFloat opts cls ident content capt = do
+scholmdFloat opts cls identifier content capt = do
   let content' = H.div ! A.class_ "scholmd-float-content" $ content
   return $ H5.figure ! A.class_ (toValue ("scholmd-float " ++ cls))
-                     !? (ident /= "", prefixedId opts ident)
+                     !? (identifier /= "", prefixedId opts identifier)
              $ mconcat [nl opts, content', capt, nl opts]
 
 scholmdFloatCaption :: WriterOptions -> String -> String -> Maybe String -> [Inline]
@@ -492,10 +492,11 @@ figureToHtml opts attr subfigRows caption = do
   subfiglist' <- mapM (setImageWidthFromHistory) subfiglist
   let subfigs = evalState (mapM (subfigsToHtml opts appendLabel) subfiglist') 1
   currWriterState <- get
-  let floatContent = mconcat $ map ((flip evalState) currWriterState) subfigs
+  let (floatContents, newWriterState) = runState (sequence subfigs) currWriterState
+  put newWriterState
   let floatClass = "scholmd-figure"
   floatCaption <- scholmdFloatMainCaption opts "Figure" numLabel caption
-  scholmdFloat opts floatClass ident floatContent floatCaption
+  scholmdFloat opts floatClass ident (mconcat floatContents) floatCaption
 
 -- | Transforms a list of subfigures to tags. The State monad implements the counter for automatic subfigure-numbering
 subfigsToHtml :: WriterOptions -> Bool -> Inline -> State Int (State WriterState Html)
