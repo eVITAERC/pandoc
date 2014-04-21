@@ -913,17 +913,17 @@ scholmdFloatCaption opts cls prefix label text = do
                              H.div ! A.class_ (toValue cls) $ H5.figcaption
                              $ mconcat [headerHtml, textHtml] ]
 
--- main caption for floats
+-- | main caption for floats
 scholmdFloatMainCaption :: WriterOptions -> String -> Maybe String -> [Inline]
                         -> State WriterState Html
 scholmdFloatMainCaption opts = scholmdFloatCaption opts "scholmd-float-caption"
 
--- caption for subfigures
+-- | caption for subfigures
 scholmdFloatSubfigCaption :: WriterOptions -> Maybe String -> [Inline]
                           -> State WriterState Html
 scholmdFloatSubfigCaption opts = scholmdFloatCaption opts "scholmd-float-subcaption" ""
 
--- Main helper function for constructing a float from rendered content blocks
+-- | Main helper function for constructing a float with caption from a rendered content block
 scholmdFloatFromAttr :: WriterOptions -> String -> String -> Attr -> [Inline] -> Html
                      -> State WriterState Html
 scholmdFloatFromAttr opts className captionPrefix attr caption content = do
@@ -937,26 +937,26 @@ scholmdFloatFromAttr opts className captionPrefix attr caption content = do
 
 figureToHtml :: WriterOptions -> Attr -> [[Inline]] -> [Inline] -> State WriterState Html
 figureToHtml opts attr subfigRows caption = do
-  let ident = getIdentifier attr
-  let numLabel = lookupKey "numLabel" attr
-  let subfigRows' = case subfigRows of -- check for single-image figure
+  -- check for single-image float figure, strip the subcaption if this is the case
+  let subfigRows' = case subfigRows of
                       [[Image a _ c]] -> [[Image a [] c]]
                       _ -> subfigRows
   let subfigIds = case (safeRead $ fromMaybe [] $ lookupKey "subfigIds" attr) :: Maybe [String] of
                       Just a -> a
                       Nothing -> [""]
-  -- show subfig labels (a), (b), etc
+  -- determine whether to show subfig enumeration labels (a), (b), etc
   let appendLabel = any (not . null) subfigIds && not (hasClass "nonumber" attr)
   let subfiglist = intercalate [LineBreak] subfigRows'
   -- need to expand the "same" or "^" keyword for width
   subfiglist' <- mapM (setImageWidthFromHistory) subfiglist
+  -- Enumerate all the subfigures
   let subfigs = evalState (mapM (subfigsToHtml opts appendLabel) subfiglist') 1
-  floatContents <- sequence subfigs
-  let floatClass = "scholmd-figure"
-  floatCaption <- scholmdFloatMainCaption opts "Figure" numLabel caption
-  scholmdFloat opts floatClass ident (mconcat floatContents) floatCaption
+  subfigsHtml <- sequence subfigs -- Render all subfigs
+  let figure = mconcat subfigsHtml
+  scholmdFloatFromAttr opts "scholmd-figure" "Figure" attr caption figure
 
--- | Transforms a list of subfigures to tags. The State monad implements the counter for automatic subfigure-numbering
+-- Transforms a (single-image) subfigure to HTML.
+-- The State Int monad implements the counter for automatic subfigure enumeration
 subfigsToHtml :: WriterOptions -> Bool -> Inline -> State Int (State WriterState Html)
 subfigsToHtml opts _ LineBreak = do
   return $ return $ if writerHtml5 opts then H5.br else H.br
