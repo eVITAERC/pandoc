@@ -434,91 +434,6 @@ setImageWidthFromHistory (Image attr b c) = do
   return $ Image attr' b c
 setImageWidthFromHistory x = return x
 
-scholmdFloat :: WriterOptions -> String -> String -> Html -> Html
-             -> State WriterState Html
-scholmdFloat opts cls identifier content capt = do
-  let content' = H.div ! A.class_ "scholmd-float-content" $ content
-  return $ H5.figure ! A.class_ (toValue ("scholmd-float " ++ cls))
-                     !? (identifier /= "", prefixedId opts identifier)
-             $ mconcat [nl opts, content', capt, nl opts]
-
-scholmdFloatCaption :: WriterOptions -> String -> String -> Maybe String -> [Inline]
-                    -> State WriterState Html
-scholmdFloatCaption opts cls prefix label text = do
-  prefixHtml <- liftM (H.span ! A.class_ "scholmd-caption-head-prefix")
-                  $ inlineToHtml opts $ Str prefix
-  labelHtml <- case label of
-                 Nothing -> return mempty
-                 Just lab -> liftM (H.span ! A.class_ "scholmd-caption-head-label")
-                               $ inlineToHtml opts $ Str lab
-  let headerHtml = case label of
-                   Just _ -> H.span ! A.class_ "scholmd-caption-head"
-                               $ mconcat [prefixHtml, labelHtml]
-                   Nothing -> mempty
-  textHtml <- if (null text)
-                 then return mempty
-                 else liftM (H.span ! A.class_ "scholmd-caption-text")
-                        $ inlineListToHtml opts text
-  return $ if (isNothing label) && (null text)
-              then mempty
-              else mconcat [ nl opts,
-                             H.div ! A.class_ (toValue cls) $ H5.figcaption
-                             $ mconcat [headerHtml, textHtml] ]
-
--- main caption for floats
-scholmdFloatMainCaption :: WriterOptions -> String -> Maybe String -> [Inline]
-                        -> State WriterState Html
-scholmdFloatMainCaption opts = scholmdFloatCaption opts "scholmd-float-caption"
-
--- caption for subfigures
-scholmdFloatSubfigCaption :: WriterOptions -> Maybe String -> [Inline]
-                          -> State WriterState Html
-scholmdFloatSubfigCaption opts = scholmdFloatCaption opts "scholmd-float-subcaption" ""
-
-figureToHtml :: WriterOptions -> Attr -> [[Inline]] -> [Inline] -> State WriterState Html
-figureToHtml opts attr subfigRows caption = do
-  let ident = getIdentifier attr
-  let numLabel = lookupKey "numLabel" attr
-  let subfigRows' = case subfigRows of -- check for single-image figure
-                      [[Image a _ c]] -> [[Image a [] c]]
-                      _ -> subfigRows
-  let subfigIds = case (safeRead $ fromMaybe [] $ lookupKey "subfigIds" attr) :: Maybe [String] of
-                      Just a -> a
-                      Nothing -> [""]
-  -- show subfig labels (a), (b), etc
-  let appendLabel = any (not . null) subfigIds && not (hasClass "nonumber" attr)
-  let subfiglist = intercalate [LineBreak] subfigRows'
-  -- need to expand the "same" or "^" keyword for width
-  subfiglist' <- mapM (setImageWidthFromHistory) subfiglist
-  let subfigs = evalState (mapM (subfigsToHtml opts appendLabel) subfiglist') 1
-  floatContents <- sequence subfigs
-  let floatClass = "scholmd-figure"
-  floatCaption <- scholmdFloatMainCaption opts "Figure" numLabel caption
-  scholmdFloat opts floatClass ident (mconcat floatContents) floatCaption
-
--- | Transforms a list of subfigures to tags. The State monad implements the counter for automatic subfigure-numbering
-subfigsToHtml :: WriterOptions -> Bool -> Inline -> State Int (State WriterState Html)
-subfigsToHtml opts _ LineBreak = do
-  return $ return $ if writerHtml5 opts then H5.br else H.br
-subfigsToHtml opts appendLabel (Image attr txt (s,tit)) = do
-  currentIndex <- get
-  put (currentIndex + 1)
-  let ident = getIdentifier attr
-  let size = case lookupKey "width" attr of
-                  Just width -> "width: " ++ width
-                  Nothing -> ""
-  let sublabel = if appendLabel
-                    then Just $ "(" ++ (alphEnum currentIndex) ++ ")"
-                    else Nothing
-  let subcap = scholmdFloatSubfigCaption opts sublabel txt
-  let img = H5.img ! (A.src $ toValue s) !? (tit /="", A.title $ toValue tit)
-  let content = liftM (\sc -> mconcat[nl opts, img, sc, nl opts]) subcap
-  let subfigContext = H5.figure ! A.class_ "scholmd-subfig"
-                        !? (ident /= "", prefixedId opts ident)
-                        ! A.style (toValue ("display: inline-block; " ++ size :: String))
-  return $ liftM subfigContext content
-subfigsToHtml _ _ _ = return $ return mempty
-
 -- | Convert Pandoc block element to HTML.
 blockToHtml :: WriterOptions -> Block -> State WriterState Html
 blockToHtml _ Null = return mempty
@@ -967,6 +882,47 @@ mathToMathJax opts mathType mathCode =
 --- Scholarly Markdown floats
 ---
 
+scholmdFloat :: WriterOptions -> String -> String -> Html -> Html
+             -> State WriterState Html
+scholmdFloat opts cls identifier content capt = do
+  let content' = H.div ! A.class_ "scholmd-float-content" $ content
+  return $ H5.figure ! A.class_ (toValue ("scholmd-float " ++ cls))
+                     !? (identifier /= "", prefixedId opts identifier)
+             $ mconcat [nl opts, content', capt, nl opts]
+
+scholmdFloatCaption :: WriterOptions -> String -> String -> Maybe String -> [Inline]
+                    -> State WriterState Html
+scholmdFloatCaption opts cls prefix label text = do
+  prefixHtml <- liftM (H.span ! A.class_ "scholmd-caption-head-prefix")
+                  $ inlineToHtml opts $ Str prefix
+  labelHtml <- case label of
+                 Nothing -> return mempty
+                 Just lab -> liftM (H.span ! A.class_ "scholmd-caption-head-label")
+                               $ inlineToHtml opts $ Str lab
+  let headerHtml = case label of
+                   Just _ -> H.span ! A.class_ "scholmd-caption-head"
+                               $ mconcat [prefixHtml, labelHtml]
+                   Nothing -> mempty
+  textHtml <- if (null text)
+                 then return mempty
+                 else liftM (H.span ! A.class_ "scholmd-caption-text")
+                        $ inlineListToHtml opts text
+  return $ if (isNothing label) && (null text)
+              then mempty
+              else mconcat [ nl opts,
+                             H.div ! A.class_ (toValue cls) $ H5.figcaption
+                             $ mconcat [headerHtml, textHtml] ]
+
+-- main caption for floats
+scholmdFloatMainCaption :: WriterOptions -> String -> Maybe String -> [Inline]
+                        -> State WriterState Html
+scholmdFloatMainCaption opts = scholmdFloatCaption opts "scholmd-float-caption"
+
+-- caption for subfigures
+scholmdFloatSubfigCaption :: WriterOptions -> Maybe String -> [Inline]
+                          -> State WriterState Html
+scholmdFloatSubfigCaption opts = scholmdFloatCaption opts "scholmd-float-subcaption" ""
+
 -- Main helper function for constructing a float from rendered content blocks
 scholmdFloatFromAttr :: WriterOptions -> String -> String -> Attr -> [Inline] -> Html
                      -> State WriterState Html
@@ -978,6 +934,50 @@ scholmdFloatFromAttr opts className captionPrefix attr caption content = do
                       else className
   floatCaption <- scholmdFloatMainCaption opts captionPrefix numLabel caption
   scholmdFloat opts className' ident content floatCaption
+
+figureToHtml :: WriterOptions -> Attr -> [[Inline]] -> [Inline] -> State WriterState Html
+figureToHtml opts attr subfigRows caption = do
+  let ident = getIdentifier attr
+  let numLabel = lookupKey "numLabel" attr
+  let subfigRows' = case subfigRows of -- check for single-image figure
+                      [[Image a _ c]] -> [[Image a [] c]]
+                      _ -> subfigRows
+  let subfigIds = case (safeRead $ fromMaybe [] $ lookupKey "subfigIds" attr) :: Maybe [String] of
+                      Just a -> a
+                      Nothing -> [""]
+  -- show subfig labels (a), (b), etc
+  let appendLabel = any (not . null) subfigIds && not (hasClass "nonumber" attr)
+  let subfiglist = intercalate [LineBreak] subfigRows'
+  -- need to expand the "same" or "^" keyword for width
+  subfiglist' <- mapM (setImageWidthFromHistory) subfiglist
+  let subfigs = evalState (mapM (subfigsToHtml opts appendLabel) subfiglist') 1
+  floatContents <- sequence subfigs
+  let floatClass = "scholmd-figure"
+  floatCaption <- scholmdFloatMainCaption opts "Figure" numLabel caption
+  scholmdFloat opts floatClass ident (mconcat floatContents) floatCaption
+
+-- | Transforms a list of subfigures to tags. The State monad implements the counter for automatic subfigure-numbering
+subfigsToHtml :: WriterOptions -> Bool -> Inline -> State Int (State WriterState Html)
+subfigsToHtml opts _ LineBreak = do
+  return $ return $ if writerHtml5 opts then H5.br else H.br
+subfigsToHtml opts appendLabel (Image attr txt (s,tit)) = do
+  currentIndex <- get
+  put (currentIndex + 1)
+  let ident = getIdentifier attr
+  let size = case lookupKey "width" attr of
+                  Just width -> "width: " ++ width
+                  Nothing -> ""
+  let sublabel = if appendLabel
+                    then Just $ "(" ++ (alphEnum currentIndex) ++ ")"
+                    else Nothing
+  let subcap = scholmdFloatSubfigCaption opts sublabel txt
+  let img = H5.img ! (A.src $ toValue s) !? (tit /="", A.title $ toValue tit)
+  let content = liftM (\sc -> mconcat[nl opts, img, sc, nl opts]) subcap
+  let subfigContext = H5.figure ! A.class_ "scholmd-subfig"
+                        !? (ident /= "", prefixedId opts ident)
+                        ! A.style (toValue ("display: inline-block; " ++ size :: String))
+  return $ liftM subfigContext content
+subfigsToHtml _ _ _ = return $ return mempty
 
 algorithmToHtml :: WriterOptions -> Attr -> [Block] -> FloatFallback -> [Inline]
                 -> State WriterState Html
