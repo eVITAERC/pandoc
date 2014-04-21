@@ -491,9 +491,7 @@ figureToHtml opts attr subfigRows caption = do
   -- need to expand the "same" or "^" keyword for width
   subfiglist' <- mapM (setImageWidthFromHistory) subfiglist
   let subfigs = evalState (mapM (subfigsToHtml opts appendLabel) subfiglist') 1
-  currWriterState <- get
-  let (floatContents, newWriterState) = runState (sequence subfigs) currWriterState
-  put newWriterState
+  floatContents <- sequence subfigs
   let floatClass = "scholmd-figure"
   floatCaption <- scholmdFloatMainCaption opts "Figure" numLabel caption
   scholmdFloat opts floatClass ident (mconcat floatContents) floatCaption
