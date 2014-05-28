@@ -43,6 +43,7 @@ module Text.Pandoc.Scholarly (classIsMath,
                               insertClass,
                               insertIfNoneKeyVal,
                               insertReplaceKeyVal,
+                              insertReplaceKeyValIf,
                               extractMetaStringList,
                               extractMetaString
                              )
@@ -87,6 +88,10 @@ insertIfNoneKeyVal = insertWithKeyVal (\_ x -> x)
 
 insertReplaceKeyVal :: (String, String) -> Attr -> Attr
 insertReplaceKeyVal = insertWithKeyVal const
+
+insertReplaceKeyValIf :: Bool -> (String, String) -> Attr -> Attr
+insertReplaceKeyValIf True kv attr = insertReplaceKeyVal kv attr
+insertReplaceKeyValIf False _ attr = attr
 
 getClasses :: Attr -> [String]
 getClasses (_, classes, _) = classes

@@ -2121,7 +2121,7 @@ scholarlyFigure = try $ do
   updateState $ \s -> s{ stateXRefIdents = newXrefIds }
   let attrActions = [ insertClass figClass
                     , insertReplaceKeyVal ("subfigIds", show allIds)
-                    , insertReplaceKeyVal ("numLabel", show myNumLabel)
+                    , insertReplaceKeyValIf needId ("numLabel", show myNumLabel)
                     ]
   let subfigRows' = map fst subfigRows
   let attr' = foldr ($) attr attrActions
@@ -2225,7 +2225,7 @@ scholarlyAlgorithm = try $ do
                       else 0 -- will never be displayed anyways
   let newXrefIds = xrefIds{ idsForAlgorithms = idsForAlgorithms xrefIds ++ [myIdentifier] }
   updateState $ \s -> s{ stateXRefIdents = newXrefIds }
-  let attrActions = [ insertReplaceKeyVal ("numLabel", show myNumLabel) ]
+  let attrActions = [ insertReplaceKeyValIf needId ("numLabel", show myNumLabel) ]
   let attr' = foldr ($) attr attrActions
   return $ do
     alg' <- mconcat alg
@@ -2278,7 +2278,7 @@ scholarlyTable = try $ do
                       else 0 -- will never be displayed anyways
   let newXrefIds = xrefIds{ idsForTables = idsForTables xrefIds ++ [myIdentifier] }
   updateState $ \s -> s{ stateXRefIdents = newXrefIds }
-  let attrActions = [ insertReplaceKeyVal ("numLabel", show myNumLabel) ]
+  let attrActions = [ insertReplaceKeyValIf needId ("numLabel", show myNumLabel) ]
   let attr' = foldr ($) attr attrActions
   return $ do
     tabl' <- tabl
@@ -2313,7 +2313,7 @@ scholarlyCodeBlock = try $ do
                       else 0 -- will never be displayed anyways
   let newXrefIds = xrefIds{ idsForCodeBlocks = idsForCodeBlocks xrefIds ++ [myIdentifier] }
   updateState $ \s -> s{ stateXRefIdents = newXrefIds }
-  let attrActions = [ insertReplaceKeyVal ("numLabel", show myNumLabel) ]
+  let attrActions = [ insertReplaceKeyValIf needId ("numLabel", show myNumLabel) ]
   let attr' = foldr ($) attr attrActions
   let codeblock = B.codeBlockWith codeAttr codeContent
   return $ do
