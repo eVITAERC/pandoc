@@ -931,7 +931,7 @@ figureToLaTeX attr subfigRows caption = do
                               then empty
                               else "\\captionsetup" <> brackets (text "subfigure")
                                    <> braces (text "labelformat=empty")
-  return $ "\\begin{figure" <> widestar <> "}[htbp]" $$ "\\centering" $$ disableSubfigLabel
+  return $ "\\begin{figure" <> widestar <> "}" $$ "\\centering" $$ disableSubfigLabel
            $$ foldl ($$) empty img $$ capt' <> label $$ "\\end{figure" <> widestar <> "}"
 
 -- Handles writing figure subfloats (using the subfig package)
@@ -1030,7 +1030,7 @@ algorithmToLaTeX attr alg _fallback caption = do
   let capt' = if null caption && not addCaptPrefix then empty else capt
   algorithm <- blockListToLaTeX alg
   let label = if (not $ null ident) then ("\\label" <> braces (text ident)) else empty
-  return $ "\\begin{scholmdAlgorithm" <> widestar <> "}[htbp]" $$ algorithm
+  return $ "\\begin{scholmdAlgorithm" <> widestar <> "}" $$ algorithm
            $$ capt' <> label $$ "\\end{scholmdAlgorithm" <> widestar <> "}"
 
 -- Handles writing algorithm/pseudocode floats
@@ -1049,7 +1049,7 @@ tableFloatToLaTeX attr tabl _fallback caption = do
   let capt' = if null caption && not addCaptPrefix then empty else capt
   table <- mapM tableToTabular tabl
   let label = if (not $ null ident) then ("\\label" <> braces (text ident)) else empty
-  return $ "\\begin{table" <> widestar <> "}[htbp]" $$ "\\centering" $$ foldl ($$) empty table
+  return $ "\\begin{table" <> widestar <> "}" $$ "\\centering" $$ foldl ($$) empty table
            $$ capt' <> label $$ "\\end{table" <> widestar <> "}"
 
 -- Specifically for table floats
