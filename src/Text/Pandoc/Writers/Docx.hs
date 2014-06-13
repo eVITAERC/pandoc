@@ -535,6 +535,13 @@ blockToOpenXML opts (OrderedList (start, numstyle, numdelim) lst) = do
   asList $ concat `fmap` mapM (listItemToOpenXML opts numid) lst
 blockToOpenXML opts (DefinitionList items) =
   concat `fmap` mapM (definitionListItemToOpenXML opts) items
+-- These elements await implementation
+blockToOpenXML _opts (Figure _ _ _) = return []
+blockToOpenXML _opts (TableFloat _ _ _ _) = return []
+blockToOpenXML _opts (CodeFloat _ _ _ _) = return []
+blockToOpenXML _opts (Algorithm _ _ _ _) = return []
+blockToOpenXML _opts (Statement _ _ ) = return []
+blockToOpenXML _opts (Proof _ _ ) = return []
 
 definitionListItemToOpenXML  :: WriterOptions -> ([Inline],[[Block]]) -> WS [Element]
 definitionListItemToOpenXML opts (term,defs) = do
@@ -810,6 +817,8 @@ inlineToOpenXML opts (Image _ alt (src, tit)) = do
                    M.insert src (ident, imgpath, mbMimeType, imgElt, img)
                            $ stImages st }
                return [imgElt]
+-- These elements await implementation
+inlineToOpenXML _opts (NumRef _ _) = return []
 
 br :: Element
 br = mknode "w:r" [] [mknode "w:br" [("w:type","textWrapping")] () ]

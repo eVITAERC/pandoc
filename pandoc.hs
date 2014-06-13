@@ -1091,7 +1091,7 @@ main = do
 
   -- Begin Scholarly Markdown specific settings
   when scholarlyMode $ do
-    unless (writerName' `elem` ["html5","dzslides","revealjs","latex","beamer","native","json"])
+    unless (writerName' `elem` ["html5","dzslides","revealjs","latex","beamer","native","json","docx"])
       $ err 101 "Scholarly Markdown currently only renders to html5, latex/pdf, or native/json"
     case mathMethod of
          MathJax _ -> return ()
