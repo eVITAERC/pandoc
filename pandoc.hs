@@ -71,7 +71,7 @@ import qualified Data.Text as T
 copyrightMessage :: String
 copyrightMessage = "\nCopyright (C) 2014 Tim T.Y. Lin\n" ++
                     "This work is based on Pandoc:\n" ++
-                    "   Copyright (C) 2006-2013 John MacFarlane\n" ++
+                    "   Copyright (C) 2006-2014 John MacFarlane\n" ++
                     "   Web:  http://johnmacfarlane.net/pandoc\n" ++
                     "This is free software; see the source for copying conditions.  There is no\n" ++
                     "warranty, not even for merchantability or fitness for a particular purpose."
@@ -734,7 +734,7 @@ options =
     , Option "" ["citeproc"]
                  (NoArg
                   (\opt -> return opt { optFilters =
-                                          "scholpandoc-citeproc" : optFilters opt }))
+                                          "scholdoc-citeproc" : optFilters opt }))
                   "" -- add pandoc-citeproc to list of filters
 
     , Option "m" ["latexmathml", "asciimathml"]
@@ -935,7 +935,7 @@ main = do
   rawArgs <- liftM (map UTF8.decodeArg) getArgs
   prg <- getProgName
   let compatMode = (prg == "hsmarkdown")
-  let scholarlyPandoc = (prg == "scholpandoc")
+  let scholarlyPandoc = (prg == "scholdoc" || prg == "scholpandoc")
 
   let (actions, args, errors) = if compatMode
                                   then ([], rawArgs, [])
