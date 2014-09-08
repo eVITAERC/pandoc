@@ -1,0 +1,330 @@
+---
+title: 'ScholarlyMarkdown: a Markdown-compatible plaintext format for academic communication'
+author: Tim T.Y. Lin
+tags: [test, markdown, scholarly]
+date: January 1, 2000
+bibliography: scholdoc_bibtex_file.bib
+---
+
+## ScholarlyMarkdown math support
+
+### Math as (fenced) code blocks
+
+This is a line of text with a `simple code block` in it.
+
+`` `this should be just a `normal` inline code block
+surrounded by literal backticks` ``
+
+This is another line of text. Here should be some math: ``\mathbf{F = ma}<2\mathbf{ma}``. There should be some displaymath environment on the following line
+
+```math
+    \mathbf{F = ma} < 2\mathbf{ma}
+```
+
+and there should be no line breaks between the displaymath block and here. **This should be bold**. *This should be italic.*
+
+The following is a displaymath with an aligned environment in a separate paragraph (preceded with, and followed by, two blank lines), with identifier `matheqn1`. It should automatically be wrapped with the `aligned` environment.
+
+
+```math {#matheqn1}
+\tag{BIGLABEL}
+    \mbox{minimize}\quad & \fx = \max_{i=1,\ldots,m} (a_i^T x + b_i) \\
+    & \|x\|_2 \le \sigma.
+```
+
+
+```math_def
+\renewcommand{\fx}{f(x)}
+```
+
+Here is an implicit align math environment consisting of multiple lines of equations with no newline in between, with at least one `&` symbol in the whole expression. It should be in the same paragraph as this one.
+
+```math
+      \sum_{j_1, j_2, \ldots j_m} \sum_{k_1, k_2, \ldots, k_m} & \widetilde{A}_{j_1,k_1}^{\ast} \widetilde{A}_{j_1,k_2} \tilde{A}_{j_2,k_2}^{\ast} \widetilde{A}_{j_2,k_3}  \ldots \widetilde{A}_{j_m,k_m}^{\ast} \widetilde{A}_{j_m,k_1}
+```  
+```math #middleAlignMathNumber
+     =   \sum_{j_1, j_2, \ldots j_m} \sum_{k_1, k_2, \ldots, k_m} & \left(  R_{\Lambda} T_{k_1}^{\ast} P_{\Omega} T_{j_1} R_{\Lambda}^{\ast} \right) \left(  R_{\Lambda} T_{j_1}^{\ast} P_{\Omega} T_{k_2} R_{\Lambda}^{\ast} \right)   \left(  R_{\Lambda} T_{k_2}^{\ast} P_{\Omega} T_{j_2} R_{\Lambda}^{\ast} \right)
+```
+```math
+     & \left(  R_{\Lambda} T_{j_2}^{\ast} P_{\Omega} T_{k_3} R_{\Lambda}^{\ast} \right) \ldots \left(  R_{\Lambda} T_{k_m}^{\ast} P_{\Omega} T_{j_m} R_{\Lambda}^{\ast} \right) \left(  R_{\Lambda} T_{j_m}^{\ast} P_{\Omega} T_{k_1} R_{\Lambda}^{\ast} \right).
+```
+
+And here is an implicit gather math environment consisting of multiple lines of equations with no newline in between, with `&` symbol not appearing in every statement:
+
+```math  {#firstGatherMathNumber}
+    \left.\begin{aligned}
+    B'&=-\partial\times E\\
+    E'&=\partial\times B - 4\pi j
+    \end{aligned}
+    \right\} \quad \textsf{Maxwell's equations}
+```
+```math {#secondGatherMathNumber}
+A = B
+```
+```math {#thirdgathernumber}
+AAAAAAA = BBBBBB
+```
+
+
+Single math equations that have line-breaks (the `\\` command) are automatically wrapped in a `split` environment. If alignment commands (symbol `&`) also exist, they get wrapped in an `aligned` environment instead. This behaviour can be disabled using the `math_plain` environment:
+
+```math
+y = ax \\
+f = kg^{-1}
+```
+
+```math
+y &= ax \\
+f &= kg^{-1}
+```
+
+The following has an ampersand and line breaks in comma, but is actually a single-line equation that should be untouched:
+
+```math
+|y|\ \&\ |x| % an & and \\ that should be ignored
+= 99\% z    % an & and \\ that should be ignored
+```
+Below is more internal vertical alignment tests. The first is one that uses `cases` internally:
+```math
+    #matheqn2
+    P_{r-j}=\begin{cases}
+    0& \ensuremath\text{if $r-j$ is odd},\\
+    r!\,(-1)^{(r-j)/2}& \text{if $r-j$ is even},
+    \end{cases}
+```
+and another one that uses `aligned` internally.
+```math #matheqn3
+    \left.\begin{aligned}
+    B'&=-\partial\times E\\
+    E'&=\partial\times B - 4\pi j
+    \end{aligned}
+    \right\}
+    \qquad \text{Maxwell's equations}
+```
+
+
+### Math and lists
+
+
+Here's a list with both inline and display math environments:
+
+- Item 1 is a famous item
+- Item 2 with a `code block` and ``\mathsf{\text{inline math}}`` with equation ``\mathbf{y=Ax}``
+- Item 3
+    - Indented item 4
+    - Indented item 5, followed by display math, which cannot be indented:  
+```math
+\mathbf{F_1 = m_1a}
+```
+      with some text below
+    - Indented item 6, which does not recognize list-item display math surrounded by one additional blank line:
+
+```math
+\mathbf{F_2 = m_2a}
+```
+
+      without breaking this text out of the list and into a pre block
+- Item 4
+    1. Numerical Item 1
+    2. Numerical item 2
+
+
+## Scholarly X-refs
+
+### References to figures
+
+This line refers to Figure [#figure2].
+
+This line refers to Figure 2.
+
+This line refers to subfigure (#reginfig3).
+
+### References to equations
+
+This line refers to Equation (#matheqn3).
+
+Referencing using the `\ref` tag: Equation [#matheqn1].
+
+Referencing using the `\eqref` tag: Equation (#middleAlignMathNumber).
+
+### Automatic non-breaking spaces
+
+Any cross-references (such as Equation [#middleAlignMathNumber]) will
+automatically be prepended with non-breaking spaces.
+
+Unless, they appear in a list like equations [#matheqn1], [#matheqn2],
+[#matheqn3], and [#middleAlignMathNumber].
+
+## ScholarlyMarkdown Figures
+
+
+### Images with attributes
+
+The following will be a bunch of figures with attributes:
+![Regular link with attributes](lunar_orbit.jpg){#reglink width=20%}
+![Reference link with attributes][lunarorbit]{#reflink width=20%}
+Which should all show fine and display a picture with a baby seal.
+
+[lunarorbit]: lunar_orbit.jpg
+
+Below is more text so that the css doesn't end abruptly! Now we'll have an explicit Scholarly Figure environment!
+
+### ScholarlyMarkdown figure/multifigures
+
+#### Figure: this text is completely ignored {#figure0}
+![](lunar_orbit.jpg){width=50%}
+: Single-image figure. You can also have citations inside captions [@Gill].
+
+#### Figure: this text is completely ignored {#figure1}
+![sub](lunar_orbit.jpg){#reginfig1 width=20%}
+![subfig](lunar_orbit.jpg){width=same}
+![longer subcaption that flows](lunar_orbit.jpg){#reginfig3 width=same}
+: Reference link in its own paragraph and long caption Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. 
+
+#### Figure: everything until the attribute block is ignored {#figure2 .wide}
+![fdsaf](lunar_orbit.jpg){#reginfig4 width=40%}
+![woogawooga](lunar_orbit.jpg){#reginfig5 width=30%}
+Reference link in its own paragraph and long caption Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. 
+
+## ScholarlyMarkdown Algorithms
+
+Here are some algorithms using various methods. The "most canonical one" is currently just using a line-block:
+
+#### Algorithm: Gauss-sidel using line blocks {#alg:gs}
+| ` 1.` **Inputs**: variables ``A, b``
+| ` 2.` **Output**: ``\phi``                `//this is a comment`
+| 
+| ` 3.` Choose an initial guess ``\phi`` to the solution
+| ` 4.`  **repeat** until convergence
+| ` 5.`    **for** ``i`` **from** 1 **until** ``n`` **do**
+| ` 6.`        ``\sigma \leftarrow 0``
+| ` 7.`        **for** ``j`` **from** 1 **until** ``n`` **do**
+| ` 8.`            **if** ``j \ne i`` **then**
+| ` 9.`               ``\sigma \leftarrow \sigma + a_{ij} \phi_j``
+| `10.`            **end if**
+| `11.`        **end** (``j``-loop)
+| `12.`        ``\phi_i \leftarrow \frac 1 {a_{ii}} (b_i - \sigma)``
+| `13.`    **end** (``i``-loop)
+| `14.`    check if convergence is reached
+| `15.` **end** (repeat)
+
+: caption for this algorithm
+
+#### Algorithm: Gauss-sidel using `line-blocks` {#alg:gs2}
+
+|  **Inputs**: variables ``A, b``
+|  **Output**: ``\phi``
+| 
+|  Choose an initial guess ``\phi`` to the solution
+|  **repeat** until convergence
+|       **for** ``i`` from 1 to ``n`` **do**
+|           ``\sigma \leftarrow 0``
+|           **for** ``j`` from 1 to ``n`` **do**
+|                **if** ``j \ne i`` **then**
+|                     ``\sigma \leftarrow \sigma + a_{ij} \phi_j``
+|                **end if**
+|           **end** (``j``-loop)
+|           ``\phi_i \leftarrow \frac 1 {a_{ii}} (b_i - \sigma)``
+|       **end** (``i``-loop)
+|       check if convergence is reached
+|  **end** (repeat)
+
+The should not be a caption
+
+#### Algorithm: Gauss-sidel using `line-blocks` {#alg:gs3}
+
+|  **Inputs**: variables ``A, b``
+|  **Output**: ``\phi``
+| 
+|  Choose an initial guess ``\phi`` to the solution
+|  **repeat** until convergence
+|       **for** ``i`` from 1 to ``n`` **do**
+|           ``\sigma \leftarrow 0``
+|           **for** ``j`` from 1 to ``n`` **do**
+|                **if** ``j \ne i`` **then**
+|                     ``\sigma \leftarrow \sigma + a_{ij} \phi_j``
+|                **end if**
+|           **end** (``j``-loop)
+|           ``\phi_i \leftarrow \frac 1 {a_{ii}} (b_i - \sigma)``
+|       **end** (``i``-loop)
+|       check if convergence is reached
+|  **end** (repeat)
+This should should be a caption
+
+## Abstract:
+
+This is the abstract! It should show up at the beginning of the page.
+
+## ScholarlyMarkdown Tables
+
+### Standard Pandoc tables
+
+The following is a normal Pandoc table
+
+| Right | Left | Default | Center |
+|------:|:-----|---------|:------:|
+|   12  |  12  |    12   |    12  |
+|  123  |  123 |   123   |   123  |
+|    1  |    1 |     1   |     1  |
+
+Table: Thisis a caption
+
+This should not be a caption
+
+### Scholarly tables
+
+The following is a floated ScholMD table
+
+#### Table: example ScholMD table {#tab:exscholmd}
+
+| Right | Left | Default | Center |
+|------:|:-----|---------|:------:|
+|   12  |  12  |    12   |    12  |
+|  123  |  123 |   123   |   123  |
+|    1  |    1 |     1   |     1  |
+
+:   This is a really really really really really
+    really really really really really really really
+    really really really really really really really really
+    really really really really really really really long caption
+
+## ScholarlyMarkdown Code blocks
+
+### Standard Pandoc code blocks
+
+#### fenced blocks
+
+```
+Value   <- [0-9.]+ / '(' Expr ')'
+Product <- Expr (('*' / '/') Expr)*
+Sum     <- Expr (('+' / '-') Expr)*
+Expr    <- Product / Sum / Value
+```
+
+#### indented blocks
+
+    Value   <- [0-9.]+ / '(' Expr ')'
+    Product <- Expr (('*' / '/') Expr)*
+    Sum     <- Expr (('+' / '-') Expr)*
+    Expr    <- Product / Sum / Value
+
+### Scholarly code block floats
+
+#### Code: PEG for calc {#lst:pegcalc}
+
+``` {.c .numberLines startFrom="100"}
+Value   <- [0-9.]+ / '(' Expr ')'
+Product <- Expr (('*' / '/') Expr)*
+Sum     <- Expr (('+' / '-') Expr)*
+Expr    <- Product / Sum / Value
+```
+
+: [Parsing Expression Grammar](http://en.wikipedia.org/wiki/Parsing_expression_grammar) rules for a simple calculator using PEG.
+
+#### Code: PEG for calc {#lst:pegcalc}
+    Value   <- [0-9.]+ / '(' Expr ')'
+    Product <- Expr (('*' / '/') Expr)*
+    Sum     <- Expr (('+' / '-') Expr)*
+    Expr    <- Product / Sum / Value
+[Parsing Expression Grammar](http://en.wikipedia.org/wiki/Parsing_expression_grammar) rules for a simple calculator.
+

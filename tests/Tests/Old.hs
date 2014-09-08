@@ -58,8 +58,8 @@ tests = [ testGroup "markdown"
               "pipe-tables.txt" "pipe-tables.native"
             , test "more" ["-r", "markdown", "-w", "native", "-S"]
               "markdown-reader-more.txt" "markdown-reader-more.native"
-            , test "scholarly-math" ["-r", "markdown_scholarly", "-w", "native"]
-              "scholarly-math.txt" "scholarly-math.native"
+            , test "scholdoc" ["-r", "markdown_scholarly", "-w", "native", "-s", "-S", "-R"]
+              "scholdoc.txt" "scholdoc.native"
             , lhsReaderTest "markdown+lhs"
             ]
           , testGroup "citations"
@@ -78,7 +78,11 @@ tests = [ testGroup "markdown"
             ]
           ]
         , testGroup "latex"
-          [ testGroup "writer" (writerTests "latex" ++ lhsWriterTests "latex")
+          [ testGroup "writer" (writerTests "latex" ++ lhsWriterTests "latex" ++
+            [ test "scholdoc"  ["-r", "markdown_scholarly", "-w", "latex", "-S", "-R",
+                                "--chapters", "--columns=72"]
+              "scholdoc.txt" "scholdoc.latex"
+            ])
           , testGroup "reader"
             [ test "basic" ["-r", "latex", "-w", "native", "-s", "-R"]
               "latex-reader.latex" "latex-reader.native"
@@ -86,7 +90,12 @@ tests = [ testGroup "markdown"
             ]
           ]
         , testGroup "html"
-          [ testGroup "writer" (writerTests "html" ++ lhsWriterTests "html")
+          [ testGroup "writer" (writerTests "html" ++ lhsWriterTests "html" ++
+            [ test "scholdoc"  ["-r", "markdown_scholarly", "-w", "html5", "-S", "-R",
+                                "--template=scholmdTemplate_bodyOnly.html5",
+                                "--no-mathjax-cdn", "--columns=72"]
+              "scholdoc.txt" "scholdoc.html"
+            ])
           , test "reader" ["-r", "html", "-w", "native", "-s"]
             "html-reader.html" "html-reader.native"
           ]
