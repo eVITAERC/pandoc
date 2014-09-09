@@ -1472,17 +1472,33 @@ symbol = do
 
 -- parses inline code, between n `s and n `s
 -- but ignores exactly 2 `s AND NOT followed by whitespace if Ext_scholarly_markdown
+-- ignores beginning and trailing spaces except in Scholarly Lineblocks
 code :: MarkdownParser (F Inlines)
 code = try $ do
   starts <- many1 (char '`')
+  codeSkipSpace
   result <- many1Till (many1 (noneOf "`\n") <|> many1 (char '`') <|>
                        (char '\n' >> notFollowedBy' blankline >> return " "))
-                      (try (count (length starts) (char '`') >>
+                      (try (codeSkipSpace >> count (length starts) (char '`') >>
                       notFollowedBy (char '`')))
   attr <- option ([],[],[]) (try $ guardEnabled Ext_inline_code_attributes >>
                                    optional whitespace >> attributes)
-  return $ return $ B.codeWith attr $ concat result
+  resultStr <- codeTrim $ concat result
+  return $ return $ B.codeWith attr resultStr
 
+codeSkipSpace :: MarkdownParser ()
+codeSkipSpace = do
+  st <- getState
+  case stateKeepSpacing st of
+    True -> return ()
+    False -> skipSpaces
+
+codeTrim :: [Char] -> MarkdownParser [Char]
+codeTrim codeStr = do
+  st <- getState
+  case stateKeepSpacing st of
+    True -> return codeStr
+    False -> return $ trim codeStr
 
 -- Parses plain inline or display math without additional attributes
 math :: MarkdownParser (F Inlines)

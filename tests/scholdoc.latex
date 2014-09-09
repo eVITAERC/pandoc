@@ -6,7 +6,7 @@ blocks}\label{math-as-fenced-code-blocks}
 
 This is a line of text with a \texttt{simple code block} in it.
 
-\texttt{ `this should be just a `normal` inline code block surrounded by literal backticks` }
+\texttt{`this should be just a `normal` inline code block surrounded by literal backticks`}
 
 This is another line of text. Here should be some math:
 $\mathbf{F = ma}<2\mathbf{ma}$. There should be some displaymath
