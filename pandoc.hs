@@ -1110,7 +1110,7 @@ main = do
                     _       -> (Nothing, True)
        else (templatePath, standalone')
 
-  let mathJaxCDNaddr = "http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML-full"
+  let mathJaxCDNaddr = "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML-full"
 
   let checkMathJaxCDN (MathJax "") = if useMathJaxCDN
                                         then MathJax mathJaxCDNaddr

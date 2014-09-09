@@ -313,7 +313,18 @@ yamlToMetaString _ = MetaString ""
 -- List of meta keys to treat as pure strings
 yamlStringKeys :: Text -> Bool
 yamlStringKeys t = (T.unpack t) `elem`
-                      ["bibliography"]
+                      ["bibliography"
+                      ,"csl"
+                      ,"before-documentclass-includes"
+                      ,"before-packages-includes"
+                      ,"geometry"
+                      ,"biblio-style"
+                      ,"natbib-options"
+                      ,"biblatex-options"
+                      ,"math-macros"
+                      ,"header-includes"
+                      ,"after-body-includes"
+                      ]
 
 stopLine :: MarkdownParser ()
 stopLine = try $ (string "---" <|> string "...") >> blankline >> return ()
