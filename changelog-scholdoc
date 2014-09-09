@@ -7,17 +7,31 @@ Scholdoc follows semantic versioning with regards to output schema.
 
 ## In development
 
+
+## 0.1.2-alpha - 2014-09-09
+
 ### Added
-- Allow rudimentry Docx output, although most Scholmd elements map to empty
+- Allow rudimentary Docx output, although most Scholmd elements map to empty
 
 ### Changed
 - The program name is changed from `scholpandoc` to `scholdoc` to more accurately reflect the limited input/output options compared to Pandoc.
 
 #### HTML output
 - Uses HTTPS instead of protocol-relative URLs for default polyfills in the template from CDNJS. This will make previewing local HTML files much easier.
+    - Default MathJax CDN URL is also changed to the HTTPS protocol
+- Added an additional variable `html-header-includes` for inclusion of HTML-specific header tags. This can be specified in YAML metadata blocks, and will be treated as an unformatted string.
 
 #### LaTeX output
-- Added `indentparagraphs` variable to template, so you can change between "no indent/line-heigt paragraph margins" and "indent/no paragraph margins"
+- Added `indentparagraphs` variable to template, so you can change between "no indent/line-height paragraph margins" and "indent/no paragraph margins"
+- Added variables `natbib-options` and `biblatex-options` to specify loading options for these citation packages
+- Added additional variables to the template for more flexibility in "injection" of custom LaTeX code without resorting to a separate template:
+    - `latex-before-documentclass-includes`
+    - `latex-before-packages-includes`
+    - `latex-after-packages-includes`
+    - `latex-header-includes`
+    - `latex-after-body-includes`
+    - `latex-after-document-includes`
+- *All the above variable can be specified in YAML metadata blocks, and will be treated as unformatted strings (along with `geometry`)*
 
 ## 0.1.1-alpha - 2014-05-30
 
