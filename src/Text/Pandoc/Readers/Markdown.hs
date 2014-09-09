@@ -313,17 +313,20 @@ yamlToMetaString _ = MetaString ""
 -- List of meta keys to treat as pure strings
 yamlStringKeys :: Text -> Bool
 yamlStringKeys t = (T.unpack t) `elem`
-                      ["bibliography"
-                      ,"csl"
-                      ,"before-documentclass-includes"
-                      ,"before-packages-includes"
-                      ,"geometry"
-                      ,"biblio-style"
-                      ,"natbib-options"
-                      ,"biblatex-options"
-                      ,"math-macros"
-                      ,"header-includes"
-                      ,"after-body-includes"
+                      [ "bibliography"
+                      , "math-macros"
+                      , "csl"
+                      , "geometry"
+                      , "biblio-style"
+                      , "natbib-options"
+                      , "biblatex-options"
+                      , "latex-before-documentclass-includes"
+                      , "latex-before-packages-includes"
+                      , "latex-after-packages-includes"
+                      , "latex-after-body-includes"
+                      , "latex-after-document-includes"
+                      , "latex-header-includes"
+                      , "html-header-includes"
                       ]
 
 stopLine :: MarkdownParser ()
