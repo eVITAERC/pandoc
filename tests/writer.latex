@@ -730,7 +730,11 @@ Ellipses\ldots{}and\ldots{}and\ldots{}.
   $p$-Tree
 \item
   Here's some display math:
-  \[\frac{d}{dx}f(x)=\lim_{h\to 0}\frac{f(x+h)-f(x)}{h}\]
+  %
+  \begin{equation*}
+  \frac{d}{dx}f(x)=\lim_{h\to 0}\frac{f(x+h)-f(x)}{h}
+  \end{equation*}
+  %
 \item
   Here's one that has a line break in it: $\alpha + \omega \times x^2$.
 \end{itemize}
@@ -917,13 +921,13 @@ or here: <http://example.com/>
 
 From ``Voyage dans la Lune'' by Georges Melies (1902):
 
-\begin{figure}[htbp]
+\begin{figure}
 \centering
-\includegraphics{lalune.jpg}
-\caption{lalune}
+\includegraphics[]{lalune.jpg}
+\caption*{lalune}
 \end{figure}
 
-Here is a movie \includegraphics{movie.jpg} icon.
+Here is a movie \includegraphics[]{movie.jpg} icon.
 
 \begin{center}\rule{3in}{0.4pt}\end{center}
 
