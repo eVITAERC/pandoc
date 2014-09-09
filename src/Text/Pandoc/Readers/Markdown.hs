@@ -345,12 +345,24 @@ parseMarkdown = do
   blocks <- parseBlocks
   st <- getState
   let meta = runF (stateMeta' st) st
-  let meta' = B.setMeta "latexMacrosForMath" (MetaString $ stateMathDefs st) $
-              B.setMeta "identifiersForMath"
-                (map (\x -> MetaString x) $ idsForMath $ stateXRefIdents st) $
-              meta
+  meta' <- addScholarlyMeta meta
   let Pandoc _ bs = B.doc $ runF blocks st
   return $ Pandoc meta' bs
+
+addScholarlyMeta :: Meta -> MarkdownParser Meta
+addScholarlyMeta meta = do
+  st <- getState
+  exts <- getOption readerExtensions
+  let setMacros = if (not $ null $ stateMathDefs st)
+                   then B.setMeta "latexMacrosForMath" (MetaString $ stateMathDefs st)
+                   else id
+  let setMathIds = if (not $ null $ idsForMath $ stateXRefIdents st)
+                    then B.setMeta "identifiersForMath"
+                          (map (\x -> MetaString x) $ idsForMath $ stateXRefIdents st)
+                    else id
+  case (Set.member Ext_scholarly_markdown exts) of
+        True -> return $ setMacros . setMathIds $ meta
+        False -> return meta
 
 addWarning :: Maybe SourcePos -> String -> MarkdownParser ()
 addWarning mbpos msg =
