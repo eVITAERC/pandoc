@@ -1,0 +1,334 @@
+<div class="math scholmd-math-definitions" style="visibility: hidden; height: 0px; width 0px;">\[
+\renewcommand{\fx}{f(x)}
+\]</div>
+<header>
+<h1 class="scholmd-title">ScholarlyMarkdown: a Markdown-compatible plaintext format for academic communication</h1>
+<div class="scholmd-author">
+Tim T.Y. Lin
+</div>
+<div class="scholmd-date">January 1, 2000</div>
+</header>
+<div class="scholmd-abstract">
+<h2 class="scholmd-abstract-title">Abstract</h2>
+<p>This is the abstract! It should show up at the beginning of the page.</p>
+</div>
+<h2 id="scholarlymarkdown-math-support">ScholarlyMarkdown math support</h2>
+<h3 id="math-as-fenced-code-blocks">Math as (fenced) code blocks</h3>
+<p>This is a line of text with a <code>simple code block</code> in it.</p>
+<p><code>`this should be just a `normal` inline code block surrounded by literal backticks`</code></p>
+<p>This is another line of text. Here should be some math: <span class="math scholmd-math-inline">\(\mathbf{F = ma}&lt;2\mathbf{ma}\)</span>. There should be some displaymath environment on the following line 
+<span class="math scholmd-math-display" style="display: block;">\[
+\begin{equation*}
+    \mathbf{F = ma} &lt; 2\mathbf{ma}
+\end{equation*}
+\]</span>
+ and there should be no line breaks between the displaymath block and here. <strong>This should be bold</strong>. <em>This should be italic.</em></p>
+<p>The following is a displaymath with an aligned environment in a separate paragraph (preceded with, and followed by, two blank lines), with identifier <code>matheqn1</code>. It should automatically be wrapped with the <code>aligned</code> environment.</p>
+<p>
+<span class="math scholmd-math-display" style="display: block;">\[
+\begin{equation}
+\label{matheqn1}
+\begin{aligned}
+\tag{BIGLABEL}
+    \mbox{minimize}\quad &amp; \fx = \max_{i=1,\ldots,m} (a_i^T x + b_i) \\
+    &amp; \|x\|_2 \le \sigma.
+\end{aligned}
+\end{equation}
+\]</span>
+</p>
+<p></p>
+<p>Here is an implicit align math environment consisting of multiple lines of equations with no newline in between, with at least one <code>&amp;</code> symbol in the whole expression. It should be in the same paragraph as this one. 
+<span class="math scholmd-math-display" style="display: block;">\[
+\begin{align}
+\nonumber \sum_{j_1, j_2, \ldots j_m} \sum_{k_1, k_2, \ldots, k_m} &amp; \widetilde{A}_{j_1,k_1}^{\ast} \widetilde{A}_{j_1,k_2} \tilde{A}_{j_2,k_2}^{\ast} \widetilde{A}_{j_2,k_3}  \ldots \widetilde{A}_{j_m,k_m}^{\ast} \widetilde{A}_{j_m,k_1}\\
+\label{middleAlignMathNumber} =   \sum_{j_1, j_2, \ldots j_m} \sum_{k_1, k_2, \ldots, k_m} &amp; \left(  R_{\Lambda} T_{k_1}^{\ast} P_{\Omega} T_{j_1} R_{\Lambda}^{\ast} \right) \left(  R_{\Lambda} T_{j_1}^{\ast} P_{\Omega} T_{k_2} R_{\Lambda}^{\ast} \right)   \left(  R_{\Lambda} T_{k_2}^{\ast} P_{\Omega} T_{j_2} R_{\Lambda}^{\ast} \right)\\
+\nonumber &amp; \left(  R_{\Lambda} T_{j_2}^{\ast} P_{\Omega} T_{k_3} R_{\Lambda}^{\ast} \right) \ldots \left(  R_{\Lambda} T_{k_m}^{\ast} P_{\Omega} T_{j_m} R_{\Lambda}^{\ast} \right) \left(  R_{\Lambda} T_{j_m}^{\ast} P_{\Omega} T_{k_1} R_{\Lambda}^{\ast} \right).
+\end{align}
+\]</span>
+ And here is an implicit gather math environment consisting of multiple lines of equations with no newline in between, with <code>&amp;</code> symbol not appearing in every statement: 
+<span class="math scholmd-math-display" style="display: block;">\[
+\begin{gather}
+\label{firstGatherMathNumber} \left.\begin{aligned}
+    B&#39;&amp;=-\partial\times E\\
+    E&#39;&amp;=\partial\times B - 4\pi j
+    \end{aligned}
+    \right\} \quad \textsf{Maxwell&#39;s equations}\\
+\label{secondGatherMathNumber} A = B\\
+\label{thirdgathernumber} AAAAAAA = BBBBBB
+\end{gather}
+\]</span>
+</p>
+<p>Single math equations that have line-breaks (the <code>\\</code> command) are automatically wrapped in a <code>split</code> environment. If alignment commands (symbol <code>&amp;</code>) also exist, they get wrapped in an <code>aligned</code> environment instead. This behaviour can be disabled using the <code>math_plain</code> environment: 
+<span class="math scholmd-math-display" style="display: block;">\[
+\begin{equation*}
+\begin{split}
+y = ax \\
+f = kg^{-1}
+\end{split}
+\end{equation*}
+\]</span>
+ 
+<span class="math scholmd-math-display" style="display: block;">\[
+\begin{equation*}
+\begin{aligned}
+y &amp;= ax \\
+f &amp;= kg^{-1}
+\end{aligned}
+\end{equation*}
+\]</span>
+ The following has an ampersand and line breaks in comma, but is actually a single-line equation that should be untouched: 
+<span class="math scholmd-math-display" style="display: block;">\[
+\begin{equation*}
+|y|\ \&amp;\ |x| % an &amp; and \\ that should be ignored
+= 99\% z    % an &amp; and \\ that should be ignored
+\end{equation*}
+\]</span>
+ Below is more internal vertical alignment tests. The first is one that uses <code>cases</code> internally: 
+<span class="math scholmd-math-display" style="display: block;">\[
+\begin{equation}
+\label{matheqn2}
+    P_{r-j}=\begin{cases}
+    0&amp; \ensuremath\text{if $r-j$ is odd},\\
+    r!\,(-1)^{(r-j)/2}&amp; \text{if $r-j$ is even},
+    \end{cases}
+\end{equation}
+\]</span>
+ and another one that uses <code>aligned</code> internally. 
+<span class="math scholmd-math-display" style="display: block;">\[
+\begin{equation}
+\label{matheqn3}
+    \left.\begin{aligned}
+    B&#39;&amp;=-\partial\times E\\
+    E&#39;&amp;=\partial\times B - 4\pi j
+    \end{aligned}
+    \right\}
+    \qquad \text{Maxwell&#39;s equations}
+\end{equation}
+\]</span>
+</p>
+<h3 id="math-and-lists">Math and lists</h3>
+<p>Here’s a list with both inline and display math environments:</p>
+<ul>
+<li>Item 1 is a famous item</li>
+<li>Item 2 with a <code>code block</code> and <span class="math scholmd-math-inline">\(\mathsf{\text{inline math}}\)</span> with equation <span class="math scholmd-math-inline">\(\mathbf{y=Ax}\)</span></li>
+<li>Item 3
+<ul>
+<li>Indented item 4</li>
+<li>Indented item 5, followed by display math, which cannot be indented: 
+<span class="math scholmd-math-display" style="display: block;">\[
+\begin{equation*}
+\mathbf{F_1 = m_1a}
+\end{equation*}
+\]</span>
+ with some text below</li>
+<li>Indented item 6, which does not recognize list-item display math surrounded by one additional blank line:</li>
+</ul></li>
+</ul>
+<p>
+<span class="math scholmd-math-display" style="display: block;">\[
+\begin{equation*}
+\mathbf{F_2 = m_2a}
+\end{equation*}
+\]</span>
+</p>
+<pre><code>  without breaking this text out of the list and into a pre block</code></pre>
+<ul>
+<li>Item 4
+<ol type="1">
+<li>Numerical Item 1</li>
+<li>Numerical item 2</li>
+</ol></li>
+</ul>
+<h2 id="scholarly-x-refs">Scholarly X-refs</h2>
+<h3 id="references-to-figures">References to figures</h3>
+<p>This line refers to Figure <span class="scholmd-crossref"><a href="#figure2">3</a></span>.</p>
+<p>This line refers to Figure 2.</p>
+<p>This line refers to subfigure <span class="scholmd-crossref"><a href="#reginfig3">(2c)</a></span>.</p>
+<h3 id="references-to-equations">References to equations</h3>
+<p>This line refers to Equation <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\eqref{matheqn3}\)</span></span>.</p>
+<p>Referencing using the <code>\ref</code> tag: Equation <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\ref{matheqn1}\)</span></span>.</p>
+<p>Referencing using the <code>\eqref</code> tag: Equation <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\eqref{middleAlignMathNumber}\)</span></span>.</p>
+<h3 id="automatic-non-breaking-spaces">Automatic non-breaking spaces</h3>
+<p>Any cross-references (such as Equation <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\ref{middleAlignMathNumber}\)</span></span>) will automatically be prepended with non-breaking spaces.</p>
+<p>Unless, they appear in a list like equations <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\ref{matheqn1}\)</span></span>, <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\ref{matheqn2}\)</span></span>, <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\ref{matheqn3}\)</span></span>, and <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\ref{middleAlignMathNumber}\)</span></span>.</p>
+<h2 id="scholarlymarkdown-figures">ScholarlyMarkdown Figures</h2>
+<h3 id="images-with-attributes">Images with attributes</h3>
+<p>The following will be a bunch of figures with attributes: <img src="lunar_orbit.jpg" alt="Regular link with attributes" id="reglink" width="20%" /> <img src="lunar_orbit.jpg" alt="Reference link with attributes" id="reflink" width="20%" /> Which should all show fine and display a picture with a baby seal.</p>
+<p>Below is more text so that the css doesn’t end abruptly! Now we’ll have an explicit Scholarly Figure environment!</p>
+<h3 id="scholarlymarkdown-figuremultifigures">ScholarlyMarkdown figure/multifigures</h3>
+<figure class="scholmd-float scholmd-figure" id="figure0">
+<div class="scholmd-float-content"><figure class="scholmd-subfig" style="display: inline-block; width: 50%">
+<img src="lunar_orbit.jpg" />
+</figure></div>
+<div class="scholmd-float-caption"><figcaption><span class="scholmd-caption-head"><span class="scholmd-caption-head-prefix">Figure</span><span class="scholmd-caption-head-label">1</span></span><span class="scholmd-caption-text">Single-image figure. You can also have citations inside captions <span class="scholmd-citation" data-cites="Gill">[@Gill]</span>.</span></figcaption></div>
+</figure>
+<figure class="scholmd-float scholmd-figure" id="figure1">
+<div class="scholmd-float-content"><figure class="scholmd-subfig" id="reginfig1" style="display: inline-block; width: 20%">
+<img src="lunar_orbit.jpg" />
+<div class="scholmd-float-subcaption"><figcaption><span class="scholmd-caption-head"><span class="scholmd-caption-head-prefix"></span><span class="scholmd-caption-head-label">(a)</span></span><span class="scholmd-caption-text">sub</span></figcaption></div>
+</figure><figure class="scholmd-subfig" style="display: inline-block; width: 20%">
+<img src="lunar_orbit.jpg" />
+<div class="scholmd-float-subcaption"><figcaption><span class="scholmd-caption-head"><span class="scholmd-caption-head-prefix"></span><span class="scholmd-caption-head-label">(b)</span></span><span class="scholmd-caption-text">subfig</span></figcaption></div>
+</figure><figure class="scholmd-subfig" id="reginfig3" style="display: inline-block; width: 20%">
+<img src="lunar_orbit.jpg" />
+<div class="scholmd-float-subcaption"><figcaption><span class="scholmd-caption-head"><span class="scholmd-caption-head-prefix"></span><span class="scholmd-caption-head-label">(c)</span></span><span class="scholmd-caption-text">longer subcaption that flows</span></figcaption></div>
+</figure></div>
+<div class="scholmd-float-caption"><figcaption><span class="scholmd-caption-head"><span class="scholmd-caption-head-prefix">Figure</span><span class="scholmd-caption-head-label">2</span></span><span class="scholmd-caption-text">Reference link in its own paragraph and long caption Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.</span></figcaption></div>
+</figure>
+<figure class="scholmd-float scholmd-figure scholmd-widefloat" id="figure2">
+<div class="scholmd-float-content"><figure class="scholmd-subfig" id="reginfig4" style="display: inline-block; width: 40%">
+<img src="lunar_orbit.jpg" />
+<div class="scholmd-float-subcaption"><figcaption><span class="scholmd-caption-head"><span class="scholmd-caption-head-prefix"></span><span class="scholmd-caption-head-label">(a)</span></span><span class="scholmd-caption-text">fdsaf</span></figcaption></div>
+</figure><figure class="scholmd-subfig" id="reginfig5" style="display: inline-block; width: 30%">
+<img src="lunar_orbit.jpg" />
+<div class="scholmd-float-subcaption"><figcaption><span class="scholmd-caption-head"><span class="scholmd-caption-head-prefix"></span><span class="scholmd-caption-head-label">(b)</span></span><span class="scholmd-caption-text">woogawooga</span></figcaption></div>
+</figure></div>
+<div class="scholmd-float-caption"><figcaption><span class="scholmd-caption-head"><span class="scholmd-caption-head-prefix">Figure</span><span class="scholmd-caption-head-label">3</span></span><span class="scholmd-caption-text">Reference link in its own paragraph and long caption Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.</span></figcaption></div>
+</figure>
+<h2 id="scholarlymarkdown-algorithms">ScholarlyMarkdown Algorithms</h2>
+<p>Here are some algorithms using various methods. The “most canonical one” is currently just using a line-block:</p>
+<figure class="scholmd-float scholmd-algorithm" id="alg:gs">
+<div class="scholmd-float-content"><p><code> 1.</code> <strong>Inputs</strong>: variables <span class="math scholmd-math-inline">\(A, b\)</span><br /><code> 2.</code> <strong>Output</strong>: <span class="math scholmd-math-inline">\(\phi\)</span>                <code>//this is a comment</code></p>
+<p><code> 3.</code> Choose an initial guess <span class="math scholmd-math-inline">\(\phi\)</span> to the solution<br /><code> 4.</code>  <strong>repeat</strong> until convergence<br /><code> 5.</code>    <strong>for</strong> <span class="math scholmd-math-inline">\(i\)</span> <strong>from</strong> 1 <strong>until</strong> <span class="math scholmd-math-inline">\(n\)</span> <strong>do</strong><br /><code> 6.</code>        <span class="math scholmd-math-inline">\(\sigma \leftarrow 0\)</span><br /><code> 7.</code>        <strong>for</strong> <span class="math scholmd-math-inline">\(j\)</span> <strong>from</strong> 1 <strong>until</strong> <span class="math scholmd-math-inline">\(n\)</span> <strong>do</strong><br /><code> 8.</code>            <strong>if</strong> <span class="math scholmd-math-inline">\(j \ne i\)</span> <strong>then</strong><br /><code> 9.</code>               <span class="math scholmd-math-inline">\(\sigma \leftarrow \sigma + a_{ij} \phi_j\)</span><br /><code>10.</code>            <strong>end if</strong><br /><code>11.</code>        <strong>end</strong> (<span class="math scholmd-math-inline">\(j\)</span>-loop)<br /><code>12.</code>        <span class="math scholmd-math-inline">\(\phi_i \leftarrow \frac 1 {a_{ii}} (b_i - \sigma)\)</span><br /><code>13.</code>    <strong>end</strong> (<span class="math scholmd-math-inline">\(i\)</span>-loop)<br /><code>14.</code>    check if convergence is reached<br /><code>15.</code> <strong>end</strong> (repeat)</p></div>
+<div class="scholmd-float-caption"><figcaption><span class="scholmd-caption-head"><span class="scholmd-caption-head-prefix">Algorithm</span><span class="scholmd-caption-head-label">1</span></span><span class="scholmd-caption-text">caption for this algorithm</span></figcaption></div>
+</figure>
+<figure class="scholmd-float scholmd-algorithm" id="alg:gs2">
+<div class="scholmd-float-content"><p> <strong>Inputs</strong>: variables <span class="math scholmd-math-inline">\(A, b\)</span><br /> <strong>Output</strong>: <span class="math scholmd-math-inline">\(\phi\)</span></p>
+<p> Choose an initial guess <span class="math scholmd-math-inline">\(\phi\)</span> to the solution<br /> <strong>repeat</strong> until convergence<br />      <strong>for</strong> <span class="math scholmd-math-inline">\(i\)</span> from 1 to <span class="math scholmd-math-inline">\(n\)</span> <strong>do</strong><br />          <span class="math scholmd-math-inline">\(\sigma \leftarrow 0\)</span><br />          <strong>for</strong> <span class="math scholmd-math-inline">\(j\)</span> from 1 to <span class="math scholmd-math-inline">\(n\)</span> <strong>do</strong><br />               <strong>if</strong> <span class="math scholmd-math-inline">\(j \ne i\)</span> <strong>then</strong><br />                    <span class="math scholmd-math-inline">\(\sigma \leftarrow \sigma + a_{ij} \phi_j\)</span><br />               <strong>end if</strong><br />          <strong>end</strong> (<span class="math scholmd-math-inline">\(j\)</span>-loop)<br />          <span class="math scholmd-math-inline">\(\phi_i \leftarrow \frac 1 {a_{ii}} (b_i - \sigma)\)</span><br />      <strong>end</strong> (<span class="math scholmd-math-inline">\(i\)</span>-loop)<br />      check if convergence is reached<br /> <strong>end</strong> (repeat)</p></div>
+<div class="scholmd-float-caption"><figcaption><span class="scholmd-caption-head"><span class="scholmd-caption-head-prefix">Algorithm</span><span class="scholmd-caption-head-label">2</span></span></figcaption></div>
+</figure>
+<p>The should not be a caption</p>
+<figure class="scholmd-float scholmd-algorithm" id="alg:gs3">
+<div class="scholmd-float-content"><p> <strong>Inputs</strong>: variables <span class="math scholmd-math-inline">\(A, b\)</span><br /> <strong>Output</strong>: <span class="math scholmd-math-inline">\(\phi\)</span></p>
+<p> Choose an initial guess <span class="math scholmd-math-inline">\(\phi\)</span> to the solution<br /> <strong>repeat</strong> until convergence<br />      <strong>for</strong> <span class="math scholmd-math-inline">\(i\)</span> from 1 to <span class="math scholmd-math-inline">\(n\)</span> <strong>do</strong><br />          <span class="math scholmd-math-inline">\(\sigma \leftarrow 0\)</span><br />          <strong>for</strong> <span class="math scholmd-math-inline">\(j\)</span> from 1 to <span class="math scholmd-math-inline">\(n\)</span> <strong>do</strong><br />               <strong>if</strong> <span class="math scholmd-math-inline">\(j \ne i\)</span> <strong>then</strong><br />                    <span class="math scholmd-math-inline">\(\sigma \leftarrow \sigma + a_{ij} \phi_j\)</span><br />               <strong>end if</strong><br />          <strong>end</strong> (<span class="math scholmd-math-inline">\(j\)</span>-loop)<br />          <span class="math scholmd-math-inline">\(\phi_i \leftarrow \frac 1 {a_{ii}} (b_i - \sigma)\)</span><br />      <strong>end</strong> (<span class="math scholmd-math-inline">\(i\)</span>-loop)<br />      check if convergence is reached<br /> <strong>end</strong> (repeat)</p></div>
+<div class="scholmd-float-caption"><figcaption><span class="scholmd-caption-head"><span class="scholmd-caption-head-prefix">Algorithm</span><span class="scholmd-caption-head-label">3</span></span><span class="scholmd-caption-text">This should should be a caption</span></figcaption></div>
+</figure>
+<h2 id="scholarlymarkdown-tables">ScholarlyMarkdown Tables</h2>
+<h3 id="standard-pandoc-tables">Standard Pandoc tables</h3>
+<p>The following is a normal Pandoc table</p>
+<table>
+<caption>Thisis a caption</caption>
+<thead>
+<tr class="header">
+<th style="text-align: right;">Right</th>
+<th style="text-align: left;">Left</th>
+<th style="text-align: left;">Default</th>
+<th style="text-align: center;">Center</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">12</td>
+<td style="text-align: left;">12</td>
+<td style="text-align: left;">12</td>
+<td style="text-align: center;">12</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">123</td>
+<td style="text-align: left;">123</td>
+<td style="text-align: left;">123</td>
+<td style="text-align: center;">123</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: center;">1</td>
+</tr>
+</tbody>
+</table>
+<p>This should not be a caption</p>
+<h3 id="scholarly-tables">Scholarly tables</h3>
+<p>The following is a floated ScholMD table</p>
+<figure class="scholmd-float scholmd-table-float" id="tab:exscholmd">
+<div class="scholmd-float-content"><table>
+<thead>
+<tr class="header">
+<th style="text-align: right;">Right</th>
+<th style="text-align: left;">Left</th>
+<th style="text-align: left;">Default</th>
+<th style="text-align: center;">Center</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">12</td>
+<td style="text-align: left;">12</td>
+<td style="text-align: left;">12</td>
+<td style="text-align: center;">12</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">123</td>
+<td style="text-align: left;">123</td>
+<td style="text-align: left;">123</td>
+<td style="text-align: center;">123</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: center;">1</td>
+</tr>
+</tbody>
+</table></div>
+<div class="scholmd-float-caption"><figcaption><span class="scholmd-caption-head"><span class="scholmd-caption-head-prefix">Table</span><span class="scholmd-caption-head-label">1</span></span><span class="scholmd-caption-text">This is a really really really really really really really really really really really really really really really really really really really really really really really really really really really long caption</span></figcaption></div>
+</figure>
+<h2 id="scholarlymarkdown-code-blocks">ScholarlyMarkdown Code blocks</h2>
+<h3 id="standard-pandoc-code-blocks">Standard Pandoc code blocks</h3>
+<h4 id="fenced-blocks">fenced blocks</h4>
+<pre><code>Value   &lt;- [0-9.]+ / &#39;(&#39; Expr &#39;)&#39;
+Product &lt;- Expr ((&#39;*&#39; / &#39;/&#39;) Expr)*
+Sum     &lt;- Expr ((&#39;+&#39; / &#39;-&#39;) Expr)*
+Expr    &lt;- Product / Sum / Value</code></pre>
+<h4 id="indented-blocks">indented blocks</h4>
+<pre><code>Value   &lt;- [0-9.]+ / &#39;(&#39; Expr &#39;)&#39;
+Product &lt;- Expr ((&#39;*&#39; / &#39;/&#39;) Expr)*
+Sum     &lt;- Expr ((&#39;+&#39; / &#39;-&#39;) Expr)*
+Expr    &lt;- Product / Sum / Value</code></pre>
+<h3 id="scholarly-code-block-floats">Scholarly code block floats</h3>
+<figure class="scholmd-float scholmd-listing-float" id="lst:pegcalc">
+<div class="scholmd-float-content"><table class="sourceCode c numberLines" startFrom="100"><tr class="sourceCode"><td class="lineNumbers"><pre>100
+101
+102
+103
+</pre></td><td class="sourceCode"><pre><code class="sourceCode c">Value   &lt;- [<span class="dv">0-9</span>.]+ / &#39;(&#39; Expr &#39;)&#39;
+Product &lt;- Expr ((&#39;*&#39; / &#39;/&#39;) Expr)*
+Sum     &lt;- Expr ((&#39;+&#39; / &#39;-&#39;) Expr)*
+Expr    &lt;- Product / Sum / Value</code></pre></td></tr></table></div>
+<div class="scholmd-float-caption"><figcaption><span class="scholmd-caption-head"><span class="scholmd-caption-head-prefix">Listing</span><span class="scholmd-caption-head-label">1</span></span><span class="scholmd-caption-text"><a href="http://en.wikipedia.org/wiki/Parsing_expression_grammar">Parsing Expression Grammar</a> rules for a simple calculator using PEG.</span></figcaption></div>
+</figure>
+<figure class="scholmd-float scholmd-listing-float" id="lst:pegcalc">
+<div class="scholmd-float-content"><pre><code>Value   &lt;- [0-9.]+ / &#39;(&#39; Expr &#39;)&#39;
+Product &lt;- Expr ((&#39;*&#39; / &#39;/&#39;) Expr)*
+Sum     &lt;- Expr ((&#39;+&#39; / &#39;-&#39;) Expr)*
+Expr    &lt;- Product / Sum / Value</code></pre></div>
+<div class="scholmd-float-caption"><figcaption><span class="scholmd-caption-head"><span class="scholmd-caption-head-prefix">Listing</span><span class="scholmd-caption-head-label">2</span></span><span class="scholmd-caption-text"><a href="http://en.wikipedia.org/wiki/Parsing_expression_grammar">Parsing Expression Grammar</a> rules for a simple calculator.</span></figcaption></div>
+</figure>
+
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+      processClass: "math"
+    },
+    TeX: {
+        TagSide: "left",
+        TagIndent: "1.2em",
+        equationNumbers: {
+            autoNumber: "AMS"
+        },
+        Macros: {
+            ensuremath: ["#1",1],
+            textsf: ["\\mathsf{\\text{#1}}",1],
+            texttt: ["\\mathtt{\\text{#1}}",1]
+        }
+    },
+    "HTML-CSS": { 
+        scale: 100,
+        availableFonts: ["TeX"], 
+        preferredFont: "TeX",
+        webFont: "TeX",
+        imageFont: "TeX",
+        EqnChunk: 1000
+    }
+});
+</script>
