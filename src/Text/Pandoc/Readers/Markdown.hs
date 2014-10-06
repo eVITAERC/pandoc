@@ -494,16 +494,13 @@ block = do
   tr <- getOption readerTrace
   pos <- getPosition
   res <- choice [ mempty <$ blanklines
-               , scholarlyCodeBlock
+               , scholarlyFigure -- scholmd floats include code blocks
                , codeBlockFenced
                , yamlMetaBlock
                , guardEnabled Ext_latex_macros *> (macro >>= return . return)
                -- note: bulletList needs to be before header because of
                -- the possibility of empty list items: -
                , bulletList
-               , scholarlyFigure -- scholmd floats start with an ATX header
-               , scholarlyAlgorithm
-               , scholarlyTable
                , scholarlyAbstract
                , header
                , lhsCodeBlock
@@ -2016,20 +2013,6 @@ many1InSeparateLines parser = try $ do
   rest <- many $ try (blankline >> parser)
   return (first:rest)
 
--- float attributes ignore all characters between @'Floatname:'@
--- and a terminating attribute block.
-floatAttribute :: MarkdownParser Attr
-floatAttribute = do
-  manyTill anyChar $ lookAhead (try (optional attributes >> blankline))
-  attr <- option nullAttr attributes
-  return attr
-
--- float captions either start immediately and optionally begins with non-indented @':'@,
--- or is separated by a blank line and must begin with non-indented @':'@
-floatCaptionStart :: MarkdownParser ()
-floatCaptionStart = try (notFollowedBy blankline >> skipNonindentSpaces >> optional (char ':') >> return ())
-                    <|> try (blankline >> skipNonindentSpaces >> char ':' >> return ())
-
 --
 -- Scholarly Markdown math extensions
 --
@@ -2135,16 +2118,58 @@ scholarlyFigure = try $ do
   notFollowedBy $ guardEnabled Ext_fancy_lists >>
                   (char '.' <|> char ')') -- this would be a list
   skipSpaces
-  string "Figure:"
-  attr <- floatAttribute
+  figKeyword <- many1 alphaNum >>~ char ':'
+  attr <- figureAttribute
   blankline >> optional blankline
-  subfigRows <- many1 scholarlySubfigureRow
-  caption <- option mempty (floatCaptionStart >> trimInlinesF . mconcat <$> many1 inline)
+  (figType, attr', content) <- figureContent (map toLower figKeyword) attr
+  caption <- option mempty figureCaption
   blanklines
+  return $ liftM2 (B.figure figType attr' noPrepContent) content caption
+
+-- Figure attributes are defined by a Attr block at the very end of the
+-- @'Figure:'@ header line. The parser should ignore all characters between
+-- @'Figure:'@ and the final Attr block.
+figureAttribute :: MarkdownParser Attr
+figureAttribute = do
+  manyTill anyChar $ lookAhead (try (optional attributes >> blankline))
+  attr <- option nullAttr attributes
+  return attr
+
+-- Figure captions consist of a single inline block/paragraph, are separated by
+-- a blank line from the figure content, and must begin with non-indented
+-- @'Caption:'@. Alternatively, the @'Caption:'@ is optional if the caption
+-- starts on the line immediately after the figure content without a blank line.
+-- As a shortcut, the word @'Caption'@ is optional, a @':'@ symbol alone is enough.
+figureCaption :: MarkdownParser (F Inlines)
+figureCaption =
+  let figureCaptionIdentifier = try (char ':') <|> try (stringAnyCase "caption" >> char ':')
+      figureCaptionStart = try (notFollowedBy blankline >> skipNonindentSpaces
+                                >> optional figureCaptionIdentifier >> return ())
+                       <|> try (blankline >> skipNonindentSpaces
+                                >> figureCaptionIdentifier >> return ())
+  in figureCaptionStart >> (trimInlinesF . mconcat <$> many1 inline)
+
+-- Contents of a figure, chosen based on keyword
+figureContent :: String -> Attr -> MarkdownParser (FigureType, Attr, F Blocks)
+figureContent "figure" = figureWithImages
+figureContent "table" = figureWithTable
+figureContent "algorithm" = figureWithLineBlock
+figureContent "textbox" = figureWithLineBlock
+figureContent "listing" = figureWithCodeBlock
+figureContent "code" = figureWithCodeBlock
+figureContent _ = \_ -> mzero
+
+-- A floating figure containing a grid of images (subfigures), needs special
+-- parsing code because each subfigure has its own identifier and attribute
+figureWithImages :: Attr -> MarkdownParser (FigureType, Attr, F Blocks)
+figureWithImages attr = try $ do
+  subfigRows <- many1 scholarlySubfigureRow
   let allIds = concatMap snd subfigRows
   let figClass = if length allIds == 1 then "singleFigure"
                                        else "multiFigure"
   state <- getState
+  -- image figures need special handling for identifier to numeric label
+  -- conversion, because of more compliocated rules involving subfigures
   let xrefIds = stateXRefIdents state
   -- need to display a numerical id if there is need to refer to subfigs
   -- unless forcibly disabled by class ".nonumber"
@@ -2165,10 +2190,51 @@ scholarlyFigure = try $ do
                     , insertReplaceKeyVal ("subfigIds", show allIds)
                     , insertReplaceKeyValIf needId ("numLabel", show myNumLabel)
                     ]
-  let subfigRows' = map fst subfigRows
-  let attr' = foldr ($) attr attrActions
-  return $ liftM2 (B.figure attr') (sequence subfigRows') caption
+  let subfigRowsOnlyImages = map fst subfigRows
+  let imgContent = liftM B.imageGrid (sequence subfigRowsOnlyImages)
+  let attrUpdater = \a ->  foldr ($) a attrActions
+  return (ImageFigure, attrUpdater attr, imgContent)
 
+-- A floating figure containing a single table
+figureWithTable :: Attr -> MarkdownParser (FigureType, Attr, F Blocks)
+figureWithTable attr = try $ do
+  tabl <- table'
+  state <- getState
+  let tblIdSetter = \ids idList -> ids{idsForTables = idList}
+  let (attrSetLabel, stAddId) = figureIdToNumLabelHandler attr state idsForTables tblIdSetter
+  updateState stAddId
+  let attrUpdater = \a ->  foldr ($) a [attrSetLabel]
+  return (TableFigure, attrUpdater attr, tabl)
+
+-- A floating figure containing a rST-type line block
+figureWithLineBlock :: Attr -> MarkdownParser (FigureType, Attr, F Blocks)
+figureWithLineBlock attr = try $ do
+  lineBlks <- many1 lineBlock'
+  state <- getState
+  let algIdSetter = \ids idList -> ids{idsForAlgorithms = idList}
+  let (attrSetLabel, stAddId) = figureIdToNumLabelHandler attr state idsForAlgorithms algIdSetter
+  updateState stAddId
+  let attrUpdater = \a ->  foldr ($) a [attrSetLabel]
+  return (LineBlockFigure, attrUpdater attr, mconcat lineBlks)
+
+-- A floating figure containing a pre-formatted code block
+figureWithCodeBlock :: Attr -> MarkdownParser (FigureType, Attr, F Blocks)
+figureWithCodeBlock attr = try $ do
+  (codeAttr, codeContent) <- codeBlockFenced' <|> codeBlockIndented'
+  state <- getState
+  let lstIdSetter = \ids idList -> ids{idsForCodeBlocks = idList}
+  let (attrSetLabel, stAddId) = figureIdToNumLabelHandler attr state idsForCodeBlocks lstIdSetter
+  updateState stAddId
+  let attrUpdater = \a ->  foldr ($) a [attrSetLabel]
+  let codeblock = B.codeBlockWith codeAttr codeContent
+  return (ListingFigure, attrUpdater attr, return codeblock)
+
+--
+-- Helper parsers for various types of Figure contents
+--
+
+-- Utility for parsing a single row of images (subfigures) and extracting
+-- their identifiers from the optional Image Attr blocks
 scholarlySubfigureRow :: MarkdownParser (F Inlines, [String])
 scholarlySubfigureRow = try $ do
   subfigs <- many1InSeparateLines image
@@ -2177,6 +2243,44 @@ scholarlySubfigureRow = try $ do
   let ids = [ (getIdentifier . getImageAttr) $
               head $ B.toList $ runF x defaultParserState | x <- subfigs ]
   return (mconcat subfigs, ids)
+
+-- | A version of lineBlockLines that doesn't consume all subsequent blanklines
+lineBlockLines' :: MarkdownParser [String]
+lineBlockLines' = try $ do
+  lines' <- many1 lineBlockLine
+  skipMany $ try (char '|' >> blankline)
+  return lines'
+
+-- | A version of lineBlock that doesn't consume all subsequent blanklines
+-- | and also converts all spaces to non-breaking (some demands this)
+lineBlock' :: MarkdownParser (F Blocks)
+lineBlock' = try $ do
+  guardEnabled Ext_line_blocks
+  st <- getState
+  let currSpacingSt = stateKeepSpacing st
+  setState $ st{ stateKeepSpacing = True }
+  lines' <- lineBlockLines' >>=
+            mapM (parseFromString (trimInlinesF . mconcat <$> many inline))
+  setState $ st{ stateKeepSpacing = currSpacingSt }
+  return $ B.para <$> mconcat (intersperse (return B.linebreak) lines')
+
+-- version of table that doesn't parse caption
+table' :: MarkdownParser (F Blocks)
+table' = try $ do
+  (aligns, widths, heads, lns) <-
+         try (guardEnabled Ext_pipe_tables >> scanForPipe >> pipeTable) <|>
+         try (guardEnabled Ext_multiline_tables >>
+                multilineTable False) <|>
+         try (guardEnabled Ext_simple_tables >>
+                (simpleTable True <|> simpleTable False)) <|>
+         try (guardEnabled Ext_multiline_tables >>
+                multilineTable True) <|>
+         try (guardEnabled Ext_grid_tables >>
+                (gridTable False <|> gridTable True)) <?> "table"
+  return $ do
+    heads' <- heads
+    lns' <- lns
+    return $ B.table mempty (zip aligns widths) heads' lns'
 
 --
 -- Scholarly Markdown numerical cross-references
@@ -2218,150 +2322,6 @@ scholarlyParensXRef = try $ do
 --                   (char '.' <|> char ')') -- this would be a list
 --   skipSpaces
 --   return mempty
-
-
---
--- Scholarly Markdown algorithm
---
-
--- | A version of lineBlockLines that doesn't consume all subsequent blanklines
-lineBlockLines' :: MarkdownParser [String]
-lineBlockLines' = try $ do
-  lines' <- many1 lineBlockLine
-  skipMany $ try (char '|' >> blankline)
-  return lines'
-
--- | A version of lineBlock that doesn't consume all subsequent blanklines
--- | and also converts all spaces to non-breaking (some demands this)
-lineBlock' :: MarkdownParser (F Blocks)
-lineBlock' = try $ do
-  guardEnabled Ext_line_blocks
-  st <- getState
-  let currSpacingSt = stateKeepSpacing st
-  setState $ st{ stateKeepSpacing = True }
-  lines' <- lineBlockLines' >>=
-            mapM (parseFromString (trimInlinesF . mconcat <$> many inline))
-  setState $ st{ stateKeepSpacing = currSpacingSt }
-  return $ B.para <$> mconcat (intersperse (return B.linebreak) lines')
-
-scholarlyAlgorithm :: MarkdownParser (F Blocks)
-scholarlyAlgorithm = try $ do
-  ensureScholarlyMarkdown
-  many1 (char '#')
-  notFollowedBy $ guardEnabled Ext_fancy_lists >>
-                  (char '.' <|> char ')') -- this would be a list
-  skipSpaces
-  string "Algorithm:"
-  attr <- floatAttribute
-  blankline >> optional blankline
-  alg <- many1 lineBlock'
-  caption <- option mempty (floatCaptionStart >> trimInlinesF . mconcat <$> many1 inline)
-  blanklines
-  state <- getState
-  let xrefIds = stateXRefIdents state
-  -- numbering can be forcibly disabled by class ".nonumber"
-  let needId = not (hasClass "nonumber" attr) && getIdentifier attr /= ""
-  let myIdentifier = getIdentifier attr
-  let myNumLabel = if needId
-                      then length (filter (/= "") $ idsForAlgorithms xrefIds) + 1
-                      else 0 -- will never be displayed anyways
-  let newXrefIds = xrefIds{ idsForAlgorithms = idsForAlgorithms xrefIds ++ [myIdentifier] }
-  updateState $ \s -> s{ stateXRefIdents = newXrefIds }
-  let attrActions = [ insertReplaceKeyValIf needId ("numLabel", show myNumLabel) ]
-  let attr' = foldr ($) attr attrActions
-  return $ do
-    alg' <- mconcat alg
-    caption' <- caption
-    return $ B.algorithmFloat attr' alg' (B.floatFallback B.space "") caption'
-
---
--- Scholarly Markdown tables
---
-
--- version of table that doesn't parse caption
-table' :: MarkdownParser (F Blocks)
-table' = try $ do
-  (aligns, widths, heads, lns) <-
-         try (guardEnabled Ext_pipe_tables >> scanForPipe >> pipeTable) <|>
-         try (guardEnabled Ext_multiline_tables >>
-                multilineTable False) <|>
-         try (guardEnabled Ext_simple_tables >>
-                (simpleTable True <|> simpleTable False)) <|>
-         try (guardEnabled Ext_multiline_tables >>
-                multilineTable True) <|>
-         try (guardEnabled Ext_grid_tables >>
-                (gridTable False <|> gridTable True)) <?> "table"
-  return $ do
-    heads' <- heads
-    lns' <- lns
-    return $ B.table mempty (zip aligns widths) heads' lns'
-
--- This is a floated table that has an Id and can be cross-referenced
-scholarlyTable :: MarkdownParser (F Blocks)
-scholarlyTable = try $ do
-  ensureScholarlyMarkdown
-  many1 (char '#')
-  notFollowedBy $ guardEnabled Ext_fancy_lists >>
-                  (char '.' <|> char ')') -- this would be a list
-  skipSpaces
-  string "Table:"
-  attr <- floatAttribute
-  blankline >> optional blankline
-  tabl <- table'
-  caption <- option mempty (floatCaptionStart >> trimInlinesF . mconcat <$> many1 inline)
-  blanklines
-  state <- getState
-  let xrefIds = stateXRefIdents state
-  -- numbering can be forcibly disabled by class ".nonumber"
-  let needId = not (hasClass "nonumber" attr) && getIdentifier attr /= ""
-  let myIdentifier = getIdentifier attr
-  let myNumLabel = if needId
-                      then length (filter (/= "") $ idsForTables xrefIds) + 1
-                      else 0 -- will never be displayed anyways
-  let newXrefIds = xrefIds{ idsForTables = idsForTables xrefIds ++ [myIdentifier] }
-  updateState $ \s -> s{ stateXRefIdents = newXrefIds }
-  let attrActions = [ insertReplaceKeyValIf needId ("numLabel", show myNumLabel) ]
-  let attr' = foldr ($) attr attrActions
-  return $ do
-    tabl' <- tabl
-    caption' <- caption
-    return $ B.tableFloat attr' tabl' (B.floatFallback B.space "") caption'
-
---
--- Scholarly Markdown code block floats
---
-
--- This is a floated code block that has an Id and can be cross-referenced
-scholarlyCodeBlock :: MarkdownParser (F Blocks)
-scholarlyCodeBlock = try $ do
-  ensureScholarlyMarkdown
-  many1 (char '#')
-  notFollowedBy $ guardEnabled Ext_fancy_lists >>
-                  (char '.' <|> char ')') -- this would be a list
-  skipSpaces
-  string "Code:"
-  attr <- floatAttribute
-  blankline >> optional blankline
-  (codeAttr, codeContent) <- codeBlockFenced' <|> codeBlockIndented'
-  caption <- option mempty (floatCaptionStart >> trimInlinesF . mconcat <$> many1 inline)
-  blanklines
-  state <- getState
-  let xrefIds = stateXRefIdents state
-  -- numbering can be forcibly disabled by class ".nonumber"
-  let needId = not (hasClass "nonumber" attr) && getIdentifier attr /= ""
-  let myIdentifier = getIdentifier attr
-  let myNumLabel = if needId
-                      then length (filter (/= "") $ idsForCodeBlocks xrefIds) + 1
-                      else 0 -- will never be displayed anyways
-  let newXrefIds = xrefIds{ idsForCodeBlocks = idsForCodeBlocks xrefIds ++ [myIdentifier] }
-  updateState $ \s -> s{ stateXRefIdents = newXrefIds }
-  let attrActions = [ insertReplaceKeyValIf needId ("numLabel", show myNumLabel) ]
-  let attr' = foldr ($) attr attrActions
-  let codeblock = B.codeBlockWith codeAttr codeContent
-  return $ do
-    caption' <- caption
-    return $ B.codeFloat attr' codeblock (B.floatFallback B.space "") caption'
-
 
 --
 -- Abstract

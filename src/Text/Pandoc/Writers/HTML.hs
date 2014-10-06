@@ -440,9 +440,7 @@ blockToHtml _ Null = return mempty
 blockToHtml opts (Plain lst) = inlineListToHtml opts lst
 -- title beginning with fig: indicates that the image is a figure
 blockToHtml opts (Para [Image attr txt (s,'f':'i':'g':':':tit)]) =
-  figureToHtml opts attr [[Image attr [] (s,tit)]] txt
-blockToHtml opts (Figure attr subfigRows caption) =
-  figureToHtml opts attr subfigRows caption
+  imageGridToHtml opts attr [ImageGrid [[Image attr [] (s,tit)]]] noPrepContent txt
 blockToHtml opts (Para lst) = do
   contents <- inlineListToHtml opts lst
   return $ H.p contents
@@ -573,12 +571,11 @@ blockToHtml opts (Table capt aligns widths headers rows') = do
                zipWithM (tableRowToHtml opts aligns) [1..] rows'
   return $ H.table $ nl opts >> captionDoc >> coltags >> head' >>
                    body' >> nl opts
-blockToHtml opts (Algorithm attr alg fallback caption) =
-  algorithmToHtml opts attr alg fallback caption
-blockToHtml opts (TableFloat attr tabl fallback caption) =
-  tableFloatToHtml opts attr tabl fallback caption
-blockToHtml opts (CodeFloat attr code fallback caption) =
-  codeFloatToHtml opts attr code fallback caption
+blockToHtml opts (Figure figType attr content pc caption) =
+  figureToHtml figType opts attr content pc caption
+blockToHtml _ (ImageGrid _) = return mempty
+blockToHtml _ (Statement _ _) = return mempty
+blockToHtml _ (Proof _ _) = return mempty
 
 tableRowToHtml :: WriterOptions
                -> [Alignment]
@@ -935,18 +932,28 @@ scholmdFloatFromAttr opts className captionPrefix attr caption content = do
   floatCaption <- scholmdFloatMainCaption opts captionPrefix numLabel caption
   scholmdFloat opts className' ident content floatCaption
 
-figureToHtml :: WriterOptions -> Attr -> [[Inline]] -> [Inline] -> State WriterState Html
-figureToHtml opts attr subfigRows caption = do
+figureToHtml :: FigureType -> WriterOptions -> Attr -> [Block] -> PreparedContent -> [Inline]
+             -> State WriterState Html
+figureToHtml ImageFigure = imageGridToHtml
+figureToHtml TableFigure = tableFloatToHtml
+figureToHtml LineBlockFigure = algorithmToHtml
+figureToHtml ListingFigure = codeFloatToHtml
+
+imageGridToHtml :: WriterOptions -> Attr -> [Block] -> PreparedContent -> [Inline]
+                -> State WriterState Html
+imageGridToHtml opts attr imageGrid _fallback caption = do
   -- check for single-image float figure, strip the subcaption if this is the case
-  let subfigRows' = case subfigRows of
-                      [[Image a _ c]] -> [[Image a [] c]]
-                      _ -> subfigRows
+  let subfigRows = case (head imageGrid) of
+                      -- get rid of any subcaption for single image
+                      ImageGrid [[Image a _ c]] -> [[Image a [] c]]
+                      ImageGrid a -> a
+                      _ -> [[]] -- should never happen
   let subfigIds = case (safeRead $ fromMaybe [] $ lookupKey "subfigIds" attr) :: Maybe [String] of
                       Just a -> a
                       Nothing -> [""]
   -- determine whether to show subfig enumeration labels (a), (b), etc
   let appendLabel = any (not . null) subfigIds && not (hasClass "nonumber" attr)
-  let subfiglist = intercalate [LineBreak] subfigRows'
+  let subfiglist = intercalate [LineBreak] subfigRows
   -- need to expand the "same" or "^" keyword for width
   subfiglist' <- mapM (setImageWidthFromHistory) subfiglist
   -- Enumerate all the subfigures
@@ -979,19 +986,19 @@ subfigsToHtml opts appendLabel (Image attr txt (s,tit)) = do
   return $ liftM subfigContext content
 subfigsToHtml _ _ _ = return $ return mempty
 
-algorithmToHtml :: WriterOptions -> Attr -> [Block] -> FloatFallback -> [Inline]
+algorithmToHtml :: WriterOptions -> Attr -> [Block] -> PreparedContent -> [Inline]
                 -> State WriterState Html
 algorithmToHtml opts attr alg _fallback caption = do
   algorithm <- blockListToHtml opts alg
   scholmdFloatFromAttr opts "scholmd-algorithm" "Algorithm" attr caption algorithm
 
-tableFloatToHtml :: WriterOptions -> Attr -> [Block] -> FloatFallback -> [Inline]
+tableFloatToHtml :: WriterOptions -> Attr -> [Block] -> PreparedContent -> [Inline]
                  -> State WriterState Html
 tableFloatToHtml opts attr tabl _fallback caption = do
   table <- blockListToHtml opts tabl
   scholmdFloatFromAttr opts "scholmd-table-float" "Table" attr caption table
 
-codeFloatToHtml :: WriterOptions -> Attr -> [Block] -> FloatFallback -> [Inline]
+codeFloatToHtml :: WriterOptions -> Attr -> [Block] -> PreparedContent -> [Inline]
                  -> State WriterState Html
 codeFloatToHtml opts attr codeblk _fallback caption = do
   codeblock <- blockListToHtml opts codeblk

@@ -536,10 +536,8 @@ blockToOpenXML opts (OrderedList (start, numstyle, numdelim) lst) = do
 blockToOpenXML opts (DefinitionList items) =
   concat `fmap` mapM (definitionListItemToOpenXML opts) items
 -- These elements await implementation
-blockToOpenXML _opts (Figure _ _ _) = return []
-blockToOpenXML _opts (TableFloat _ _ _ _) = return []
-blockToOpenXML _opts (CodeFloat _ _ _ _) = return []
-blockToOpenXML _opts (Algorithm _ _ _ _) = return []
+blockToOpenXML _opts (Figure _ _ _ _ _) = return []
+blockToOpenXML _opts (ImageGrid _) = return []
 blockToOpenXML _opts (Statement _ _ ) = return []
 blockToOpenXML _opts (Proof _ _ ) = return []
 

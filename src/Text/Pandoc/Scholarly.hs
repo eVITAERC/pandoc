@@ -32,6 +32,7 @@ module Text.Pandoc.Scholarly (classIsMath,
                               processSingleEqn,
                               processMultiEqn,
                               dispMathToLaTeX,
+                              figureIdToNumLabelHandler,
                               AttributedMath,
                               getImageAttr,
                               getIdentifier,
@@ -256,3 +257,27 @@ dispMathToLaTeX (label, classes, _) mathCode
   | otherwise = case label of
                   "" -> wrapInLatexEnv "equation*" mathCode
                   _  -> wrapInLatexEnv "equation" mathCode
+
+--
+-- Utility functions for Figures
+--
+
+-- Specifies how Ids for Scholarly Figures map to numeric labels, and how they
+-- are updated in the list of identifiers
+figureIdToNumLabelHandler :: Attr
+                          -> ParserState
+                          -> (XRefIdentifiers -> [String])
+                          -> (XRefIdentifiers -> [String] -> XRefIdentifiers)
+                          -> (Attr -> Attr, ParserState -> ParserState)
+figureIdToNumLabelHandler attr state idListGetter idListSetter =
+  let xrefIds = stateXRefIdents state
+  -- numbering can be forcibly disabled by class ".nonumber"
+      needId = not (hasClass "nonumber" attr) && getIdentifier attr /= ""
+      myIdentifier = getIdentifier attr
+      myNumLabel = if needId
+                      then length (filter (/= "") $ idListGetter xrefIds) + 1
+                      else 0 -- will never be displayed anyways
+      newXrefIds = idListSetter xrefIds (idListGetter xrefIds ++ [myIdentifier])
+      stateUpdater = \s -> s{ stateXRefIdents = newXrefIds }
+      attrUpdater = insertReplaceKeyValIf needId ("numLabel", show myNumLabel)
+  in (attrUpdater, stateUpdater)

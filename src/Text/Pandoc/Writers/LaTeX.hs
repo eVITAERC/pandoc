@@ -348,7 +348,7 @@ blockToLaTeX (Plain lst) =
 -- title beginning with fig: indicates that the image is a figure
 -- the identifiers in attr will be lifted to the Figure block
 blockToLaTeX (Para [Image attr txt (src,'f':'i':'g':':':tit)]) =
-  figureToLaTeX attr [[Image (setIdentifier "" attr) [] (src,tit)]] txt
+  imageGridToLaTeX attr [ImageGrid [[Image attr [] (src,tit)]]] noPrepContent txt
 blockToLaTeX (Para [Str ".",Space,Str ".",Space,Str "."]) = do
   beamer <- writerBeamer `fmap` gets stOptions
   if beamer
@@ -510,13 +510,12 @@ blockToLaTeX (Table caption aligns widths heads rows) = do
          $$ "\\bottomrule"
          $$ capt
          $$ "\\end{longtable}"
-blockToLaTeX (Figure attr subfigRows txt) = figureToLaTeX attr subfigRows txt
-blockToLaTeX (Algorithm attr alg fallback caption) =
-  algorithmToLaTeX attr alg fallback caption
-blockToLaTeX (TableFloat attr tabl fallback caption) =
-  tableFloatToLaTeX attr tabl fallback caption
-blockToLaTeX (CodeFloat attr code fallback caption) =
-  codeFloatToLaTeX attr code fallback caption
+blockToLaTeX (Figure figType attr content pc txt) =
+  figureToLaTeXfloat figType attr content pc txt
+blockToLaTeX (ImageGrid _) = return empty
+blockToLaTeX (Statement _ _) = return empty
+blockToLaTeX (Proof _ _) = return empty
+
 toColDescriptor :: Alignment -> String
 toColDescriptor align =
   case align of
@@ -900,21 +899,36 @@ getListingsLanguage :: [String] -> Maybe String
 getListingsLanguage [] = Nothing
 getListingsLanguage (x:xs) = toListingsLanguage x <|> getListingsLanguage xs
 
--- Handles writing figure floats
-figureToLaTeX ::  Attr -> [[Inline]] -> [Inline] -> State WriterState Doc
-figureToLaTeX attr subfigRows caption = do
+--
+-- ScholarlyMarkdown floating figures
+--
+
+-- Handles all float types
+figureToLaTeXfloat :: FigureType -> Attr -> [Block] -> PreparedContent -> [Inline]
+                   -> State WriterState Doc
+figureToLaTeXfloat ImageFigure = imageGridToLaTeX
+figureToLaTeXfloat TableFigure = tableFloatToLaTeX
+figureToLaTeXfloat LineBlockFigure = algorithmToLaTeX
+figureToLaTeXfloat ListingFigure = codeFloatToLaTeX
+
+-- Handles writing image figure floats
+imageGridToLaTeX ::  Attr -> [Block] -> PreparedContent -> [Inline] -> State WriterState Doc
+imageGridToLaTeX attr imageGrid _fallback caption = do
   modify $ \s -> s{ stFloats = True }
   let ident = getIdentifier attr
-  let (subfigRows', snglImg) = case subfigRows of
-                                    [[Image a _ c]] -> ([[Image a [] c]], True)
-                                    _ -> (subfigRows, False)
+  let (subfigRows, snglImg) = case (head imageGrid) of
+                              -- get rid of any subcaption and label for single image
+                                ImageGrid [[Image a _ c]]
+                                             -> ([[Image (setIdentifier "" a) [] c]], True)
+                                ImageGrid ig -> (ig, False)
+                                _ -> ([[]], True) -- should never happen
   when (not snglImg) $ modify $ \s -> s{ stSubfigs = True }
   let subfigIds = case (safeRead $ fromMaybe [] $ lookupKey "subfigIds" attr) :: Maybe [String] of
                       Just a -> a
                       Nothing -> [""]
   -- show subfig labels (a), (b), etc
   let showSubfigLabel = any (not . null) subfigIds && not (hasClass "nonumber" attr)
-  let subfiglist = intercalate [LineBreak] subfigRows'
+  let subfiglist = intercalate [LineBreak] subfigRows
   let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
   let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
   -- | this requires the "caption" package which is provided by "subfig"
@@ -1015,7 +1029,7 @@ validLaTeXUnits :: [String]
 validLaTeXUnits = ["mm","cm","in","pt","em","ex","%"]
 
 -- Handles writing algorithm/pseudocode floats
-algorithmToLaTeX ::  Attr -> [Block] -> FloatFallback -> [Inline] -> State WriterState Doc
+algorithmToLaTeX ::  Attr -> [Block] -> PreparedContent -> [Inline] -> State WriterState Doc
 algorithmToLaTeX attr alg _fallback caption = do
   modify $ \s -> s{ stAlgorithms = True, stFloats = True }
   let ident = getIdentifier attr
@@ -1034,7 +1048,7 @@ algorithmToLaTeX attr alg _fallback caption = do
            $$ capt' <> label $$ "\\end{scholmdAlgorithm" <> widestar <> "}"
 
 -- Handles writing algorithm/pseudocode floats
-tableFloatToLaTeX ::  Attr -> [Block] -> FloatFallback -> [Inline] -> State WriterState Doc
+tableFloatToLaTeX ::  Attr -> [Block] -> PreparedContent -> [Inline] -> State WriterState Doc
 tableFloatToLaTeX attr tabl _fallback caption = do
   modify $ \s -> s{ stTable = True, stFloats = True }
   let ident = getIdentifier attr
@@ -1072,7 +1086,7 @@ tableToTabular _ = return empty
 
 -- Handles writing code-block/listing floats
 -- (Scholarly automatically uses Listings for floating block)
-codeFloatToLaTeX ::  Attr -> [Block] -> FloatFallback -> [Inline] -> State WriterState Doc
+codeFloatToLaTeX ::  Attr -> [Block] -> PreparedContent -> [Inline] -> State WriterState Doc
 codeFloatToLaTeX attr codeblock _fallback caption = do
   modify $ \s -> s{ stFloats = True }
   let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
