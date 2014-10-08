@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings, ScopedTypeVariables  #-}
 {-
-  Copyright (C) 2011 John MacFarlane <jgm@berkeley.edu>
+  Copyright (C) 2011-2014 John MacFarlane <jgm@berkeley.edu>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 
 {- |
 Module      : Text.Pandoc.ImageSize
-Copyright   : Copyright (C) 2011 John MacFarlane
+Copyright   : Copyright (C) 2011-2014 John MacFarlane
 License     : GNU GPL, version 2 or above
 
 Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -75,6 +75,9 @@ imageSize img = do
        Jpeg -> jpegSize img
        Eps  -> epsSize img
        Pdf  -> Nothing  -- TODO
+
+defaultSize :: (Integer, Integer)
+defaultSize = (72, 72)
 
 sizeInPixels :: ImageSize -> (Integer, Integer)
 sizeInPixels s = (pxX s, pxY s)
@@ -217,7 +220,7 @@ exifHeader hdr = do
   numentries <- getWord16
   let ifdEntry = do
        tag <- getWord16 >>= \t ->
-                maybe (fail $ "Unknown tag type " ++ show t) return
+                maybe (return UnknownTagType) return
                 (M.lookup t tagTypeTable)
        dataFormat <- getWord16
        numComponents <- getWord32
@@ -260,7 +263,9 @@ exifHeader hdr = do
                            lookup ExifImageHeight allentries) of
                           (Just (UnsignedLong w), Just (UnsignedLong h)) ->
                             return (fromIntegral w, fromIntegral h)
-                          _ -> fail "Could not determine image width, height"
+                          _ -> return defaultSize
+                               -- we return a default width and height when
+                               -- the exif header doesn't contain these
   let resfactor = case lookup ResolutionUnit allentries of
                         Just (UnsignedShort 1) -> (100 / 254)
                         _ -> 1
@@ -337,6 +342,7 @@ data TagType = ImageDescription
              | SensingMethod
              | FileSource
              | SceneType
+             | UnknownTagType
              deriving (Show, Eq, Ord)
 
 tagTypeTable :: M.Map Word16 TagType

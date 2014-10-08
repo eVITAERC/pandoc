@@ -1,5 +1,5 @@
 {-
-Copyright (C) 2007-2010 John MacFarlane <jgm@berkeley.edu>
+Copyright (C) 2007-2014 John MacFarlane <jgm@berkeley.edu>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 {- |
    Module      : Text.Pandoc.Writers.Man
-   Copyright   : Copyright (C) 2007-2010 John MacFarlane
+   Copyright   : Copyright (C) 2007-2014 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -36,7 +36,8 @@ import Text.Pandoc.Writers.Shared
 import Text.Pandoc.Options
 import Text.Pandoc.Readers.TeXMath
 import Text.Printf ( printf )
-import Data.List ( isPrefixOf, intersperse, intercalate )
+import Data.List ( stripPrefix, intersperse, intercalate )
+import Data.Maybe (fromMaybe)
 import Text.Pandoc.Pretty
 import Text.Pandoc.Builder (deleteMeta)
 import Control.Monad.State
@@ -283,7 +284,7 @@ definitionListItemToMan opts (label, defs) = do
                                   mapM (\item -> blockToMan opts item) rest
                         first' <- blockToMan opts first
                         return $ first' $$ text ".RS" $$ rest' $$ text ".RE"
-  return $ text ".TP" $$ text ".B " <> labelText $$ contents
+  return $ text ".TP" $$ nowrap (text ".B " <> labelText) $$ contents
 
 -- | Convert list of Pandoc block elements to man.
 blockListToMan :: WriterOptions -- ^ Options
@@ -331,9 +332,9 @@ inlineToMan _ (Code _ str) =
   return $ text $ "\\f[C]" ++ escapeCode str ++ "\\f[]"
 inlineToMan _ (Str str) = return $ text $ escapeString str
 inlineToMan opts (Math InlineMath str) =
-  inlineListToMan opts $ readTeXMath' InlineMath str
+  inlineListToMan opts $ texMathToInlines InlineMath str
 inlineToMan opts (Math (DisplayMath a) str) = do
-  contents <- inlineListToMan opts $ readTeXMath' (DisplayMath a) str
+  contents <- inlineListToMan opts $ texMathToInlines (DisplayMath a) str
   return $ cr <> text ".RS" $$ contents $$ text ".RE"
 inlineToMan _ (RawInline f str)
   | f == Format "man" = return $ text str
@@ -343,7 +344,7 @@ inlineToMan _ (LineBreak) = return $
 inlineToMan _ Space = return space
 inlineToMan opts (Link txt (src, _)) = do
   linktext <- inlineListToMan opts txt
-  let srcSuffix = if isPrefixOf "mailto:" src then drop 7 src else src
+  let srcSuffix = fromMaybe src (stripPrefix "mailto:" src)
   return $ case txt of
            [Str s]
              | escapeURI s == srcSuffix ->

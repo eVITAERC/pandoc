@@ -5,9 +5,10 @@
 ,Plain [RawInline (Format "tex") "\\placeformula "]
 ,RawBlock (Format "context") "\\startformula\n   L_{1} = L_{2}\n   \\stopformula"
 ,RawBlock (Format "context") "\\start[a2]\n\\start[a2]\n\\stop[a2]\n\\stop[a2]"
-,Header 2 ("urls-with-spaces",[],[]) [Str "URLs",Space,Str "with",Space,Str "spaces"]
+,Header 2 ("urls-with-spaces-and-punctuation",[],[]) [Str "URLs",Space,Str "with",Space,Str "spaces",Space,Str "and",Space,Str "punctuation"]
 ,Para [Link [Str "foo"] ("/bar%20and%20baz",""),Space,Link [Str "foo"] ("/bar%20and%20baz",""),Space,Link [Str "foo"] ("/bar%20and%20baz",""),Space,Link [Str "foo"] ("bar%20baz","title")]
 ,Para [Link [Str "baz"] ("/foo%20foo",""),Space,Link [Str "bam"] ("/foo%20fee",""),Space,Link [Str "bork"] ("/foo/zee%20zob","title")]
+,Para [Link [Str "Ward\8217s",Space,Str "method."] ("http://en.wikipedia.org/wiki/Ward's_method","")]
 ,Header 2 ("horizontal-rules-with-spaces-at-end",[],[]) [Str "Horizontal",Space,Str "rules",Space,Str "with",Space,Str "spaces",Space,Str "at",Space,Str "end"]
 ,HorizontalRule
 ,HorizontalRule
@@ -16,10 +17,21 @@
 ,Header 3 ("my-header",[],[]) [Str "my",Space,Str "header"]
 ,Header 2 ("in-math",[],[]) [Str "$",Space,Str "in",Space,Str "math"]
 ,Para [Math InlineMath "\\$2 + \\$3"]
+,Para [Str "This",Space,Str "should",Space,Str "not",Space,Str "be",Space,Str "math:"]
+,Para [Str "$PATH",Space,Str "90",Space,Str "$PATH"]
 ,Header 2 ("commented-out-list-item",[],[]) [Str "Commented-out",Space,Str "list",Space,Str "item"]
 ,BulletList
  [[Plain [Str "one",Space,RawInline (Format "html") "<!--\n- two\n-->"]]
  ,[Plain [Str "three"]]]
+,Header 2 ("indented-code-at-beginning-of-list",[],[]) [Str "Indented",Space,Str "code",Space,Str "at",Space,Str "beginning",Space,Str "of",Space,Str "list"]
+,BulletList
+ [[CodeBlock ("",[],[]) "code\ncode"]]
+,OrderedList (1,Decimal,Period)
+ [[CodeBlock ("",[],[]) "code\ncode"]
+ ,[CodeBlock ("",[],[]) "code\ncode"]]
+,BulletList
+ [[CodeBlock ("",[],[]) "code\ncode"]
+ ,[Plain [Str "no",Space,Str "code"]]]
 ,Header 2 ("backslash-newline",[],[]) [Str "Backslash",Space,Str "newline"]
 ,Para [Str "hi",LineBreak,Str "there"]
 ,Header 2 ("code-spans",[],[]) [Str "Code",Space,Str "spans"]
@@ -136,4 +148,7 @@
 ,Para [Link [Str "link"] ("/hithere)","")]
 ,Para [Link [Str "linky"] ("hi_(there_(nested))","")]
 ,Header 2 ("reference-link-fallbacks",[],[]) [Str "Reference",Space,Str "link",Space,Str "fallbacks"]
-,Para [Str "[",Emph [Str "not",Space,Str "a",Space,Str "link"],Str "]",Space,Str "[",Emph [Str "nope"],Str "]\8230"]]
+,Para [Str "[",Emph [Str "not",Space,Str "a",Space,Str "link"],Str "]",Space,Str "[",Emph [Str "nope"],Str "]\8230"]
+,Header 2 ("empty-reference-links",[],[]) [Str "Empty",Space,Str "reference",Space,Str "links"]
+,Para [Str "bar"]
+,Para [Link [Str "foo2"] ("","")]]

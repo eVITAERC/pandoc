@@ -3,10 +3,10 @@ module Tests.Old (tests) where
 import Test.Framework (testGroup, Test )
 import Test.Framework.Providers.HUnit
 import Test.HUnit ( assertBool )
-import System.Environment ( getArgs )
+import System.Environment.Executable (getExecutablePath)
 import System.IO ( openTempFile, stderr )
 import System.Process ( runProcess, waitForProcess )
-import System.FilePath ( (</>), (<.>) )
+import System.FilePath ( (</>), (<.>), takeDirectory, splitDirectories, joinPath )
 import System.Directory
 import System.Exit
 import Data.Algorithm.Diff
@@ -93,7 +93,7 @@ tests = [ testGroup "markdown"
           [ testGroup "writer" (writerTests "html" ++ lhsWriterTests "html" ++
             [ test "scholdoc"  ["-r", "markdown_scholarly", "-w", "html5", "-S", "-R",
                                 "--template=scholmdTemplate_bodyOnly.html5",
-                                "--no-mathjax-cdn", "--columns=72"]
+                                "--mathjax", "--no-mathjax-cdn", "--columns=72"]
               "scholdoc.txt" "scholdoc.html"
             ])
           , test "reader" ["-r", "html", "-w", "native", "-s"]
@@ -122,18 +122,25 @@ tests = [ testGroup "markdown"
             "testsuite.native" "testsuite.native"
           ]
         , testGroup "fb2"
-          [ fb2WriterTest "basic" [] "fb2.basic.markdown" "fb2.basic.fb2"
-          , fb2WriterTest "titles" [] "fb2.titles.markdown" "fb2.titles.fb2"
-          , fb2WriterTest "images" [] "fb2.images.markdown" "fb2.images.fb2"
-          , fb2WriterTest "images-embedded" [] "fb2.images-embedded.html" "fb2.images-embedded.fb2"
+          [ fb2WriterTest "basic" [] "fb2/basic.markdown" "fb2/basic.fb2"
+          , fb2WriterTest "titles" [] "fb2/titles.markdown" "fb2/titles.fb2"
+          , fb2WriterTest "images" [] "fb2/images.markdown" "fb2/images.fb2"
+          , fb2WriterTest "images-embedded" [] "fb2/images-embedded.html" "fb2/images-embedded.fb2"
+          , fb2WriterTest "math" [] "fb2/math.markdown" "fb2/math.fb2"
           , fb2WriterTest "tables" [] "tables.native" "tables.fb2"
-          , fb2WriterTest "math" [] "fb2.math.markdown" "fb2.math.fb2"
           , fb2WriterTest "testsuite" [] "testsuite.native" "writer.fb2"
           ]
         , testGroup "mediawiki"
           [ testGroup "writer" $ writerTests "mediawiki"
           , test "reader" ["-r", "mediawiki", "-w", "native", "-s"]
             "mediawiki-reader.wiki" "mediawiki-reader.native"
+          ]
+        , testGroup "dokuwiki"
+          [ testGroup "writer" $ writerTests "dokuwiki"
+          , test "inline_formatting" ["-r", "native", "-w", "dokuwiki", "-s"]
+            "dokuwiki_inline_formatting.native" "dokuwiki_inline_formatting.dokuwiki"
+          , test "multiblock table" ["-r", "native", "-w", "dokuwiki", "-s"]
+            "dokuwiki_multiblock_table.native" "dokuwiki_multiblock_table.dokuwiki"
           ]
         , testGroup "opml"
           [ test "basic" ["-r", "native", "-w", "opml", "--columns=78", "-s"]
@@ -142,11 +149,23 @@ tests = [ testGroup "markdown"
             "opml-reader.opml" "opml-reader.native"
           ]
         , testGroup "haddock"
-          [ test "reader" ["-r", "haddock", "-w", "native", "-s"]
+          [ testGroup "writer" $ writerTests "haddock"
+          , test "reader" ["-r", "haddock", "-w", "native", "-s"]
             "haddock-reader.haddock" "haddock-reader.native"
           ]
+        , testGroup "txt2tags"
+          [ test "reader" ["-r", "t2t", "-w", "native", "-s"]
+              "txt2tags.t2t" "txt2tags.native" ]
+        , testGroup "epub" [
+            test "features" ["-r", "epub", "-w", "native"]
+              "epub/features.epub" "epub/features.native"
+          , test "wasteland" ["-r", "epub", "-w", "native"]
+              "epub/wasteland.epub" "epub/wasteland.native"
+          , test "formatting" ["-r", "epub", "-w", "native"]
+              "epub/formatting.epub" "epub/formatting.native"
+          ]
         , testGroup "other writers" $ map (\f -> testGroup f $ writerTests f)
-          [ "opendocument" , "context" , "texinfo"
+          [ "opendocument" , "context" , "texinfo", "icml"
           , "man" , "plain" , "rtf", "org", "asciidoc"
           ]
         ]
@@ -186,7 +205,7 @@ s5WriterTest :: String -> [String] -> String -> Test
 s5WriterTest modifier opts format
   = test (format ++ " writer (" ++ modifier ++ ")")
     (["-r", "native", "-w", format] ++ opts)
-    "s5.native"  ("s5." ++ modifier <.> "html")
+    "s5.native"  ("s5-" ++ modifier <.> "html")
 
 fb2WriterTest :: String -> [String] -> String -> String -> Test
 fb2WriterTest title opts inputfile normfile =
@@ -217,11 +236,18 @@ testWithNormalize  :: (String -> String) -- ^ Normalize function for output
                    -> FilePath  -- ^ Norm (for test results) filepath
                    -> Test
 testWithNormalize normalizer testname opts inp norm = testCase testname $ do
-  args <- getArgs
-  let buildDir = case args of
-                      (x:_) -> ".." </> x
-                      _     -> error "test-pandoc: missing buildDir argument"
-  let pandocPath = buildDir </> "pandoc" </> "pandoc"
+  -- find pandoc executable relative to test-pandoc
+  -- First, try in same directory (e.g. if both in ~/.cabal/bin)
+  -- Second, try ../pandoc (e.g. if in dist/XXX/build/test-pandoc)
+  pandocPath <- do
+    testExePath <- getExecutablePath
+    let testExeDir = takeDirectory testExePath
+    found <- doesFileExist (testExeDir </> "pandoc")
+    return $ if found
+                then testExeDir </> "pandoc"
+                else case splitDirectories testExeDir of
+                           [] -> error "test-pandoc: empty testExeDir"
+                           xs -> joinPath (init xs) </> "pandoc" </> "pandoc"
   (outputPath, hOut) <- openTempFile "" "pandoc-test"
   let inpPath = inp
   let normPath = norm

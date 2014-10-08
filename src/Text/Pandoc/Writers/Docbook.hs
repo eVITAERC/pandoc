@@ -1,6 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, PatternGuards #-}
 {-
-Copyright (C) 2006-2010 John MacFarlane <jgm@berkeley.edu>
+Copyright (C) 2006-2014 John MacFarlane <jgm@berkeley.edu>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 {- |
    Module      : Text.Pandoc.Writers.Docbook
-   Copyright   : Copyright (C) 2006-2010 John MacFarlane
+   Copyright   : Copyright (C) 2006-2014 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -32,12 +32,15 @@ module Text.Pandoc.Writers.Docbook ( writeDocbook) where
 import Text.Pandoc.Definition
 import Text.Pandoc.XML
 import Text.Pandoc.Shared
+import Text.Pandoc.Walk
 import Text.Pandoc.Writers.Shared
 import Text.Pandoc.Options
 import Text.Pandoc.Templates (renderTemplate')
 import Text.Pandoc.Readers.TeXMath
-import Data.List ( isPrefixOf, intercalate, isSuffixOf )
+import Data.List ( stripPrefix, isPrefixOf, intercalate, isSuffixOf )
 import Data.Char ( toLower )
+import Control.Applicative ((<$>))
+import Data.Monoid ( Any(..) )
 import Text.Pandoc.Highlighting ( languages, languagesByExtension )
 import Text.Pandoc.Pretty
 import qualified Text.Pandoc.Builder as B
@@ -165,8 +168,9 @@ blockToDocbook opts (Para [Image _ txt (src,'f':'i':'g':':':_)]) =
            (inTagsIndented "imageobject"
              (selfClosingTag "imagedata" [("fileref",src)])) $$
            inTagsSimple "textobject" (inTagsSimple "phrase" alt))
-blockToDocbook opts (Para lst) =
-  inTagsIndented "para" $ inlinesToDocbook opts lst
+blockToDocbook opts (Para lst)
+  | hasLineBreaks lst = flush $ nowrap $ inTagsSimple "literallayout" $ inlinesToDocbook opts lst
+  | otherwise         = inTagsIndented "para" $ inlinesToDocbook opts lst
 blockToDocbook opts (BlockQuote blocks) =
   inTagsIndented "blockquote" $ blocksToDocbook opts blocks
 blockToDocbook _ (CodeBlock (_,classes,_) str) =
@@ -182,10 +186,11 @@ blockToDocbook _ (CodeBlock (_,classes,_) str) =
                            else languagesByExtension . map toLower $ s
           langs       = concatMap langsFrom classes
 blockToDocbook opts (BulletList lst) =
-  inTagsIndented "itemizedlist" $ listItemsToDocbook opts lst
+  let attribs = [("spacing", "compact") | isTightList lst]
+  in  inTags True "itemizedlist" attribs $ listItemsToDocbook opts lst
 blockToDocbook _ (OrderedList _ []) = empty
 blockToDocbook opts (OrderedList (start, numstyle, _) (first:rest)) =
-  let attribs  = case numstyle of
+  let numeration = case numstyle of
                        DefaultStyle -> []
                        Decimal      -> [("numeration", "arabic")]
                        Example      -> [("numeration", "arabic")]
@@ -193,14 +198,17 @@ blockToDocbook opts (OrderedList (start, numstyle, _) (first:rest)) =
                        LowerAlpha   -> [("numeration", "loweralpha")]
                        UpperRoman   -> [("numeration", "upperroman")]
                        LowerRoman   -> [("numeration", "lowerroman")]
-      items    = if start == 1
-                    then listItemsToDocbook opts (first:rest)
-                    else (inTags True "listitem" [("override",show start)]
-                         (blocksToDocbook opts $ map plainToPara first)) $$
-                         listItemsToDocbook opts rest
+      spacing    = [("spacing", "compact") | isTightList (first:rest)]
+      attribs    = numeration ++ spacing
+      items      = if start == 1
+                      then listItemsToDocbook opts (first:rest)
+                      else (inTags True "listitem" [("override",show start)]
+                           (blocksToDocbook opts $ map plainToPara first)) $$
+                           listItemsToDocbook opts rest
   in  inTags True "orderedlist" attribs items
 blockToDocbook opts (DefinitionList lst) =
-  inTagsIndented "variablelist" $ deflistItemsToDocbook opts lst
+  let attribs = [("spacing", "compact") | isTightList $ concatMap snd lst]
+  in  inTags True "variablelist" attribs $ deflistItemsToDocbook opts lst
 blockToDocbook _ (RawBlock f str)
   | f == "docbook" = text str -- raw XML block
   | f == "html"    = text str -- allow html for backwards compatibility
@@ -225,6 +233,16 @@ blockToDocbook opts (Table caption aligns widths headers rows) =
   in  inTagsIndented tableType $ captionDoc $$
         (inTags True "tgroup" [("cols", show (length headers))] $
          coltags $$ head' $$ body')
+
+hasLineBreaks :: [Inline] -> Bool
+hasLineBreaks = getAny . query isLineBreak . walk removeNote
+  where
+    removeNote :: Inline -> Inline
+    removeNote (Note _) = Str ""
+    removeNote x = x
+    isLineBreak :: Inline -> Any
+    isLineBreak LineBreak = Any True
+    isLineBreak _ = Any False
 
 alignmentToString :: Alignment -> [Char]
 alignmentToString alignment = case alignment of
@@ -276,14 +294,14 @@ inlineToDocbook _ (Code _ str) =
   inTagsSimple "literal" $ text (escapeStringForXML str)
 inlineToDocbook opts (Math t str)
   | isMathML (writerHTMLMathMethod opts) =
-    case texMathToMathML dt str of
-      Right r -> inTagsSimple tagtype
-                 $ text $ Xml.ppcElement conf
-                 $ fixNS
-                 $ removeAttr r
-      Left  _ -> inlinesToDocbook opts
-                 $ readTeXMath' t str
-  | otherwise = inlinesToDocbook opts $ readTeXMath' t str
+    case writeMathML dt <$> readTeX str of
+      Right r  -> inTagsSimple tagtype
+                  $ text $ Xml.ppcElement conf
+                  $ fixNS
+                  $ removeAttr r
+      Left _   -> inlinesToDocbook opts
+                  $ texMathToInlines t str
+  | otherwise = inlinesToDocbook opts $ texMathToInlines t str
      where (dt, tagtype) = case t of
                             InlineMath  -> (DisplayInline,"inlineequation")
                             DisplayMath _ -> (DisplayBlock,"informalequation")
@@ -293,21 +311,21 @@ inlineToDocbook opts (Math t str)
            fixNS = everywhere (mkT fixNS')
 inlineToDocbook _ (RawInline f x) | f == "html" || f == "docbook" = text x
                                   | otherwise                     = empty
-inlineToDocbook _ LineBreak = flush $ inTagsSimple "literallayout" (text "\n")
+inlineToDocbook _ LineBreak = text "\n"
 inlineToDocbook _ Space = space
-inlineToDocbook opts (Link txt (src, _)) =
-  if isPrefixOf "mailto:" src
-     then let src' = drop 7 src
-              emailLink = inTagsSimple "email" $ text $
-                          escapeStringForXML $ src'
-          in  case txt of
-               [Str s] | escapeURI s == src' -> emailLink
-               _             -> inlinesToDocbook opts txt <+>
-                                  char '(' <> emailLink <> char ')'
-     else (if isPrefixOf "#" src
-              then inTags False "link" [("linkend", drop 1 src)]
-              else inTags False "ulink" [("url", src)]) $
-          inlinesToDocbook opts txt
+inlineToDocbook opts (Link txt (src, _))
+  | Just email <- stripPrefix "mailto:" src =
+      let emailLink = inTagsSimple "email" $ text $
+                      escapeStringForXML $ email
+      in  case txt of
+           [Str s] | escapeURI s == email -> emailLink
+           _             -> inlinesToDocbook opts txt <+>
+                              char '(' <> emailLink <> char ')'
+  | otherwise =
+      (if isPrefixOf "#" src
+            then inTags False "link" [("linkend", drop 1 src)]
+            else inTags False "ulink" [("url", src)]) $
+        inlinesToDocbook opts txt
 inlineToDocbook _ (Image _ _ (src, tit)) =
   let titleDoc = if null tit
                    then empty

@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-
-Copyright (C) 2006-2010 John MacFarlane <jgm@berkeley.edu>
+Copyright (C) 2006-2014 John MacFarlane <jgm@berkeley.edu>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 {- |
    Module      : Text.Pandoc.Writers.RST
-   Copyright   : Copyright (C) 2006-2010 John MacFarlane
+   Copyright   : Copyright (C) 2006-2014 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -37,7 +37,8 @@ import Text.Pandoc.Shared
 import Text.Pandoc.Writers.Shared
 import Text.Pandoc.Templates (renderTemplate')
 import Text.Pandoc.Builder (deleteMeta)
-import Data.List ( isPrefixOf, intersperse, transpose )
+import Data.Maybe (fromMaybe)
+import Data.List ( isPrefixOf, stripPrefix, intersperse, transpose )
 import Network.URI (isURI)
 import Text.Pandoc.Pretty
 import Control.Monad.State
@@ -174,7 +175,7 @@ blockToRST (Para [Image _ txt (src,'f':'i':'g':':':tit)]) = do
   let alt = ":alt: " <> if null tit then capt else text tit
   return $ hang 3 ".. " $ fig $$ alt $+$ capt $$ blankline
 blockToRST (Para inlines)
-  | LineBreak `elem` inlines = do -- use line block if LineBreaks 
+  | LineBreak `elem` inlines = do -- use line block if LineBreaks
       lns <- mapM inlineListToRST $ splitBy (==LineBreak) inlines
       return $ (vcat $ map (text "| " <>) lns) <> blankline
   | otherwise = do
@@ -219,11 +220,15 @@ blockToRST (Table caption _ widths headers rows) =  do
                      else blankline <> text "Table: " <> caption'
   headers' <- mapM blockListToRST headers
   rawRows <- mapM (mapM blockListToRST) rows
-  let isSimple = all (==0) widths && all (all (\bs -> length bs <= 1)) rows
+  -- let isSimpleCell [Plain _] = True
+  --     isSimpleCell [Para _]  = True
+  --     isSimpleCell []        = True
+  --     isSimpleCell _         = False
+  -- let isSimple = all (==0) widths && all (all isSimpleCell) rows
   let numChars = maximum . map offset
   opts <- get >>= return . stOptions
   let widthsInChars =
-       if isSimple
+       if all (== 0) widths
           then map ((+2) . numChars) $ transpose (headers' : rawRows)
           else map (floor . (fromIntegral (writerColumns opts) *)) widths
   let hpipeBlocks blocks = hcat [beg, middle, end]
@@ -397,7 +402,7 @@ inlineToRST (Link [Str str] (src, _))
     if "mailto:" `isPrefixOf` src
        then src == escapeURI ("mailto:" ++ str)
        else src == escapeURI str = do
-  let srcSuffix = if isPrefixOf "mailto:" src then drop 7 src else src
+  let srcSuffix = fromMaybe src (stripPrefix "mailto:" src)
   return $ text srcSuffix
 inlineToRST (Link [Image _ alt (imgsrc,imgtit)] (src, _tit)) = do
   label <- registerImage alt (imgsrc,imgtit) (Just src)

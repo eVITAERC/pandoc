@@ -27,7 +27,7 @@ main = do
 
   unless (null ds1 && null ds2) $ do
     rmContents <- UTF8.readFile "README"
-    let (Pandoc meta blocks) = readMarkdown def rmContents
+    let (Pandoc meta blocks) = normalize $ readMarkdown def rmContents
     let manBlocks = removeSect [Str "Wrappers"]
                   $ removeSect [Str "Pandoc's",Space,Str "markdown"] blocks
     let syntaxBlocks = extractSect [Str "Pandoc's",Space,Str "markdown"] blocks
@@ -47,8 +47,10 @@ makeManPage verbose page meta blocks = do
 
 writeManPage :: FilePath -> String -> Pandoc -> IO ()
 writeManPage page templ doc = do
+  let version = pandocVersion
   let opts = def{ writerStandalone = True
-                , writerTemplate = templ }
+                , writerTemplate = templ
+                , writerVariables = [("version",version)] }
   let manPage = writeMan opts $
                     bottomUp (concatMap removeLinks) $
                     bottomUp  capitalizeHeaders doc
@@ -67,13 +69,13 @@ capitalize (Str xs) = Str $ map toUpper xs
 capitalize x = x
 
 removeSect :: [Inline] -> [Block] -> [Block]
-removeSect ils (Header 1 _ x:xs) | normalize x == normalize ils =
+removeSect ils (Header 1 _ x:xs) | x == ils =
   dropWhile (not . isHeader1) xs
 removeSect ils (x:xs) = x : removeSect ils xs
 removeSect _ [] = []
 
 extractSect :: [Inline] -> [Block] -> [Block]
-extractSect ils (Header 1 _ z:xs) | normalize z == normalize ils =
+extractSect ils (Header 1 _ z:xs) | z == ils =
   bottomUp promoteHeader $ takeWhile (not . isHeader1) xs
     where promoteHeader (Header n attr x) = Header (n-1) attr x
           promoteHeader x            = x

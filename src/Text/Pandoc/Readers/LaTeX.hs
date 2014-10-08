@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables, OverloadedStrings #-}
 {-
-Copyright (C) 2006-2012 John MacFarlane <jgm@berkeley.edu>
+Copyright (C) 2006-2014 John MacFarlane <jgm@berkeley.edu>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 {- |
    Module      : Text.Pandoc.Readers.LaTeX
-   Copyright   : Copyright (C) 2006-2012 John MacFarlane
+   Copyright   : Copyright (C) 2006-2014 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -31,6 +31,7 @@ Conversion of LaTeX to 'Pandoc' document.
 module Text.Pandoc.Readers.LaTeX ( readLaTeX,
                                    rawLaTeXInline,
                                    rawLaTeXBlock,
+                                   inlineCommand,
                                    handleIncludes
                                  ) where
 
@@ -42,6 +43,7 @@ import Text.Pandoc.Parsing hiding ((<|>), many, optional, space,
                                    mathDisplay, mathInline)
 import qualified Text.Pandoc.UTF8 as UTF8
 import Data.Char ( chr, ord )
+import Control.Monad.Trans (lift)
 import Control.Monad
 import Text.Pandoc.Builder
 import Data.Char (isLetter, isAlphaNum)
@@ -101,7 +103,7 @@ dimenarg = try $ do
 
 sp :: LP ()
 sp = skipMany1 $ satisfy (\c -> c == ' ' || c == '\t')
-        <|> (try $ newline >>~ lookAhead anyChar >>~ notFollowedBy blankline)
+        <|> (try $ newline <* lookAhead anyChar <* notFollowedBy blankline)
 
 isLowerHex :: Char -> Bool
 isLowerHex x = x >= '0' && x <= '9' || x >= 'a' && x <= 'f'
@@ -123,7 +125,7 @@ comment :: LP ()
 comment = do
   char '%'
   skipMany (satisfy (/='\n'))
-  newline
+  optional newline
   return ()
 
 bgroup :: LP ()
@@ -302,6 +304,13 @@ blockCommands = M.fromList $
   , ("item", skipopts *> loose_item)
   , ("documentclass", skipopts *> braced *> preamble)
   , ("centerline", (para . trimInlines) <$> (skipopts *> tok))
+  , ("caption", skipopts *> tok >>= setCaption)
+  , ("PandocStartInclude", startInclude)
+  , ("PandocEndInclude", endInclude)
+  , ("bibliography", mempty <$ (skipopts *> braced >>=
+                                addMeta "bibliography" . splitBibs))
+  , ("addbibresource", mempty <$ (skipopts *> braced >>=
+                                addMeta "bibliography" . splitBibs))
   ] ++ map ignoreBlocks
   -- these commands will be ignored unless --parse-raw is specified,
   -- in which case they will appear as raw latex blocks
@@ -309,7 +318,7 @@ blockCommands = M.fromList $
     -- newcommand, etc. should be parsed by macro, but we need this
     -- here so these aren't parsed as inline commands to ignore
   , "special", "pdfannot", "pdfstringdef"
-  , "bibliography", "bibliographystyle"
+  , "bibliographystyle"
   , "maketitle", "makeindex", "makeglossary"
   , "addcontentsline", "addtocontents", "addtocounter"
      -- \ignore{} is used conventionally in literate haskell for definitions
@@ -321,7 +330,19 @@ blockCommands = M.fromList $
   ]
 
 addMeta :: ToMetaValue a => String -> a -> LP ()
-addMeta field val = updateState $ setMeta field val
+addMeta field val = updateState $ \st ->
+  st{ stateMeta = addMetaField field val $ stateMeta st }
+
+splitBibs :: String -> [Inlines]
+splitBibs = map (str . flip replaceExtension "bib" . trim) . splitBy (==',')
+
+setCaption :: Inlines -> LP Blocks
+setCaption ils = do
+  updateState $ \st -> st{ stateCaption = Just ils }
+  return mempty
+
+resetCaption :: LP ()
+resetCaption = updateState $ \st -> st{ stateCaption = Nothing }
 
 authors :: LP ()
 authors = try $ do
@@ -332,7 +353,7 @@ authors = try $ do
                -- skip e.g. \vspace{10pt}
   auths <- sepBy oneAuthor (controlSeq "and")
   char '}'
-  addMeta "authors" (map trimInlines auths)
+  addMeta "author" (map trimInlines auths)
 
 section :: Attr -> Int -> LP Blocks
 section (ident, classes, kvs) lvl = do
@@ -375,18 +396,18 @@ isBlockCommand s = maybe False (const True) $ M.lookup s blockCommands
 
 inlineCommands :: M.Map String (LP Inlines)
 inlineCommands = M.fromList $
-  [ ("emph", emph <$> tok)
-  , ("textit", emph <$> tok)
-  , ("textsl", emph <$> tok)
-  , ("textsc", smallcaps <$> tok)
-  , ("sout", strikeout <$> tok)
-  , ("textsuperscript", superscript <$> tok)
-  , ("textsubscript", subscript <$> tok)
+  [ ("emph", extractSpaces emph <$> tok)
+  , ("textit", extractSpaces emph <$> tok)
+  , ("textsl", extractSpaces emph <$> tok)
+  , ("textsc", extractSpaces smallcaps <$> tok)
+  , ("sout", extractSpaces strikeout <$> tok)
+  , ("textsuperscript", extractSpaces superscript <$> tok)
+  , ("textsubscript", extractSpaces subscript <$> tok)
   , ("textbackslash", lit "\\")
   , ("backslash", lit "\\")
   , ("slash", lit "/")
-  , ("textbf", strong <$> tok)
-  , ("textnormal", spanWith ("",["nodecor"],[]) <$> tok)
+  , ("textbf", extractSpaces strong <$> tok)
+  , ("textnormal", extractSpaces (spanWith ("",["nodecor"],[])) <$> tok)
   , ("ldots", lit "…")
   , ("dots", lit "…")
   , ("mdots", lit "…")
@@ -406,15 +427,15 @@ inlineCommands = M.fromList $
   , ("{", lit "{")
   , ("}", lit "}")
   -- old TeX commands
-  , ("em", emph <$> inlines)
-  , ("it", emph <$> inlines)
-  , ("sl", emph <$> inlines)
-  , ("bf", strong <$> inlines)
+  , ("em", extractSpaces emph <$> inlines)
+  , ("it", extractSpaces emph <$> inlines)
+  , ("sl", extractSpaces emph <$> inlines)
+  , ("bf", extractSpaces strong <$> inlines)
   , ("rm", inlines)
-  , ("itshape", emph <$> inlines)
-  , ("slshape", emph <$> inlines)
-  , ("scshape", smallcaps <$> inlines)
-  , ("bfseries", strong <$> inlines)
+  , ("itshape", extractSpaces emph <$> inlines)
+  , ("slshape", extractSpaces emph <$> inlines)
+  , ("scshape", extractSpaces smallcaps <$> inlines)
+  , ("bfseries", extractSpaces strong <$> inlines)
   , ("/", pure mempty) -- italic correction
   , ("aa", lit "å")
   , ("AA", lit "Å")
@@ -516,25 +537,21 @@ inlineCommands = M.fromList $
   , ("citeauthor", (try (tok *> optional sp *> controlSeq "citetext") *>
                         complexNatbibCitation AuthorInText)
                    <|> citation "citeauthor" AuthorInText False)
+  , ("nocite", mempty <$ (citation "nocite" NormalCitation False >>=
+                          addMeta "nocite"))
   ] ++ map ignoreInlines
   -- these commands will be ignored unless --parse-raw is specified,
   -- in which case they will appear as raw latex blocks:
-  [ "noindent", "index", "nocite" ]
+  [ "noindent", "index" ]
 
 mkImage :: String -> LP Inlines
 mkImage src = do
-   -- try for a caption
-   (alt, tit) <- option (str "image", "") $ try $ do
-                   spaces
-                   controlSeq "caption"
-                   optional (char '*')
-                   ils <- grouped inline
-                   return (ils, "fig:")
+   let alt = str "image"
    case takeExtension src of
         "" -> do
               defaultExt <- getOption readerDefaultImageExtension
-              return $ image (addExtension src defaultExt) tit alt
-        _  -> return $ image src tit alt
+              return $ image (addExtension src defaultExt) "" alt
+        _  -> return $ image src "" alt
 
 inNote :: Inlines -> Inlines
 inNote ils =
@@ -788,31 +805,107 @@ rawEnv name = do
             (withRaw (env name blocks) >>= applyMacros' . snd)
      else env name blocks
 
+----
+
+type IncludeParser = ParserT [Char] [String] IO String
+
 -- | Replace "include" commands with file contents.
 handleIncludes :: String -> IO String
-handleIncludes = handleIncludes' []
+handleIncludes s = do
+  res <- runParserT includeParser' [] "input" s
+  case res of
+       Right s'    -> return s'
+       Left e      -> error $ show e
 
--- parents parameter prevents infinite include loops
-handleIncludes' :: [FilePath] -> String -> IO String
-handleIncludes' _ [] = return []
-handleIncludes' parents ('\\':'%':xs) =
-  ("\\%"++) `fmap` handleIncludes' parents xs
-handleIncludes' parents ('%':xs) = handleIncludes' parents
-  $ drop 1 $ dropWhile (/='\n') xs
-handleIncludes' parents ('\\':xs) =
-  case runParser include defaultParserState "input" ('\\':xs) of
-       Right (fs, rest) -> do yss <- mapM (\f -> if f `elem` parents
-                                                    then "" <$ warn ("Include file loop in '"
-                                                                      ++ f ++ "'.")
-                                                    else readTeXFile f >>=
-                                                           handleIncludes' (f:parents)) fs
-                              rest' <- handleIncludes' parents rest
-                              return $ intercalate "\n" yss ++ rest'
-       _  -> case runParser (verbCmd <|> verbatimEnv) defaultParserState
-                  "input" ('\\':xs) of
-                   Right (r, rest) -> (r ++) `fmap` handleIncludes' parents rest
-                   _               -> ('\\':) `fmap` handleIncludes' parents xs
-handleIncludes' parents (x:xs) = (x:) `fmap` handleIncludes' parents xs
+includeParser' :: IncludeParser
+includeParser' =
+  concat <$> many (comment' <|> escaped' <|> blob' <|> include'
+                   <|> startMarker' <|> endMarker'
+                   <|> verbCmd' <|> verbatimEnv' <|> backslash')
+
+comment' :: IncludeParser
+comment' = do
+  char '%'
+  xs <- manyTill anyChar newline
+  return ('%':xs ++ "\n")
+
+escaped' :: IncludeParser
+escaped' = try $ string "\\%" <|> string "\\\\"
+
+verbCmd' :: IncludeParser
+verbCmd' = fmap snd <$>
+  withRaw $ try $ do
+             string "\\verb"
+             c <- anyChar
+             manyTill anyChar (char c)
+
+verbatimEnv' :: IncludeParser
+verbatimEnv' = fmap snd <$>
+  withRaw $ try $ do
+             string "\\begin"
+             name <- braced'
+             guard $ name `elem` ["verbatim", "Verbatim", "lstlisting",
+                                  "minted", "alltt"]
+             manyTill anyChar (try $ string $ "\\end{" ++ name ++ "}")
+
+blob' :: IncludeParser
+blob' = try $ many1 (noneOf "\\%")
+
+backslash' :: IncludeParser
+backslash' = string "\\"
+
+braced' :: IncludeParser
+braced' = try $ char '{' *> manyTill (satisfy (/='}')) (char '}')
+
+include' :: IncludeParser
+include' = do
+  fs' <- try $ do
+              char '\\'
+              name <- try (string "include")
+                  <|> try (string "input")
+                  <|> string "usepackage"
+              -- skip options
+              skipMany $ try $ char '[' *> (manyTill anyChar (char ']'))
+              fs <- (map trim . splitBy (==',')) <$> braced'
+              return $ if name == "usepackage"
+                          then map (flip replaceExtension ".sty") fs
+                          else map (flip replaceExtension ".tex") fs
+  pos <- getPosition
+  containers <- getState
+  let fn = case containers of
+                (f':_) -> f'
+                []     -> "input"
+  -- now process each include file in order...
+  rest <- getInput
+  results' <- forM fs' (\f -> do
+    when (f `elem` containers) $
+      fail "Include file loop!"
+    contents <- lift $ readTeXFile f
+    return $ "\\PandocStartInclude{" ++ f ++ "}" ++
+             contents ++ "\\PandocEndInclude{" ++
+             fn ++ "}{" ++ show (sourceLine pos) ++ "}{"
+             ++ show (sourceColumn pos) ++ "}")
+  setInput $ concat results' ++ rest
+  return ""
+
+startMarker' :: IncludeParser
+startMarker' = try $ do
+  string "\\PandocStartInclude"
+  fn <- braced'
+  updateState (fn:)
+  setPosition $ newPos fn 1 1
+  return $ "\\PandocStartInclude{" ++ fn ++ "}"
+
+endMarker' :: IncludeParser
+endMarker' = try $ do
+  string "\\PandocEndInclude"
+  fn <- braced'
+  ln <- braced'
+  co <- braced'
+  updateState tail
+  setPosition $ newPos fn (fromMaybe 1 $ safeRead ln) (fromMaybe 1 $ safeRead co)
+  return $ "\\PandocEndInclude{" ++ fn ++ "}{" ++ ln ++ "}{" ++
+               co ++ "}"
 
 readTeXFile :: FilePath -> IO String
 readTeXFile f = do
@@ -827,27 +920,7 @@ readFileFromDirs (d:ds) f =
   E.catch (UTF8.readFile $ d </> f) $ \(_ :: E.SomeException) ->
     readFileFromDirs ds f
 
-include :: LP ([FilePath], String)
-include = do
-  name <- controlSeq "include"
-      <|> controlSeq "input"
-      <|> controlSeq "usepackage"
-  skipopts
-  fs <- (splitBy (==',')) <$> braced
-  rest <- getInput
-  let fs' = if name == "usepackage"
-               then map (flip replaceExtension ".sty") fs
-               else map (flip replaceExtension ".tex") fs
-  return (fs', rest)
-
-verbCmd :: LP (String, String)
-verbCmd = do
-  (_,r) <- withRaw $ do
-             controlSeq "verb"
-             c <- anyChar
-             manyTill anyChar (char c)
-  rest <- getInput
-  return (r, rest)
+----
 
 keyval :: LP (String, String)
 keyval = try $ do
@@ -869,17 +942,6 @@ alltt t = walk strToCode <$> parseFromString blocks
   where strToCode (Str s) = Code nullAttr s
         strToCode x       = x
 
-verbatimEnv :: LP (String, String)
-verbatimEnv = do
-  (_,r) <- withRaw $ do
-             controlSeq "begin"
-             name <- braced
-             guard $ name `elem` ["verbatim", "Verbatim", "lstlisting",
-                                  "minted", "alltt"]
-             verbEnv name
-  rest <- getInput
-  return (r,rest)
-
 rawLaTeXBlock :: Parser [Char] ParserState String
 rawLaTeXBlock = snd <$> try (withRaw (environment <|> blockCommand))
 
@@ -888,12 +950,33 @@ rawLaTeXInline = do
   raw <- (snd <$> withRaw inlineCommand) <|> (snd <$> withRaw blockCommand)
   RawInline "latex" <$> applyMacros' raw
 
+addImageCaption :: Blocks -> LP Blocks
+addImageCaption = walkM go
+  where go (Image attr alt (src,tit)) = do
+          mbcapt <- stateCaption <$> getState
+          case mbcapt of
+               Just ils -> return (Image attr (toList ils) (src, "fig:"))
+               Nothing  -> return (Image attr alt (src,tit))
+        go x = return x
+
+addTableCaption :: Blocks -> LP Blocks
+addTableCaption = walkM go
+  where go (Table c als ws hs rs) = do
+          mbcapt <- stateCaption <$> getState
+          case mbcapt of
+               Just ils -> return (Table (toList ils) als ws hs rs)
+               Nothing  -> return (Table c als ws hs rs)
+        go x = return x
+
 environments :: M.Map String (LP Blocks)
 environments = M.fromList
   [ ("document", env "document" blocks <* skipMany anyChar)
   , ("letter", env "letter" letter_contents)
-  , ("figure", env "figure" $ skipopts *> blocks)
+  , ("figure", env "figure" $
+         resetCaption *> skipopts *> blocks >>= addImageCaption)
   , ("center", env "center" blocks)
+  , ("table",  env "table" $
+         resetCaption *> skipopts *> blocks >>= addTableCaption)
   , ("tabular", env "tabular" simpTable)
   , ("quote", blockQuote <$> env "quote" blocks)
   , ("quotation", blockQuote <$> env "quotation" blocks)
@@ -1050,7 +1133,7 @@ paragraph = do
 
 preamble :: LP Blocks
 preamble = mempty <$> manyTill preambleBlock beginDoc
-  where beginDoc = lookAhead $ controlSeq "begin" *> string "{document}"
+  where beginDoc = lookAhead $ try $ controlSeq "begin" *> string "{document}"
         preambleBlock =  (void comment)
                      <|> (void sp)
                      <|> (void blanklines)
@@ -1144,12 +1227,13 @@ complexNatbibCitation mode = try $ do
 parseAligns :: LP [Alignment]
 parseAligns = try $ do
   char '{'
-  let maybeBar = try $ spaces >> optional (char '|')
+  let maybeBar = skipMany $ sp <|> () <$ char '|' <|> () <$ try (string "@{}")
   maybeBar
   let cAlign = AlignCenter <$ char 'c'
   let lAlign = AlignLeft <$ char 'l'
   let rAlign = AlignRight <$ char 'r'
-  let alignChar = optional sp *> (cAlign <|> lAlign <|> rAlign)
+  let parAlign = AlignLeft <$ (char 'p' >> braced)
+  let alignChar = cAlign <|> lAlign <|> rAlign <|> parAlign
   aligns' <- sepEndBy alignChar maybeBar
   spaces
   char '}'
@@ -1170,10 +1254,14 @@ parseTableRow :: Int  -- ^ number of columns
 parseTableRow cols = try $ do
   let tableCellInline = notFollowedBy (amp <|> lbreak) >> inline
   let tableCell = (plain . trimInlines . mconcat) <$> many tableCellInline
-  cells' <- sepBy tableCell amp
-  guard $ length cells' == cols
+  cells' <- sepBy1 tableCell amp
+  let numcells = length cells'
+  guard $ numcells <= cols && numcells >= 1
+  guard $ cells' /= [mempty]
+  -- note:  a & b in a three-column table leaves an empty 3rd cell:
+  let cells'' = cells' ++ replicate (cols - numcells) mempty
   spaces
-  return cells'
+  return cells''
 
 simpTable :: LP Blocks
 simpTable = try $ do
@@ -1184,9 +1272,23 @@ simpTable = try $ do
   header' <- option [] $ try (parseTableRow cols <* lbreak <* hline)
   rows <- sepEndBy (parseTableRow cols) (lbreak <* optional hline)
   spaces
+  skipMany (comment *> spaces)
   let header'' = if null header'
                     then replicate cols mempty
                     else header'
   lookAhead $ controlSeq "end" -- make sure we're at end
   return $ table mempty (zip aligns (repeat 0)) header'' rows
 
+startInclude :: LP Blocks
+startInclude = do
+  fn <- braced
+  setPosition $ newPos fn 1 1
+  return mempty
+
+endInclude :: LP Blocks
+endInclude = do
+  fn <- braced
+  ln <- braced
+  co <- braced
+  setPosition $ newPos fn (fromMaybe 1 $ safeRead ln) (fromMaybe 1 $ safeRead co)
+  return mempty

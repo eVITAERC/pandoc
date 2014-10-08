@@ -1,6 +1,6 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, TupleSections #-}
 {-
-Copyright (C) 2006-2013 John MacFarlane <jgm@berkeley.edu>
+Copyright (C) 2006-2014 John MacFarlane <jgm@berkeley.edu>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 {- |
    Module      : Main
-   Copyright   : Copyright (C) 2006-2013 John MacFarlane
+   Copyright   : Copyright (C) 2006-2014 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley@edu>
@@ -33,10 +33,12 @@ module Main where
 import Text.Pandoc
 import Text.Pandoc.Builder (setMeta)
 import Text.Pandoc.PDF (makePDF)
+import Text.Pandoc.Walk (walk)
 import Text.Pandoc.Readers.LaTeX (handleIncludes)
 import Text.Pandoc.Shared ( tabFilter, readDataFileUTF8, readDataFile,
                             safeRead, headerShift, normalize, err, warn,
                             openURL )
+import Text.Pandoc.MediaBag ( mediaDirectory, extractMediaBag, MediaBag )
 import Text.Pandoc.XML ( toEntities )
 import Text.Pandoc.SelfContained ( makeSelfContained )
 import Text.Pandoc.Process (pipeProcess)
@@ -47,34 +49,42 @@ import System.Exit ( exitWith, ExitCode (..) )
 import System.FilePath
 import System.Console.GetOpt
 import Data.Char ( toLower )
-import Data.List ( intercalate, isPrefixOf, sort, (\\) )
+import Data.List ( intercalate, isPrefixOf, isSuffixOf, sort, (\\) )
 import Data.Maybe ( isNothing )
-import System.Directory ( getAppUserDataDirectory, findExecutable )
+import System.Directory ( getAppUserDataDirectory, findExecutable,
+                          doesFileExist, Permissions(..), getPermissions )
 import System.IO ( stdout, stderr )
 import System.IO.Error ( isDoesNotExistError )
 import qualified Control.Exception as E
 import Control.Exception.Extensible ( throwIO )
 import qualified Text.Pandoc.UTF8 as UTF8
-import Control.Monad (when, unless, liftM)
+import Control.Monad (when, unless, (>=>))
+import Data.Maybe (isJust)
 import Data.Foldable (foldrM)
 import Network.URI (parseURI, isURI, URI(..))
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString as BS
 import Data.Aeson (eitherDecode', encode)
 import qualified Data.Map as M
-import System.IO.Error(ioeGetErrorType)
-import GHC.IO.Exception (IOErrorType(ResourceVanished))
 import Data.Yaml (decode)
 import qualified Data.Yaml as Yaml
 import qualified Data.Text as T
+import Control.Applicative ((<$>))
+import Text.Pandoc.Readers.Txt2Tags (getT2TMeta)
+import Data.Monoid
+
+type Transform = Pandoc -> Pandoc
 
 copyrightMessage :: String
-copyrightMessage = "\nCopyright (C) 2014 Tim T.Y. Lin\n" ++
-                    "This work is based on Pandoc:\n" ++
-                    "   Copyright (C) 2006-2014 John MacFarlane\n" ++
-                    "   Web:  http://johnmacfarlane.net/pandoc\n" ++
-                    "This is free software; see the source for copying conditions.  There is no\n" ++
-                    "warranty, not even for merchantability or fitness for a particular purpose."
+copyrightMessage = intercalate "\n" [
+  "",
+  "Copyright (C) 2014 Tim T.Y. Lin",
+  "This work is a fork of Pandoc:",
+  "   Copyright (C) 2006-2014 John MacFarlane",
+  "   Web:  http://johnmacfarlane.net/pandoc",
+  "This is free software; see the source for copying conditions.",
+  "There is no warranty, not even for merchantability or fitness",
+  "for a particular purpose." ]
 
 compileInfo :: String
 compileInfo =
@@ -88,30 +98,60 @@ compileInfo =
 -- comma separated words in lines with a maximum line length.
 wrapWords :: Int -> Int -> [String] -> String
 wrapWords indent c = wrap' (c - indent) (c - indent)
-        where wrap' _    _         []     = ""
-              wrap' cols remaining (x:xs) = if remaining == cols
-                                               then x ++ wrap' cols (remaining - length x) xs
-                                               else if (length x + 1) > remaining
-                                                       then ",\n" ++ replicate indent ' ' ++ x ++ wrap' cols (cols - length x) xs
-                                                       else ", "  ++ x ++ wrap' cols (remaining - (length x + 2)) xs
+  where
+    wrap'   _       _      []   = ""
+    wrap' cols remaining (x:xs)
+      | remaining == cols =
+            x ++ wrap' cols (remaining - length x) xs
+      | (length x + 1) > remaining =
+            ",\n" ++ replicate indent ' ' ++ x ++
+            wrap' cols (cols - length x) xs
+      | otherwise =
+            ", "  ++ x ++
+            wrap' cols (remaining - length x - 2) xs
 
 isTextFormat :: String -> Bool
-isTextFormat s = takeWhile (`notElem` "+-") s `notElem` ["odt","docx","epub","epub3"]
+isTextFormat s = takeWhile (`notElem` "+-") s `notElem` binaries
+  where binaries = ["odt","docx","epub","epub3"]
 
 externalFilter :: FilePath -> [String] -> Pandoc -> IO Pandoc
 externalFilter f args' d = do
+      mbexe <- if '/' `elem` f
+                  -- don't check PATH if filter name has a path
+                  then return Nothing
+                  -- we catch isDoesNotExistError because this will
+                  -- be triggered if PATH not set:
+                  else E.catch (findExecutable f)
+                                 (\e -> if isDoesNotExistError e
+                                           then return Nothing
+                                           else throwIO e)
+      (f', args'') <- case mbexe of
+                           Just x  -> return (x, args')
+                           Nothing -> do
+                             exists <- doesFileExist f
+                             if exists
+                                then do
+                                  isExecutable <- executable `fmap`
+                                                    getPermissions f
+                                  return $
+                                    case map toLower $ takeExtension f of
+                                         _ | isExecutable -> (f, args')
+                                         ".py"  -> ("python", f:args')
+                                         ".hs"  -> ("runhaskell", f:args')
+                                         ".pl"  -> ("perl", f:args')
+                                         ".rb"  -> ("ruby", f:args')
+                                         ".php" -> ("php", f:args')
+                                         _      -> (f, args')
+                                else err 85 $ "Filter " ++ f ++ " not found"
       (exitcode, outbs, errbs) <- E.handle filterException $
-                                    pipeProcess Nothing f args' $ encode d
+                                    pipeProcess Nothing f' args'' $ encode d
       when (not $ B.null errbs) $ B.hPutStr stderr errbs
       case exitcode of
            ExitSuccess    -> return $ either error id $ eitherDecode' outbs
            ExitFailure _  -> err 83 $ "Error running filter " ++ f
  where filterException :: E.SomeException -> IO a
        filterException e = err 83 $ "Error running filter " ++ f ++ "\n" ++
-                                  if ioeGetErrorType `fmap` E.fromException e ==
-                                          Just ResourceVanished
-                                     then f ++ " not found in path"
-                                     else show e
+                                       show e
 
 -- | Data structure for command line options.
 data Opt = Opt
@@ -122,7 +162,7 @@ data Opt = Opt
     , optWriter            :: String  -- ^ Writer format
     , optParseRaw          :: Bool    -- ^ Parse unconvertable HTML and TeX
     , optTableOfContents   :: Bool    -- ^ Include table of contents
-    , optTransforms        :: [Pandoc -> Pandoc]  -- ^ Doc transforms to apply
+    , optTransforms        :: [Transform]  -- ^ Doc transforms to apply
     , optTemplate          :: Maybe FilePath  -- ^ Custom template
     , optVariables         :: [(String,String)] -- ^ Template variables to set
     , optMetadata          :: M.Map String MetaValue -- ^ Metadata fields to set
@@ -166,7 +206,9 @@ data Opt = Opt
     , optAscii             :: Bool       -- ^ Use ascii characters only in html
     , optTeXLigatures      :: Bool       -- ^ Use TeX ligatures for quotes/dashes
     , optDefaultImageExtension :: String -- ^ Default image extension
+    , optExtractMedia      :: Maybe FilePath -- ^ Path to extract embedded media
     , optTrace             :: Bool       -- ^ Print debug information
+    , optTrackChanges      :: TrackChanges -- ^ Accept or reject MS Word track-changes.
     }
 
 -- | Defaults for command-line options.
@@ -223,7 +265,9 @@ defaultOpts = Opt
     , optAscii                 = False
     , optTeXLigatures          = True
     , optDefaultImageExtension = ""
+    , optExtractMedia          = Nothing
     , optTrace                 = False
+    , optTrackChanges          = AcceptChanges
     }
 
 -- | A list of functions, each transforming the options data structure
@@ -232,19 +276,13 @@ options :: [OptDescr (Opt -> IO Opt)]
 options =
     [ Option "fr" ["from","read"]
                  (ReqArg
-                  (\arg opt -> return opt { optReader = map toLower arg })
+                  (\arg opt -> return opt { optReader = arg })
                   "FORMAT")
                  ""
 
     , Option "tw" ["to","write"]
                  (ReqArg
-                  (\arg opt -> case T.stripSuffix (T.pack "_bodyonly")
-                                            (T.pack $ map toLower arg) of
-                               Just arg' -> return
-                                            opt { optWriter = T.unpack arg'
-                                                , optStandalone = False }
-                               Nothing   -> return
-                                            opt { optWriter = map toLower arg })
+                  (\arg opt -> return opt { optWriter = arg })
                   "FORMAT")
                  ""
 
@@ -341,6 +379,26 @@ options =
                                           "tab-stop must be a number greater than 0")
                   "NUMBER")
                  "" -- "Tab stop (default 4)"
+
+    , Option "" ["track-changes"]
+                 (ReqArg
+                  (\arg opt -> do
+                     action <- case arg of
+                            "accept" -> return AcceptChanges
+                            "reject" -> return RejectChanges
+                            "all"    -> return AllChanges
+                            _        -> err 6
+                               ("Unknown option for track-changes: " ++ arg)
+                     return opt { optTrackChanges = action })
+                  "accept|reject|all")
+                 "" -- "Accepting or reject MS Word track-changes.""
+
+    , Option "" ["extract-media"]
+                 (ReqArg
+                  (\arg opt -> do
+                    return opt { optExtractMedia = Just arg })
+                  "PATH")
+                 "" -- "Directory to which to extract embedded media"
 
     , Option "s" ["standalone"]
                  (NoArg
@@ -820,7 +878,7 @@ options =
                      prg <- getProgName
                      defaultDatadir <- getAppUserDataDirectory "pandoc"
                      UTF8.hPutStrLn stdout (prg ++
-                       " 0.1.2-alpha, incorporating Pandoc " ++ pandocVersion ++
+                       " 0.1.3-alpha, incorporating Pandoc " ++ pandocVersion ++
                        compileInfo ++ "\nDefault user data directory: " ++
                        defaultDatadir ++ copyrightMessage)
                      exitWith ExitSuccess ))
@@ -879,13 +937,18 @@ defaultReaderName fallback (x:xs) =
     ".latex"    -> "latex"
     ".ltx"      -> "latex"
     ".rst"      -> "rst"
+    ".org"      -> "org"
     ".lhs"      -> "markdown+lhs"
     ".db"       -> "docbook"
     ".opml"     -> "opml"
     ".wiki"     -> "mediawiki"
+    ".dokuwiki" -> "dokuwiki"
     ".textile"  -> "textile"
     ".native"   -> "native"
     ".json"     -> "json"
+    ".docx"     -> "docx"
+    ".t2t"      -> "t2t"
+    ".epub"     -> "epub"
     _           -> defaultReaderName fallback xs
 
 -- Returns True if extension of first source is .lhs
@@ -927,12 +990,37 @@ defaultWriterName x =
     ".fb2"      -> "fb2"
     ".opml"     -> "opml"
     ['.',y] | y `elem` ['1'..'9'] -> "man"
-    _          -> "html"
+    _           -> "html"
+
+-- Transformations of a Pandoc document post-parsing:
+
+extractMedia :: MediaBag -> FilePath -> Pandoc -> IO Pandoc
+extractMedia media dir d =
+  case [fp | (fp, _, _) <- mediaDirectory media] of
+        []  -> return d
+        fps -> do
+          extractMediaBag True dir media
+          return $ walk (adjustImagePath dir fps) d
+
+adjustImagePath :: FilePath -> [FilePath] -> Inline -> Inline
+adjustImagePath dir paths (Image attr lab (src, tit))
+   | src `elem` paths = Image attr lab (dir ++ "/" ++ src, tit)
+adjustImagePath _ _ x = x
+
+adjustMetadata :: M.Map String MetaValue -> Pandoc -> IO Pandoc
+adjustMetadata metadata d = return $ M.foldWithKey setMeta d metadata
+
+applyTransforms :: [Transform] -> Pandoc -> IO Pandoc
+applyTransforms transforms d = return $ foldr ($) d transforms
+
+applyFilters :: [FilePath] -> [String] -> Pandoc -> IO Pandoc
+applyFilters filters args d =
+  foldrM ($) d $ map (flip externalFilter args) filters
 
 main :: IO ()
 main = do
 
-  rawArgs <- liftM (map UTF8.decodeArg) getArgs
+  rawArgs <- map UTF8.decodeArg <$> getArgs
   prg <- getProgName
   let compatMode = (prg == "hsmarkdown")
   let scholarlyPandoc = (prg == "scholdoc" || prg == "scholpandoc")
@@ -955,6 +1043,7 @@ main = do
                                              , optSmart = True
                                              , optParseRaw = True
                                              , optStandalone = True
+                                             , optHTMLMathMethod = MathJax ""
                                              }
                             else defaultOpts
 
@@ -974,7 +1063,7 @@ main = do
               , optTemplate              = templatePath
               , optOutputFile            = outputFile
               , optNumberSections        = numberSections
-              , optNumberOffset            = numberFrom
+              , optNumberOffset          = numberFrom
               , optSectionDivs           = sectionDivs
               , optIncremental           = incremental
               , optSelfContained         = selfContained
@@ -1012,7 +1101,9 @@ main = do
               , optAscii                 = ascii
               , optTeXLigatures          = texLigatures
               , optDefaultImageExtension = defaultImageExtension
+              , optExtractMedia          = mbExtractMedia
               , optTrace                 = trace
+              , optTrackChanges          = trackChanges
              } = opts
 
   when dumpArgs $
@@ -1021,71 +1112,79 @@ main = do
        exitWith ExitSuccess
 
   -- --bibliography implies -F pandoc-citeproc for backwards compatibility:
-  let filters' = case M.lookup "bibliography" metadata of
-                       Just _ | optCiteMethod opts /= Natbib &&
-                                optCiteMethod opts /= Biblatex &&
-                                all (\f -> takeBaseName f /= "scholpandoc-citeproc")
-                                filters -> "scholpandoc-citeproc" : filters
-                       _                -> filters
-  let plugins = map externalFilter filters'
+  let needsCiteproc = isJust (M.lookup "bibliography" metadata) &&
+                      optCiteMethod opts `notElem` [Natbib, Biblatex] &&
+                      "pandoc-citeproc" `notElem` map takeBaseName filters
+  let filters' = if needsCiteproc then "scholpandoc-citeproc" : filters
+                                  else filters
 
   let sources = if ignoreArgs then [] else args
 
   datadir <- case mbDataDir of
                   Nothing   -> E.catch
-                                 (liftM Just $ getAppUserDataDirectory "pandoc")
+                                 (Just <$> getAppUserDataDirectory "pandoc")
                                  (\e -> let _ = (e :: E.SomeException)
                                         in  return Nothing)
                   Just _    -> return mbDataDir
 
   -- assign reader and writer based on options and filenames
-  let readerName' = if null readerName
-                      then let fallback = if any isURI sources
-                                             then "html"
-                                             else "markdown"
-                           in  defaultReaderName fallback sources
-                      else readerName
+  let readerName' = case map toLower readerName of
+                          []       -> defaultReaderName
+                                      (if any isURI sources
+                                          then "html"
+                                          else "markdown") sources
+                          "html4"  -> "html"
+                          x        -> x
 
   let scholarlyMode = if readerName' == "markdown_scholarly"
                          then True
                          else False
 
-  let writerNameTmp = if null writerName
-                         then defaultWriterName outputFile
-                         else case writerName of
-                                   "epub2"   -> "epub"
-                                   "html4"   -> "html"
-                                   "html"    -> if scholarlyMode then "html5"
-                                                                 else "html"
-                                   x         -> x
+  -- postepending "_bodyonly" to a writer enables a special "body-only" template
+  let (writerNameTrim, bodyOnly) = case T.stripSuffix (T.pack "_bodyonly")
+                                              (T.pack $ map toLower writerName) of
+                                        Just w   -> (T.unpack w, True)
+                                        Nothing  -> (writerName, False)
 
-  -- ScholMD only implemented for html5
-  let writerName' = if not scholarlyMode
-                       then writerNameTmp
-                       else case writerNameTmp of
-                            "html" -> "html5"
-                            _ -> writerNameTmp
+  let writerName' = case map toLower writerNameTrim of
+                          -- ScholMD defaults to html5
+                          []        -> case defaultWriterName outputFile of
+                                          "html" -> if scholarlyMode
+                                                        then "html5"
+                                                        else "html"
+                                          x      -> x
+                          "epub2"   -> "epub"
+                          "html4"   -> "html"
+                          -- ScholMD only implemented for html5
+                          "html"    -> if scholarlyMode then "html5" else "html"
+                          x         -> x
 
   let pdfOutput = map toLower (takeExtension outputFile) == ".pdf"
 
   let laTeXOutput = "latex" `isPrefixOf` writerName' ||
                     "beamer" `isPrefixOf` writerName'
 
-  when pdfOutput $ do
-    -- make sure writer is latex or beamer
-    unless laTeXOutput $
-      err 47 $ "cannot produce pdf output with " ++ writerName' ++ " writer"
-    -- check for latex program
-    mbLatex <- findExecutable latexEngine
-    case mbLatex of
-         Nothing  -> err 41 $
-           latexEngine ++ " not found. " ++
-           latexEngine ++ " is needed for pdf output."
-         Just _   -> return ()
+  writer <- if ".lua" `isSuffixOf` writerName'
+               -- note:  use non-lowercased version writerName
+               then return $ IOStringWriter $ writeCustom writerName
+               else case getWriter writerName' of
+                         Left e  -> err 9 $
+                           if writerName' == "pdf"
+                              then e ++
+                               "\nTo create a pdf with pandoc, use " ++
+                               "the latex or beamer writer and specify\n" ++
+                               "an output file with .pdf extension " ++
+                               "(pandoc -t latex -o filename.pdf)."
+                              else e
+                         Right w -> return w
 
-  reader <- case getReader readerName' of
-     Right r  -> return r
-     Left e   -> err 7 e
+  reader <- if "t2t" == readerName'
+              then (mkStringReader .
+                    readTxt2Tags) <$>
+                      (getT2TMeta sources outputFile)
+              else case getReader readerName' of
+                Right r  -> return r
+                Left e   -> err 7 e
 
   let standalone' = standalone || not (isTextFormat writerName') || pdfOutput
 
@@ -1100,14 +1199,18 @@ main = do
               >> return ()
 
   let (templatePath', standalone'') = if scholarlyMode && isNothing templatePath
-       then if not standalone'
-               then if writerName' == "html5" -- always use
-                       then (Just "scholmdTemplate_bodyOnly.html5", True)
-                       else (Nothing, False)
-               else case writerName' of
-                    "html5" -> (Just "scholmdTemplate.html5", True)
-                    "latex" -> (Just "scholmdTemplate.latex", True)
-                    _       -> (Nothing, True)
+       then if standalone' && not bodyOnly
+               then case writerName' of
+                      "html5" -> (Just "scholmdTemplate.html5", True)
+                      "latex" -> (Just "scholmdTemplate.latex", True)
+                      _       -> (Nothing, True)
+               else if bodyOnly
+                     then case writerName' of
+                            -- needed to conform to scholmd schema, and also
+                            -- for math definitions and MathJax settings
+                            "html5" -> (Just "scholmdTemplate_bodyOnly.html5", True)
+                            _       -> (Nothing, standalone')
+                     else (Nothing, standalone')
        else (templatePath, standalone')
 
   let mathJaxCDNaddr = "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML-full"
@@ -1116,9 +1219,10 @@ main = do
                                         then MathJax mathJaxCDNaddr
                                         else MathJax ""
       checkMathJaxCDN (MathJax a) = MathJax a
+      checkMathJaxCDN PlainMath = PlainMath
       checkMathJaxCDN _ = checkMathJaxCDN (MathJax "") -- force using MathJax
 
-  let mathMethod' = if not scholarlyMode
+  let mathMethod'' = if not scholarlyMode
                        then mathMethod
                        else checkMathJaxCDN mathMethod
 
@@ -1157,7 +1261,7 @@ main = do
                                                      in throwIO e')
                                        else throwIO e)
 
-  variables' <- case mathMethod' of
+  variables' <- case mathMethod'' of
                       LaTeXMathML Nothing -> do
                          s <- readDataFileUTF8 datadir "LaTeXMathML.js"
                          return $ ("mathml-script", s) : variables
@@ -1170,19 +1274,21 @@ main = do
                     then do
                         dztempl <- readDataFileUTF8 datadir
                                      ("dzslides" </> "template.html")
-                        let dzcore = unlines $ dropWhile (not . isPrefixOf "<!-- {{{{ dzslides core")
-                                             $ lines dztempl
+                        let dzline = "<!-- {{{{ dzslides core"
+                        let dzcore = unlines
+                                   $ dropWhile (not . (dzline `isPrefixOf`))
+                                   $ lines dztempl
                         return $ ("dzslides-core", dzcore) : variables'
                     else return variables'
+
   let sourceURL = case sources of
-                        []    -> Nothing
-                        (x:_) -> case parseURI x of
-                                    Just u
-                                      | uriScheme u `elem` ["http:","https:"] ->
-                                          Just $ show u{ uriPath = "",
-                                                         uriQuery = "",
-                                                         uriFragment = "" }
-                                    _ -> Nothing
+                    []    -> Nothing
+                    (x:_) -> case parseURI x of
+                                Just u
+                                  | uriScheme u `elem` ["http:","https:"] ->
+                                      Just $ show u{ uriQuery = "",
+                                                     uriFragment = "" }
+                                _ -> Nothing
 
   let readerOpts = def{ readerSmart = smart || (texLigatures &&
                           (laTeXOutput || "context" `isPrefixOf` writerName'))
@@ -1195,14 +1301,52 @@ main = do
                       , readerApplyMacros = not laTeXOutput
                       , readerDefaultImageExtension = defaultImageExtension'
                       , readerTrace = trace
+                      , readerTrackChanges = trackChanges
                       }
+
+  when (not (isTextFormat writerName') && outputFile == "-") $
+    err 5 $ "Cannot write " ++ writerName' ++ " output to stdout.\n" ++
+            "Specify an output file using the -o option."
+
+  let readSources [] = mapM readSource ["-"]
+      readSources srcs = mapM readSource srcs
+      readSource "-" = UTF8.getContents
+      readSource src = case parseURI src of
+                            Just u | uriScheme u `elem` ["http:","https:"] ->
+                                       readURI src
+                            _       -> UTF8.readFile src
+      readURI src = do
+        res <- openURL src
+        case res of
+             Left e        -> throwIO e
+             Right (bs,_)  -> return $ UTF8.toString bs
+
+  let readFiles [] = error "Cannot read archive from stdin"
+      readFiles (x:_) = B.readFile x
+
+  let convertTabs = tabFilter (if preserveTabs || readerName' == "t2t"
+                                 then 0
+                                 else tabStop)
+
+  let handleIncludes' = if readerName' == "latex" ||
+                           readerName' == "latex+lhs"
+                               then handleIncludes
+                               else return
+
+  (doc, media) <-
+     case reader of
+          StringReader r-> (, mempty) <$>
+            (  readSources >=>
+               handleIncludes' . convertTabs . intercalate "\n" >=>
+               r readerOpts ) sources
+          ByteStringReader r -> readFiles sources >>= r readerOpts
 
   let writerOptions = def { writerStandalone       = standalone'',
                             writerTemplate         = templ,
                             writerVariables        = variables'',
                             writerTabStop          = tabStop,
                             writerTableOfContents  = toc,
-                            writerHTMLMathMethod   = mathMethod',
+                            writerHTMLMathMethod   = mathMethod'',
                             writerIncremental      = incremental,
                             writerCiteMethod       = citeMethod,
                             writerIgnoreNotes      = False,
@@ -1233,40 +1377,15 @@ main = do
                             writerTOCDepth         = epubTOCDepth,
                             writerReferenceODT     = referenceODT,
                             writerReferenceDocx    = referenceDocx,
-                            writerScholarly        = scholarlyMode
+                            writerScholarly        = scholarlyMode,
+                            writerMediaBag         = media
                           }
 
-  when (not (isTextFormat writerName') && outputFile == "-") $
-    err 5 $ "Cannot write " ++ writerName' ++ " output to stdout.\n" ++
-            "Specify an output file using the -o option."
 
-  let readSources [] = mapM readSource ["-"]
-      readSources srcs = mapM readSource srcs
-      readSource "-" = UTF8.getContents
-      readSource src = case parseURI src of
-                            Just u | uriScheme u `elem` ["http:","https:"] ->
-                                       readURI src
-                            _       -> UTF8.readFile src
-      readURI src = do
-        res <- openURL src
-        case res of
-             Left e        -> throwIO e
-             Right (bs,_)  -> return $ UTF8.toString bs
-
-  let convertTabs = tabFilter (if preserveTabs then 0 else tabStop)
-
-  let handleIncludes' = if readerName' == "latex" || readerName' == "latex+lhs"
-                           then handleIncludes
-                           else return
-
-  doc <- readSources sources >>=
-           handleIncludes' . convertTabs . intercalate "\n" >>=
-           reader readerOpts
-
-
-  let doc0 = M.foldWithKey setMeta doc metadata
-  let doc1 = foldr ($) doc0 transforms
-  doc2 <- foldrM ($) doc1 $ map ($ [writerName']) plugins
+  doc' <- (maybe return (extractMedia media) mbExtractMedia >=>
+           adjustMetadata metadata >=>
+           applyTransforms transforms >=>
+           applyFilters filters' [writerName']) doc
 
   let writeBinary :: B.ByteString -> IO ()
       writeBinary = B.writeFile (UTF8.encodePath outputFile)
@@ -1275,24 +1394,37 @@ main = do
       writerFn "-" = UTF8.putStr
       writerFn f   = UTF8.writeFile f
 
-  case getWriter writerName' of
-    Left e -> err 9 e
-    Right (IOStringWriter f) -> f writerOptions doc2 >>= writerFn outputFile
-    Right (IOByteStringWriter f) -> f writerOptions doc2 >>= writeBinary
-    Right (PureStringWriter f)
+  case writer of
+    IOStringWriter f -> f writerOptions doc' >>= writerFn outputFile
+    IOByteStringWriter f -> f writerOptions doc' >>= writeBinary
+    PureStringWriter f
       | pdfOutput -> do
-              res <- makePDF latexEngine f writerOptions doc2
+              -- make sure writer is latex or beamer
+              unless laTeXOutput $
+                err 47 $ "cannot produce pdf output with " ++ writerName' ++
+                         " writer"
+
+              -- check for latex program
+              mbLatex <- findExecutable latexEngine
+              when (mbLatex == Nothing) $
+                   err 41 $ latexEngine ++ " not found. " ++
+                     latexEngine ++ " is needed for pdf output."
+
+              res <- makePDF latexEngine f writerOptions doc'
               case res of
                    Right pdf -> writeBinary pdf
-                   Left err' -> err 43 $ UTF8.toStringLazy err'
-      | otherwise -> selfcontain (f writerOptions doc2 ++
+                   Left err' -> do
+                     B.hPutStr stderr $ err'
+                     B.hPut stderr $ B.pack [10]
+                     err 43 "Error producing PDF from TeX source"
+      | otherwise -> selfcontain (f writerOptions doc' ++
                                   ['\n' | not standalone''])
                       >>= writerFn outputFile . handleEntities
           where htmlFormat = writerName' `elem`
                                ["html","html+lhs","html5","html5+lhs",
                                "s5","slidy","slideous","dzslides","revealjs"]
                 selfcontain = if selfContained && htmlFormat
-                                 then makeSelfContained datadir
+                                 then makeSelfContained writerOptions
                                  else return
                 handleEntities = if htmlFormat && ascii
                                     then toEntities

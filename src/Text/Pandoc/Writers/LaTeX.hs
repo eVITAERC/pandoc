@@ -1,6 +1,7 @@
-{-# LANGUAGE OverloadedStrings, ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings, ScopedTypeVariables,
+             PatternGuards #-}
 {-
-Copyright (C) 2006-2010 John MacFarlane <jgm@berkeley.edu>
+Copyright (C) 2006-2014 John MacFarlane <jgm@berkeley.edu>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,7 +20,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 {- |
    Module      : Text.Pandoc.Writers.LaTeX
-   Copyright   : Copyright (C) 2006-2010 John MacFarlane
+   Copyright   : Copyright (C) 2006-2014 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -39,7 +40,7 @@ import Text.Pandoc.Templates
 import Text.Printf ( printf )
 import Network.URI ( isURI, unEscapeString )
 import System.FilePath ( dropExtension )
-import Data.List ( (\\), isSuffixOf, isInfixOf,
+import Data.List ( (\\), isSuffixOf, isInfixOf, stripPrefix,
                    isPrefixOf, intercalate, intersperse )
 import Data.Char ( toLower, isPunctuation, isAscii, isLetter, isDigit, ord )
 import Data.Maybe ( fromMaybe , isJust, fromJust )
@@ -54,6 +55,7 @@ import Text.Pandoc.Highlighting (highlight, styleToLaTeX,
 
 data WriterState =
   WriterState { stInNote        :: Bool          -- true if we're in a note
+              , stInQuote       :: Bool          -- true if in a blockquote
               , stInMinipage    :: Bool          -- true if in minipage
               , stNotes         :: [Doc]         -- notes in a minipage
               , stOLLevel       :: Int           -- level of ordered list nesting
@@ -82,7 +84,8 @@ data WriterState =
 writeLaTeX :: WriterOptions -> Pandoc -> String
 writeLaTeX options document =
   evalState (pandocToLaTeX options document) $
-  WriterState { stInNote = False, stInMinipage = False, stNotes = [],
+  WriterState { stInNote = False, stInQuote = False,
+                stInMinipage = False, stNotes = [],
                 stOLLevel = 1, stOptions = options,
                 stVerbInNote = False,
                 stTable = False, stStrikeout = False,
@@ -158,7 +161,7 @@ pandocToLaTeX options (Pandoc meta blocks) = do
   authorsMeta <- mapM (stringToLaTeX TextString . stringify) $ docAuthors meta
   let context  =  defField "toc" (writerTableOfContents options) $
                   defField "toc-depth" (show (writerTOCDepth options -
-                                              if writerChapters options
+                                              if stBook st
                                                  then 1
                                                  else 0)) $
                   defField "body" main $
@@ -166,8 +169,7 @@ pandocToLaTeX options (Pandoc meta blocks) = do
                   defField "author-meta" (intercalate "; " authorsMeta) $
                   defField "documentclass" (if writerBeamer options
                                                then ("beamer" :: String)
-                                               else if writerChapters options
-                                                       && not (writerScholarly options)
+                                               else if stBook st
                                                     then "book"
                                                     else "article") $
                   defField "verbatim-in-note" (stVerbInNote st) $
@@ -231,7 +233,7 @@ stringToLaTeX  _     []     = return ""
 stringToLaTeX  ctx (x:xs) = do
   opts <- gets stOptions
   rest <- stringToLaTeX ctx xs
-  let ligatures = writerTeXLigatures opts && (ctx /= CodeString)
+  let ligatures = writerTeXLigatures opts && ctx == TextString
   let isUrl = ctx == URLString
   when (x == '€') $
      modify $ \st -> st{ stUsesEuro = True }
@@ -245,7 +247,8 @@ stringToLaTeX  ctx (x:xs) = do
        '&' -> "\\&" ++ rest
        '_' | not isUrl -> "\\_" ++ rest
        '#' -> "\\#" ++ rest
-       '-' -> case xs of   -- prevent adjacent hyphens from forming ligatures
+       '-' | not isUrl -> case xs of
+                   -- prevent adjacent hyphens from forming ligatures
                    ('-':_) -> "-\\/" ++ rest
                    _       -> '-' : rest
        '~' | not isUrl -> "\\textasciitilde{}" ++ rest
@@ -257,6 +260,7 @@ stringToLaTeX  ctx (x:xs) = do
        '>' -> "\\textgreater{}" ++ rest
        '[' -> "{[}" ++ rest  -- to avoid interpretation as
        ']' -> "{]}" ++ rest  -- optional arguments
+       '\'' | ctx == CodeString -> "\\textquotesingle{}" ++ rest
        '\160' -> "~" ++ rest
        '\x2026' -> "\\ldots{}" ++ rest
        '\x2018' | ligatures -> "`" ++ rest
@@ -267,12 +271,13 @@ stringToLaTeX  ctx (x:xs) = do
        '\x2013' | ligatures -> "--" ++ rest
        _        -> x : rest
 
-toLabel :: String -> String
-toLabel [] = ""
-toLabel (x:xs)
-  | (isLetter x || isDigit x) && isAscii x = x:toLabel xs
-  | elem x "-+=:;." = x:toLabel xs
-  | otherwise = "ux" ++ printf "%x" (ord x) ++ toLabel xs
+toLabel :: String -> State WriterState String
+toLabel z = go `fmap` stringToLaTeX URLString z
+ where go [] = ""
+       go (x:xs)
+         | (isLetter x || isDigit x) && isAscii x = x:go xs
+         | elem x "-+=:;." = x:go xs
+         | otherwise = "ux" ++ printf "%x" (ord x) ++ go xs
 
 -- | Puts contents into LaTeX command.
 inCmd :: String -> Doc -> Doc
@@ -337,18 +342,23 @@ isLineBreakOrSpace _ = False
 blockToLaTeX :: Block     -- ^ Block to convert
              -> State WriterState Doc
 blockToLaTeX Null = return empty
-blockToLaTeX (Div (_,classes,_) bs) = do
+blockToLaTeX (Div (identifier,classes,_) bs) = do
   beamer <- writerBeamer `fmap` gets stOptions
+  ref <- toLabel identifier
+  let linkAnchor = if null identifier
+                      then empty
+                      else "\\hyperdef{}" <> braces (text ref) <> "{}"
   contents <- blockListToLaTeX bs
   if beamer && "notes" `elem` classes  -- speaker notes
      then return $ "\\note" <> braces contents
-     else return contents
+     else return (linkAnchor $$ contents)
 blockToLaTeX (Plain lst) =
   inlineListToLaTeX $ dropWhile isLineBreakOrSpace lst
 -- title beginning with fig: indicates that the image is a figure
 -- the identifiers in attr will be lifted to the Figure block
 blockToLaTeX (Para [Image attr txt (src,'f':'i':'g':':':tit)]) =
   imageGridToLaTeX attr [ImageGrid [[Image attr [] (src,tit)]]] noPrepContent txt
+-- . . . indicates pause in beamer slides
 blockToLaTeX (Para [Str ".",Space,Str ".",Space,Str "."]) = do
   beamer <- writerBeamer `fmap` gets stOptions
   if beamer
@@ -366,61 +376,64 @@ blockToLaTeX (BlockQuote lst) = do
          modify $ \s -> s{ stIncremental = oldIncremental }
          return result
        _ -> do
+         oldInQuote <- gets stInQuote
+         modify (\s -> s{stInQuote = True})
          contents <- blockListToLaTeX lst
+         modify (\s -> s{stInQuote = oldInQuote})
          return $ "\\begin{quote}" $$ contents $$ "\\end{quote}"
 blockToLaTeX (CodeBlock (identifier,classes,keyvalAttr) str) = do
   opts <- gets stOptions
+  ref <- toLabel identifier
+  let linkAnchor = if null identifier
+                      then empty
+                      else "\\hyperdef{}" <> braces (text ref) <>
+                                braces ("\\label" <> braces (text ref))
+  let lhsCodeBlock = do
+        modify $ \s -> s{ stLHS = True }
+        return $ flush (linkAnchor $$ "\\begin{code}" $$ text str $$
+                            "\\end{code}") $$ cr
+  let rawCodeBlock = do
+        st <- get
+        env <- if stInNote st
+                  then modify (\s -> s{ stVerbInNote = True }) >>
+                       return "Verbatim"
+                  else return "verbatim"
+        return $ flush (linkAnchor $$ text ("\\begin{" ++ env ++ "}") $$
+                 text str $$ text ("\\end{" ++ env ++ "}")) <> cr
+  let listingsCodeBlock = do
+        st <- get
+        let params = if writerListings (stOptions st)
+                     then (case getListingsLanguage classes of
+                                Just l  -> [ "language=" ++ l ]
+                                Nothing -> []) ++
+                          [ "numbers=left" | "numberLines" `elem` classes
+                             || "number" `elem` classes
+                             || "number-lines" `elem` classes ] ++
+                          [ (if key == "startFrom"
+                                then "firstnumber"
+                                else key) ++ "=" ++ attr |
+                                (key,attr) <- keyvalAttr ] ++
+                          (if identifier == ""
+                                then []
+                                else [ "label=" ++ ref ])
+
+                     else []
+            printParams
+                | null params = empty
+                | otherwise   = brackets $ hcat (intersperse ", " (map text params))
+        return $ flush ("\\begin{lstlisting}" <> printParams $$ text str $$
+                 "\\end{lstlisting}") $$ cr
+  let highlightedCodeBlock =
+        case highlight formatLaTeXBlock ("",classes,keyvalAttr) str of
+               Nothing -> rawCodeBlock
+               Just  h -> modify (\st -> st{ stHighlighting = True }) >>
+                          return (flush $ linkAnchor $$ text h)
   case () of
      _ | isEnabled Ext_literate_haskell opts && "haskell" `elem` classes &&
          "literate" `elem` classes                      -> lhsCodeBlock
        | writerListings opts                            -> listingsCodeBlock
        | writerHighlight opts && not (null classes)     -> highlightedCodeBlock
        | otherwise                                      -> rawCodeBlock
-   where ref = text $ toLabel identifier
-         linkAnchor = if null identifier
-                         then empty
-                         else "\\hyperdef{}" <> braces ref <>
-                                   braces ("\\label" <> braces ref)
-         lhsCodeBlock = do
-           modify $ \s -> s{ stLHS = True }
-           return $ flush (linkAnchor $$ "\\begin{code}" $$ text str $$
-                               "\\end{code}") $$ cr
-         rawCodeBlock = do
-           st <- get
-           env <- if stInNote st
-                     then modify (\s -> s{ stVerbInNote = True }) >>
-                          return "Verbatim"
-                     else return "verbatim"
-           return $ flush (linkAnchor $$ text ("\\begin{" ++ env ++ "}") $$
-                    text str $$ text ("\\end{" ++ env ++ "}")) <> cr
-         listingsCodeBlock = do
-           st <- get
-           let params = if writerListings (stOptions st)
-                        then (case getListingsLanguage classes of
-                                   Just l  -> [ "language=" ++ l ]
-                                   Nothing -> []) ++
-                             [ "numbers=left" | "numberLines" `elem` classes
-                                || "number" `elem` classes
-                                || "number-lines" `elem` classes ] ++
-                             [ (if key == "startFrom"
-                                   then "firstnumber"
-                                   else key) ++ "=" ++ attr |
-                                   (key,attr) <- keyvalAttr ] ++
-                             (if identifier == ""
-                                   then []
-                                   else [ "label=" ++ toLabel identifier ])
-
-                        else []
-               printParams
-                   | null params = empty
-                   | otherwise   = brackets $ hcat (intersperse ", " (map text params))
-           return $ flush ("\\begin{lstlisting}" <> printParams $$ text str $$
-                    "\\end{lstlisting}") $$ cr
-         highlightedCodeBlock =
-           case highlight formatLaTeXBlock ("",classes,keyvalAttr) str of
-                  Nothing -> rawCodeBlock
-                  Just  h -> modify (\st -> st{ stHighlighting = True }) >>
-                             return (flush $ linkAnchor $$ text h)
 blockToLaTeX (RawBlock f x)
   | f == Format "latex" || f == Format "tex"
                         = return $ text x
@@ -485,30 +498,36 @@ blockToLaTeX (DefinitionList lst) = do
   return $ text ("\\begin{description}" ++ inc) $$ spacing $$ vcat items $$
                "\\end{description}"
 blockToLaTeX HorizontalRule = return $
-  "\\begin{center}\\rule{3in}{0.4pt}\\end{center}"
+  "\\begin{center}\\rule{0.5\\linewidth}{\\linethickness}\\end{center}"
 blockToLaTeX (Header level (id',classes,_) lst) =
   sectionHeader ("unnumbered" `elem` classes) id' level lst
 blockToLaTeX (Table caption aligns widths heads rows) = do
   headers <- if all null heads
                 then return empty
-                else ($$ "\\midrule\\endhead") `fmap`
+                else ($$ "\\midrule\n") `fmap`
                       (tableRowToLaTeX True aligns widths) heads
+  let endhead = if all null heads
+                   then empty
+                   else text "\\endhead"
   captionText <- inlineListToLaTeX caption
   let capt = if isEmpty captionText
                 then empty
-                else text "\\addlinespace"
-                     $$ text "\\caption" <> braces captionText
+                else text "\\caption" <> braces captionText
+                         <> "\\tabularnewline\n\\toprule\n"
+                         <> headers
+                         <> "\\endfirsthead"
   rows' <- mapM (tableRowToLaTeX False aligns widths) rows
   let colDescriptors = text $ concat $ map toColDescriptor aligns
   modify $ \s -> s{ stTable = True }
   return $ "\\begin{longtable}[c]" <>
               braces ("@{}" <> colDescriptors <> "@{}")
               -- the @{} removes extra space at beginning and end
-         $$ "\\toprule\\addlinespace"
+         $$ capt
+         $$ "\\toprule"
          $$ headers
+         $$ endhead
          $$ vcat rows'
          $$ "\\bottomrule"
-         $$ capt
          $$ "\\end{longtable}"
 blockToLaTeX (Figure figType attr content pc txt) =
   figureToLaTeXfloat figType attr content pc txt
@@ -538,11 +557,30 @@ tableRowToLaTeX header aligns widths cols = do
   let scaleFactor = 0.97 ** fromIntegral (length aligns)
   let widths' = map (scaleFactor *) widths
   cells <- mapM (tableCellToLaTeX header) $ zip3 widths' aligns cols
-  return $ hsep (intersperse "&" cells) $$ "\\\\\\addlinespace"
+  return $ hsep (intersperse "&" cells) <> "\\tabularnewline"
+
+-- For simple latex tables (without minipages or parboxes),
+-- we need to go to some lengths to get line breaks working:
+-- as LineBreak bs = \vtop{\hbox{\strut as}\hbox{\strut bs}}.
+fixLineBreaks :: Block -> Block
+fixLineBreaks (Para ils)  = Para $ fixLineBreaks' ils
+fixLineBreaks (Plain ils) = Plain $ fixLineBreaks' ils
+fixLineBreaks x           = x
+
+fixLineBreaks' :: [Inline] -> [Inline]
+fixLineBreaks' ils = case splitBy (== LineBreak) ils of
+                       []     -> []
+                       [xs]   -> xs
+                       chunks -> RawInline "tex" "\\vtop{" :
+                                 concatMap tohbox chunks ++
+                                 [RawInline "tex" "}"]
+  where tohbox ys = RawInline "tex" "\\hbox{\\strut " : ys ++
+                    [RawInline "tex" "}"]
 
 tableCellToLaTeX :: Bool -> (Double, Alignment, [Block])
                  -> State WriterState Doc
-tableCellToLaTeX _      (0,     _,     blocks) = blockListToLaTeX blocks
+tableCellToLaTeX _      (0,     _,     blocks) =
+  blockListToLaTeX $ walk fixLineBreaks blocks
 tableCellToLaTeX header (width, align, blocks) = do
   modify $ \st -> st{ stInMinipage = True, stNotes = [] }
   cellContents <- blockListToLaTeX blocks
@@ -556,7 +594,8 @@ tableCellToLaTeX header (width, align, blocks) = do
                AlignDefault -> "\\raggedright"
   return $ ("\\begin{minipage}" <> valign <>
             braces (text (printf "%.2f\\hsize" width)) <>
-            (halign <> cr <> cellContents <> cr) <> "\\end{minipage}")
+            (halign <> "\\strut" <> cr <> cellContents <> cr) <>
+            "\\strut\\end{minipage}")
           $$ case notes of
                   [] -> empty
                   ns -> (case length ns of
@@ -595,6 +634,7 @@ sectionHeader :: Bool    -- True for unnumbered
               -> State WriterState Doc
 sectionHeader unnumbered ref level lst = do
   txt <- inlineListToLaTeX lst
+  lab <- text `fmap` toLabel ref
   let noNote (Note _) = Str ""
       noNote x        = x
   let lstNoNotes = walk noNote lst
@@ -615,13 +655,13 @@ sectionHeader unnumbered ref level lst = do
   let refLabel x = (if ref `elem` internalLinks
                        then text "\\hyperdef"
                                 <> braces empty
-                                <> braces (text $ toLabel ref)
+                                <> braces lab
                                 <> braces x
                        else x)
-  let headerWith x y r = refLabel $ text x <> y <>
-                             if null r
+  let headerWith x y = refLabel $ text x <> y <>
+                             if null ref
                                 then empty
-                                else text "\\label" <> braces (text $ toLabel r)
+                                else text "\\label" <> braces lab
   let sectionType = case level' of
                           0  | writerBeamer opts -> "part"
                              | otherwise -> "chapter"
@@ -631,9 +671,16 @@ sectionHeader unnumbered ref level lst = do
                           4  -> "paragraph"
                           5  -> "subparagraph"
                           _  -> ""
+  inQuote <- gets stInQuote
+  let prefix = if inQuote && level' >= 4
+                  then text "\\mbox{}%"
+                  -- needed for \paragraph, \subparagraph in quote environment
+                  -- see http://tex.stackexchange.com/questions/169830/
+                  else empty
   return $ if level' > 5
               then txt
-              else headerWith ('\\':sectionType) stuffing ref
+              else prefix $$
+                   headerWith ('\\':sectionType) stuffing
                    $$ if unnumbered
                          then "\\addcontentsline{toc}" <>
                                 braces (text sectionType) <>
@@ -675,22 +722,29 @@ isQuoted _ = False
 -- | Convert inline element to LaTeX
 inlineToLaTeX :: Inline    -- ^ Inline to convert
               -> State WriterState Doc
-inlineToLaTeX (Span (_,classes,_) ils) = do
+inlineToLaTeX (Span (id',classes,_) ils) = do
   let noEmph = "csl-no-emph" `elem` classes
   let noStrong = "csl-no-strong" `elem` classes
   let noSmallCaps = "csl-no-smallcaps" `elem` classes
-  ((if noEmph then inCmd "textup" else id) .
-   (if noStrong then inCmd "textnormal" else id) .
-   (if noSmallCaps then inCmd "textnormal" else id) .
-   (if not (noEmph || noStrong || noSmallCaps)
-       then braces
-       else id)) `fmap` inlineListToLaTeX ils
+  ref <- toLabel id'
+  let linkAnchor = if null id'
+                      then empty
+                      else "\\hyperdef{}" <> braces (text ref) <> "{}"
+  fmap (linkAnchor <>)
+    ((if noEmph then inCmd "textup" else id) .
+     (if noStrong then inCmd "textnormal" else id) .
+     (if noSmallCaps then inCmd "textnormal" else id) .
+     (if not (noEmph || noStrong || noSmallCaps)
+         then braces
+         else id)) `fmap` inlineListToLaTeX ils
 inlineToLaTeX (Emph lst) =
   inlineListToLaTeX lst >>= return . inCmd "emph"
 inlineToLaTeX (Strong lst) =
   inlineListToLaTeX lst >>= return . inCmd "textbf"
 inlineToLaTeX (Strikeout lst) = do
-  contents <- inlineListToLaTeX lst
+  -- we need to protect VERB in an mbox or we get an error
+  -- see #1294
+  contents <- inlineListToLaTeX $ protectCode lst
   modify $ \s -> s{ stStrikeout = True }
   return $ inCmd "sout" contents
 inlineToLaTeX (Superscript lst) =
@@ -767,15 +821,21 @@ inlineToLaTeX (LineBreak) = return "\\\\"
 inlineToLaTeX Space = return space
 inlineToLaTeX (Link txt ('#':ident, _)) = do
   contents <- inlineListToLaTeX txt
-  ident' <- stringToLaTeX URLString ident
-  return $ text "\\hyperref" <> brackets (text $ toLabel ident') <>
-              braces contents
+  lab <- toLabel ident
+  return $ text "\\hyperref" <> brackets (text lab) <> braces contents
 inlineToLaTeX (Link txt (src, _)) =
   case txt of
-        [Str x] | x == src ->  -- autolink
+        [Str x] | escapeURI x == src ->  -- autolink
              do modify $ \s -> s{ stUrl = True }
-                src' <- stringToLaTeX URLString x
+                src' <- stringToLaTeX URLString src
                 return $ text $ "\\url{" ++ src' ++ "}"
+        [Str x] | Just rest <- stripPrefix "mailto:" src,
+                  escapeURI x == rest -> -- email autolink
+             do modify $ \s -> s{ stUrl = True }
+                src' <- stringToLaTeX URLString src
+                contents <- inlineListToLaTeX txt
+                return $ "\\href" <> braces (text src') <>
+                   braces ("\\nolinkurl" <> braces contents)
         _ -> do contents <- inlineListToLaTeX txt
                 src' <- stringToLaTeX URLString src
                 return $ text ("\\href{" ++ src' ++ "}{") <>
@@ -792,12 +852,24 @@ inlineToLaTeX (Note contents) = do
                    (CodeBlock _ _ : _) -> cr
                    _                   -> empty
   let noteContents = nest 2 contents' <> optnl
+  opts <- gets stOptions
+  -- in beamer slides, display footnote from current overlay forward
+  let beamerMark = if writerBeamer opts
+                      then text "<.->"
+                      else empty
   modify $ \st -> st{ stNotes = noteContents : stNotes st }
   return $
     if inMinipage
        then "\\footnotemark{}"
        -- note: a \n before } needed when note ends with a Verbatim environment
-       else "\\footnote" <> braces noteContents
+       else "\\footnote" <> beamerMark <> braces noteContents
+
+protectCode :: [Inline] -> [Inline]
+protectCode [] = []
+protectCode (x@(Code ("",[],[]) _) : xs) = x : protectCode xs
+protectCode (x@(Code _ _) : xs) = ltx "\\mbox{" : x : ltx "}" : xs
+  where ltx = RawInline (Format "latex")
+protectCode (x : xs) = x : protectCode xs
 
 citationsToNatbib :: [Citation] -> State WriterState Doc
 citationsToNatbib (one:[])
@@ -1100,7 +1172,7 @@ notCodeBlock _ = True
 
 codeToListingsFloat :: Block -> Attr -> [Inline] -> Bool -> State WriterState Doc
 codeToListingsFloat (CodeBlock (_,classes,keyvalAttr) str) attrib caption captPref = do
-  let ident = getIdentifier attrib
+  ident <- toLabel $ getIdentifier attrib
   let params = (case getListingsLanguage classes of
                      Just l  -> [ "language=" ++ l ]
                      Nothing -> []) ++
@@ -1113,7 +1185,7 @@ codeToListingsFloat (CodeBlock (_,classes,keyvalAttr) str) attrib caption captPr
                      (key,attr) <- keyvalAttr ] ++
                (if ident == ""
                      then []
-                     else [ "label=" ++ toLabel ident ]) ++
+                     else [ "label=" ++ ident ]) ++
                (if not captPref
                    then [ "nolol=true" ]
                    else []) ++

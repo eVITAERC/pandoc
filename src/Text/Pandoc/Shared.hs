@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, CPP, MultiParamTypeClasses,
-    FlexibleContexts #-}
+    FlexibleContexts, ScopedTypeVariables, PatternGuards #-}
 {-
-Copyright (C) 2006-2013 John MacFarlane <jgm@berkeley.edu>
+Copyright (C) 2006-2014 John MacFarlane <jgm@berkeley.edu>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 {- |
    Module      : Text.Pandoc.Shared
-   Copyright   : Copyright (C) 2006-2013 John MacFarlane
+   Copyright   : Copyright (C) 2006-2014 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -35,6 +35,7 @@ module Text.Pandoc.Shared (
                      splitByIndices,
                      splitStringByIndices,
                      substitute,
+                     ordNub,
                      -- * Text processing
                      backslashEscapes,
                      escapeStringUsing,
@@ -52,10 +53,16 @@ module Text.Pandoc.Shared (
                      -- * Pandoc block and inline list processing
                      orderedListMarkers,
                      normalizeSpaces,
+                     extractSpaces,
                      normalize,
+                     normalizeInlines,
+                     normalizeBlocks,
+                     removeFormatting,
                      stringify,
+                     capitalize,
                      compactify,
                      compactify',
+                     compactify'DL,
                      Element (..),
                      hierarchicalize,
                      uniqueIdent,
@@ -72,31 +79,37 @@ module Text.Pandoc.Shared (
                      readDataFile,
                      readDataFileUTF8,
                      fetchItem,
+                     fetchItem',
                      openURL,
+                     collapseFilePath,
                      -- * Error handling
                      err,
                      warn,
                      -- * Safe read
-                     safeRead
+                     safeRead,
+                     -- * Temp directory
+                     withTempDir
                     ) where
 
 import Text.Pandoc.Definition
 import Text.Pandoc.Walk
-import Text.Pandoc.Generic
-import Text.Pandoc.Builder (Blocks, ToMetaValue(..))
+import Text.Pandoc.MediaBag (MediaBag, lookupMedia)
+import Text.Pandoc.Builder (Inlines, Blocks, ToMetaValue(..))
 import qualified Text.Pandoc.Builder as B
 import qualified Text.Pandoc.UTF8 as UTF8
 import System.Environment (getProgName)
 import System.Exit (exitWith, ExitCode(..))
 import Data.Char ( toLower, isLower, isUpper, isAlpha,
                    isLetter, isDigit, isSpace, ord, chr )
-import Data.List ( find, isPrefixOf, intercalate )
+import Data.List ( find, stripPrefix, intercalate )
 import qualified Data.Map as M
 import Network.URI ( escapeURIString, isURI, nonStrictRelativeTo,
-                     unEscapeString, parseURIReference )
+                     unEscapeString, parseURIReference, isAllowedInURI )
+import qualified Data.Set as Set
 import System.Directory
-import Text.Pandoc.MIME (getMimeType)
-import System.FilePath ( (</>), takeExtension, dropExtension )
+import System.FilePath (joinPath, splitDirectories)
+import Text.Pandoc.MIME (MimeType, getMimeType)
+import System.FilePath ( (</>), takeExtension, dropExtension)
 import Data.Generics (Typeable, Data)
 import qualified Control.Monad.State as S
 import qualified Control.Exception as E
@@ -105,23 +118,29 @@ import Text.Pandoc.Pretty (charWidth)
 import System.Locale (defaultTimeLocale)
 import Data.Time
 import System.IO (stderr)
+import System.IO.Temp
 import Text.HTML.TagSoup (renderTagsOptions, RenderOptions(..), Tag(..),
          renderOptions)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as B8
 import Text.Pandoc.Compat.Monoid
 import Data.ByteString.Base64 (decodeLenient)
+import Data.Sequence (ViewR(..), ViewL(..), viewl, viewr)
+import qualified Data.Text as T (toUpper, pack, unpack)
 
 #ifdef EMBED_DATA_FILES
 import Text.Pandoc.Data (dataFiles)
-import System.FilePath ( joinPath, splitDirectories )
 #else
 import Paths_pandoc (getDataFileName)
 #endif
-#ifdef HTTP_CONDUIT
+#ifdef HTTP_CLIENT
 import Data.ByteString.Lazy (toChunks)
-import Network.HTTP.Conduit (httpLbs, parseUrl, withManager,
-                             responseBody, responseHeaders)
+import Network.HTTP.Client (httpLbs, parseUrl, withManager,
+                            responseBody, responseHeaders,
+                            Request(port,host))
+import Network.HTTP.Client.Internal (addProxy)
+import Network.HTTP.Client.TLS (tlsManagerSettings)
+import System.Environment (getEnv)
 import Network.HTTP.Types.Header ( hContentType)
 import Network (withSocketsDo)
 #else
@@ -166,9 +185,16 @@ substitute :: (Eq a) => [a] -> [a] -> [a] -> [a]
 substitute _ _ [] = []
 substitute [] _ xs = xs
 substitute target replacement lst@(x:xs) =
-    if target `isPrefixOf` lst
-       then replacement ++ substitute target replacement (drop (length target) lst)
-       else x : substitute target replacement xs
+    case stripPrefix target lst of
+      Just lst' -> replacement ++ substitute target replacement lst'
+      Nothing   -> x : substitute target replacement xs
+
+ordNub :: (Ord a) => [a] -> [a]
+ordNub l = go Set.empty l
+  where
+    go _ [] = []
+    go s (x:xs) = if x `Set.member` s then go s xs
+                                      else x : go (Set.insert x s) xs
 
 --
 -- Text processing
@@ -233,9 +259,9 @@ toRomanNumeral x =
               _ | x >= 50   -> "L"  ++ toRomanNumeral (x - 50)
               _ | x >= 40   -> "XL" ++ toRomanNumeral (x - 40)
               _ | x >= 10   -> "X" ++ toRomanNumeral (x - 10)
-              _ | x >= 9    -> "IX" ++ toRomanNumeral (x - 5)
+              _ | x == 9    -> "IX"
               _ | x >= 5    -> "V" ++ toRomanNumeral (x - 5)
-              _ | x >= 4    -> "IV" ++ toRomanNumeral (x - 4)
+              _ | x == 4    -> "IV"
               _ | x >= 1    -> "I" ++ toRomanNumeral (x - 1)
               _             -> ""
 
@@ -318,75 +344,182 @@ isSpaceOrEmpty Space = True
 isSpaceOrEmpty (Str "") = True
 isSpaceOrEmpty _ = False
 
+-- | Extract the leading and trailing spaces from inside an inline element
+-- and place them outside the element.
+
+extractSpaces :: (Inlines -> Inlines) -> Inlines -> Inlines
+extractSpaces f is =
+  let contents = B.unMany is
+      left  = case viewl contents of
+                    (Space :< _) -> B.space
+                    _            -> mempty
+      right = case viewr contents of
+                    (_ :> Space) -> B.space
+                    _            -> mempty in
+  (left <> f (B.trimInlines . B.Many $ contents) <> right)
+
 -- | Normalize @Pandoc@ document, consolidating doubled 'Space's,
 -- combining adjacent 'Str's and 'Emph's, remove 'Null's and
 -- empty elements, etc.
-normalize :: (Eq a, Data a) => a -> a
-normalize = topDown removeEmptyBlocks .
-            topDown consolidateInlines .
-            bottomUp (removeEmptyInlines . removeTrailingInlineSpaces)
+normalize :: Pandoc -> Pandoc
+normalize (Pandoc (Meta meta) blocks) =
+  Pandoc (Meta $ M.map go meta) (normalizeBlocks blocks)
+  where go (MetaInlines xs) = MetaInlines $ normalizeInlines xs
+        go (MetaBlocks xs)  = MetaBlocks  $ normalizeBlocks xs
+        go (MetaList ms)    = MetaList $ map go ms
+        go (MetaMap m)      = MetaMap $ M.map go m
+        go x                = x
 
-removeEmptyBlocks :: [Block] -> [Block]
-removeEmptyBlocks (Null : xs) = removeEmptyBlocks xs
-removeEmptyBlocks (BulletList [] : xs) = removeEmptyBlocks xs
-removeEmptyBlocks (OrderedList _ [] : xs) = removeEmptyBlocks xs
-removeEmptyBlocks (DefinitionList [] : xs) = removeEmptyBlocks xs
-removeEmptyBlocks (RawBlock _ [] : xs) = removeEmptyBlocks xs
-removeEmptyBlocks (x:xs) = x : removeEmptyBlocks xs
-removeEmptyBlocks [] = []
+normalizeBlocks :: [Block] -> [Block]
+normalizeBlocks (Null : xs) = normalizeBlocks xs
+normalizeBlocks (Div attr bs : xs) =
+  Div attr (normalizeBlocks bs) : normalizeBlocks xs
+normalizeBlocks (BlockQuote bs : xs) =
+  case normalizeBlocks bs of
+       []    -> normalizeBlocks xs
+       bs'   -> BlockQuote bs' : normalizeBlocks xs
+normalizeBlocks (BulletList [] : xs) = normalizeBlocks xs
+normalizeBlocks (BulletList items : xs) =
+  BulletList (map normalizeBlocks items) : normalizeBlocks xs
+normalizeBlocks (OrderedList _ [] : xs) = normalizeBlocks xs
+normalizeBlocks (OrderedList attr items : xs) =
+  OrderedList attr (map normalizeBlocks items) : normalizeBlocks xs
+normalizeBlocks (DefinitionList [] : xs) = normalizeBlocks xs
+normalizeBlocks (DefinitionList items : xs) =
+  DefinitionList (map go items) : normalizeBlocks xs
+  where go (ils, bs) = (normalizeInlines ils, map normalizeBlocks bs)
+normalizeBlocks (RawBlock _ "" : xs) = normalizeBlocks xs
+normalizeBlocks (RawBlock f x : xs) =
+   case normalizeBlocks xs of
+        (RawBlock f' x' : rest) | f' == f ->
+          RawBlock f (x ++ ('\n':x')) : rest
+        rest -> RawBlock f x : rest
+normalizeBlocks (Para ils : xs) =
+  case normalizeInlines ils of
+       []   -> normalizeBlocks xs
+       ils' -> Para ils' : normalizeBlocks xs
+normalizeBlocks (Plain ils : xs) =
+  case normalizeInlines ils of
+       []   -> normalizeBlocks xs
+       ils' -> Plain ils' : normalizeBlocks xs
+normalizeBlocks (Header lev attr ils : xs) =
+  Header lev attr (normalizeInlines ils) : normalizeBlocks xs
+normalizeBlocks (Table capt aligns widths hdrs rows : xs) =
+  Table (normalizeInlines capt) aligns widths
+    (map normalizeBlocks hdrs) (map (map normalizeBlocks) rows)
+  : normalizeBlocks xs
+normalizeBlocks (ImageGrid imgs : xs) =
+  ImageGrid (map normalizeInlines imgs) : normalizeBlocks xs
+normalizeBlocks (Figure typ attr content pc capt : xs) =
+  Figure typ attr (normalizeBlocks content) pc (normalizeInlines capt)
+  : normalizeBlocks xs
+normalizeBlocks (x:xs) = x : normalizeBlocks xs
+normalizeBlocks [] = []
 
-removeEmptyInlines :: [Inline] -> [Inline]
-removeEmptyInlines (Emph [] : zs) = removeEmptyInlines zs
-removeEmptyInlines (Strong [] : zs) = removeEmptyInlines zs
-removeEmptyInlines (Subscript [] : zs) = removeEmptyInlines zs
-removeEmptyInlines (Superscript [] : zs) = removeEmptyInlines zs
-removeEmptyInlines (SmallCaps [] : zs) = removeEmptyInlines zs
-removeEmptyInlines (Strikeout [] : zs) = removeEmptyInlines zs
-removeEmptyInlines (RawInline _ [] : zs) = removeEmptyInlines zs
-removeEmptyInlines (Code _ [] : zs) = removeEmptyInlines zs
-removeEmptyInlines (Str "" : zs) = removeEmptyInlines zs
-removeEmptyInlines (x : xs) = x : removeEmptyInlines xs
-removeEmptyInlines [] = []
-
-removeTrailingInlineSpaces :: [Inline] -> [Inline]
-removeTrailingInlineSpaces = reverse . removeLeadingInlineSpaces . reverse
-
-removeLeadingInlineSpaces :: [Inline] -> [Inline]
-removeLeadingInlineSpaces = dropWhile isSpaceOrEmpty
-
-consolidateInlines :: [Inline] -> [Inline]
-consolidateInlines (Str x : ys) =
+normalizeInlines :: [Inline] -> [Inline]
+normalizeInlines (Str x : ys) =
   case concat (x : map fromStr strs) of
-        ""     -> consolidateInlines rest
-        n      -> Str n : consolidateInlines rest
+        ""     -> rest
+        n      -> Str n : rest
    where
-     (strs, rest)  = span isStr ys
+     (strs, rest)  = span isStr $ normalizeInlines ys
      isStr (Str _) = True
      isStr _       = False
      fromStr (Str z) = z
-     fromStr _       = error "consolidateInlines - fromStr - not a Str"
-consolidateInlines (Space : ys) = Space : rest
+     fromStr _       = error "normalizeInlines - fromStr - not a Str"
+normalizeInlines (Space : ys) =
+  if null rest
+     then []
+     else Space : rest
    where isSp Space = True
          isSp _     = False
-         rest       = consolidateInlines $ dropWhile isSp ys
-consolidateInlines (Emph xs : Emph ys : zs) = consolidateInlines $
-  Emph (xs ++ ys) : zs
-consolidateInlines (Strong xs : Strong ys : zs) = consolidateInlines $
-  Strong (xs ++ ys) : zs
-consolidateInlines (Subscript xs : Subscript ys : zs) = consolidateInlines $
-  Subscript (xs ++ ys) : zs
-consolidateInlines (Superscript xs : Superscript ys : zs) = consolidateInlines $
-  Superscript (xs ++ ys) : zs
-consolidateInlines (SmallCaps xs : SmallCaps ys : zs) = consolidateInlines $
-  SmallCaps (xs ++ ys) : zs
-consolidateInlines (Strikeout xs : Strikeout ys : zs) = consolidateInlines $
-  Strikeout (xs ++ ys) : zs
-consolidateInlines (RawInline f x : RawInline f' y : zs) | f == f' =
-  consolidateInlines $ RawInline f (x ++ y) : zs
-consolidateInlines (Code a1 x : Code a2 y : zs) | a1 == a2 =
-  consolidateInlines $ Code a1 (x ++ y) : zs
-consolidateInlines (x : xs) = x : consolidateInlines xs
-consolidateInlines [] = []
+         rest       = dropWhile isSp $ normalizeInlines ys
+normalizeInlines (Emph xs : zs) =
+  case normalizeInlines zs of
+       (Emph ys : rest) -> normalizeInlines $
+         Emph (normalizeInlines $ xs ++ ys) : rest
+       rest -> case normalizeInlines xs of
+                    []  -> rest
+                    xs' -> Emph xs' : rest
+normalizeInlines (Strong xs : zs) =
+  case normalizeInlines zs of
+       (Strong ys : rest) -> normalizeInlines $
+         Strong (normalizeInlines $ xs ++ ys) : rest
+       rest -> case normalizeInlines xs of
+                    []  -> rest
+                    xs' -> Strong xs' : rest
+normalizeInlines (Subscript xs : zs) =
+  case normalizeInlines zs of
+       (Subscript ys : rest) -> normalizeInlines $
+         Subscript (normalizeInlines $ xs ++ ys) : rest
+       rest -> case normalizeInlines xs of
+                    []  -> rest
+                    xs' -> Subscript xs' : rest
+normalizeInlines (Superscript xs : zs) =
+  case normalizeInlines zs of
+       (Superscript ys : rest) -> normalizeInlines $
+         Superscript (normalizeInlines $ xs ++ ys) : rest
+       rest -> case normalizeInlines xs of
+                    []  -> rest
+                    xs' -> Superscript xs' : rest
+normalizeInlines (SmallCaps xs : zs) =
+  case normalizeInlines zs of
+       (SmallCaps ys : rest) -> normalizeInlines $
+         SmallCaps (normalizeInlines $ xs ++ ys) : rest
+       rest -> case normalizeInlines xs of
+                    []  -> rest
+                    xs' -> SmallCaps xs' : rest
+normalizeInlines (Strikeout xs : zs) =
+  case normalizeInlines zs of
+       (Strikeout ys : rest) -> normalizeInlines $
+         Strikeout (normalizeInlines $ xs ++ ys) : rest
+       rest -> case normalizeInlines xs of
+                    []  -> rest
+                    xs' -> Strikeout xs' : rest
+normalizeInlines (RawInline _ [] : ys) = normalizeInlines ys
+normalizeInlines (RawInline f xs : zs) =
+  case normalizeInlines zs of
+       (RawInline f' ys : rest) | f == f' -> normalizeInlines $
+         RawInline f (xs ++ ys) : rest
+       rest -> RawInline f xs : rest
+normalizeInlines (Code _ "" : ys) = normalizeInlines ys
+normalizeInlines (Code attr xs : zs) =
+  case normalizeInlines zs of
+       (Code attr' ys : rest) | attr == attr' -> normalizeInlines $
+         Code attr (xs ++ ys) : rest
+       rest -> Code attr xs : rest
+-- allow empty spans, they may carry identifiers etc.
+-- normalizeInlines (Span _ [] : ys) = normalizeInlines ys
+normalizeInlines (Span attr xs : zs) =
+  case normalizeInlines zs of
+       (Span attr' ys : rest) | attr == attr' -> normalizeInlines $
+         Span attr (normalizeInlines $ xs ++ ys) : rest
+       rest -> Span attr (normalizeInlines xs) : rest
+normalizeInlines (Note bs : ys) = Note (normalizeBlocks bs) :
+  normalizeInlines ys
+normalizeInlines (Quoted qt ils : ys) =
+  Quoted qt (normalizeInlines ils) : normalizeInlines ys
+normalizeInlines (Link ils t : ys) =
+  Link (normalizeInlines ils) t : normalizeInlines ys
+normalizeInlines (Image attr ils t : ys) =
+  Image attr (normalizeInlines ils) t : normalizeInlines ys
+normalizeInlines (Cite cs ils : ys) =
+  Cite cs (normalizeInlines ils) : normalizeInlines ys
+normalizeInlines (x : xs) = x : normalizeInlines xs
+normalizeInlines [] = []
+
+-- | Extract inlines, removing formatting.
+removeFormatting :: Walkable Inline a => a -> [Inline]
+removeFormatting = query go . walk deNote
+  where go :: Inline -> [Inline]
+        go (Str xs)     = [Str xs]
+        go Space        = [Space]
+        go (Code _ x)   = [Str x]
+        go (Math _ x)   = [Str x]
+        go LineBreak    = [Space]
+        go _            = []
+        deNote (Note _) = Str ""
+        deNote x        = x
 
 -- | Convert pandoc structure to a string with formatting removed.
 -- Footnotes are skipped (since we don't want their contents in link
@@ -402,6 +535,17 @@ stringify = query go . walk deNote
         go _ = ""
         deNote (Note _) = Str ""
         deNote x = x
+
+-- | Bring all regular text in a pandoc structure to uppercase.
+--
+-- This function correctly handles cases where a lowercase character doesn't
+-- match to a single uppercase character – e.g. “Straße” would be converted
+-- to “STRASSE”, not “STRAßE”.
+capitalize :: Walkable Inline a => a -> a
+capitalize = walk go
+  where go :: Inline -> Inline
+        go (Str s) = Str (T.unpack $ T.toUpper $ T.pack s)
+        go x       = x
 
 -- | Change final list item from @Para@ to @Plain@ if the list contains
 -- no other @Para@ blocks.
@@ -433,6 +577,23 @@ compactify' items =
                             [_] -> others ++ [B.fromList (reverse $ Plain a : xs)]
                             _   -> items
            _      -> items
+
+-- | Like @compactify'@, but acts on items of definition lists.
+compactify'DL :: [(Inlines, [Blocks])] -> [(Inlines, [Blocks])]
+compactify'DL items =
+  let defs = concatMap snd items
+  in  case reverse (concatMap B.toList defs) of
+           (Para x:xs)
+             | not (any isPara xs) ->
+                   let (t,ds) = last items
+                       lastDef = B.toList $ last ds
+                       ds' = init ds ++
+                             if null lastDef
+                                then [B.fromList lastDef]
+                                else [B.fromList $ init lastDef ++ [Plain x]]
+                    in init items ++ [(t, ds')]
+             | otherwise           -> items
+           _                       -> items
 
 isPara :: Block -> Bool
 isPara (Para _) = True
@@ -551,8 +712,10 @@ addMetaField :: ToMetaValue a
              -> Meta
 addMetaField key val (Meta meta) =
   Meta $ M.insertWith combine key (toMetaValue val) meta
-  where combine newval (MetaList xs) = MetaList (xs ++ [newval])
+  where combine newval (MetaList xs) = MetaList (xs ++ tolist newval)
         combine newval x             = MetaList [x, newval]
+        tolist (MetaList ys)         = ys
+        tolist y                     = [y]
 
 -- | Create 'Meta' from old-style title, authors, date.  This is
 -- provided to ease the transition from the old API.
@@ -626,34 +789,51 @@ readDataFileUTF8 userDir fname =
 -- | Fetch an image or other item from the local filesystem or the net.
 -- Returns raw content and maybe mime type.
 fetchItem :: Maybe String -> String
-          -> IO (Either E.SomeException (BS.ByteString, Maybe String))
-fetchItem sourceURL s
-  | isURI s         = openURL s
-  | otherwise       =
-      case sourceURL >>= parseURIReference of
-           Just u  -> case parseURIReference s of
-                           Just s' -> openURL $ show $
-                                        s' `nonStrictRelativeTo` u
-                           Nothing -> openURL $ show u ++ "/" ++ s
-           Nothing -> E.try readLocalFile
+          -> IO (Either E.SomeException (BS.ByteString, Maybe MimeType))
+fetchItem sourceURL s =
+  case (sourceURL >>= parseURIReference . ensureEscaped, ensureEscaped s) of
+       (_, s') | isURI s'  -> openURL s'
+       (Just u, s') -> -- try fetching from relative path at source
+          case parseURIReference s' of
+               Just u' -> openURL $ show $ u' `nonStrictRelativeTo` u
+               Nothing -> openURL s' -- will throw error
+       (Nothing, _) -> E.try readLocalFile -- get from local file system
   where readLocalFile = do
-          let mime = case takeExtension s of
-                          ".gz" -> getMimeType $ dropExtension s
-                          x     -> getMimeType x
-          cont <- BS.readFile s
+          cont <- BS.readFile fp
           return (cont, mime)
+        dropFragmentAndQuery = takeWhile (\c -> c /= '?' && c /= '#')
+        fp = unEscapeString $ dropFragmentAndQuery s
+        mime = case takeExtension fp of
+                    ".gz" -> getMimeType $ dropExtension fp
+                    x     -> getMimeType x
+        ensureEscaped x@(_:':':'\\':_) = x -- likely windows path
+        ensureEscaped x = escapeURIString isAllowedInURI x
+
+-- | Like 'fetchItem', but also looks for items in a 'MediaBag'.
+fetchItem' :: MediaBag -> Maybe String -> String
+           -> IO (Either E.SomeException (BS.ByteString, Maybe MimeType))
+fetchItem' media sourceURL s = do
+  case lookupMedia s media of
+       Nothing -> fetchItem sourceURL s
+       Just (mime, bs) -> return $ Right (BS.concat $ toChunks bs, Just mime)
 
 -- | Read from a URL and return raw data and maybe mime type.
-openURL :: String -> IO (Either E.SomeException (BS.ByteString, Maybe String))
+openURL :: String -> IO (Either E.SomeException (BS.ByteString, Maybe MimeType))
 openURL u
-  | "data:" `isPrefixOf` u =
-    let mime     = takeWhile (/=',') $ drop 5 u
-        contents = B8.pack $ unEscapeString $ drop 1 $ dropWhile (/=',') u
+  | Just u' <- stripPrefix "data:" u =
+    let mime     = takeWhile (/=',') u'
+        contents = B8.pack $ unEscapeString $ drop 1 $ dropWhile (/=',') u'
     in  return $ Right (decodeLenient contents, Just mime)
-#ifdef HTTP_CONDUIT
+#ifdef HTTP_CLIENT
   | otherwise = withSocketsDo $ E.try $ do
      req <- parseUrl u
-     resp <- withManager $ httpLbs req
+     (proxy :: Either E.SomeException String) <- E.try $ getEnv "http_proxy"
+     let req' = case proxy of
+                     Left _   -> req
+                     Right pr -> case parseUrl pr of
+                                      Just r  -> addProxy (host r) (port r) req
+                                      Nothing -> req
+     resp <- withManager tlsManagerSettings $ httpLbs req'
      return (BS.concat $ toChunks $ responseBody resp,
              UTF8.toString `fmap` lookup hContentType (responseHeaders resp))
 #else
@@ -686,6 +866,27 @@ warn msg = do
   name <- getProgName
   UTF8.hPutStrLn stderr $ name ++ ": " ++ msg
 
+-- | Remove intermediate "." and ".." directories from a path.
+--
+-- > collapseFilePath "./foo" == "foo"
+-- > collapseFilePath "/bar/../baz" == "/baz"
+-- > collapseFilePath "/../baz" == "/../baz"
+-- > collapseFilePath "parent/foo/baz/../bar" ==  "parent/foo/bar"
+-- > collapseFilePath "parent/foo/baz/../../bar" ==  "parent/bar"
+-- > collapseFilePath "parent/foo/.." ==  "parent"
+-- > collapseFilePath "/parent/foo/../../bar" ==  "/bar"
+collapseFilePath :: FilePath -> FilePath
+collapseFilePath = joinPath . reverse . foldl go [] . splitDirectories
+  where
+    go rs "." = rs
+    go r@(p:rs) ".." = case p of
+                            ".." -> ("..":r)
+                            "/" -> ("..":r)
+                            _ -> rs
+    go _ "/" = ["/"]
+    go rs x = x:rs
+
+
 --
 -- Safe read
 --
@@ -696,4 +897,14 @@ safeRead s = case reads s of
                     | all isSpace x -> return d
                   _                 -> fail $ "Could not read `" ++ s ++ "'"
 
+--
+-- Temp directory
+--
 
+withTempDir :: String -> (FilePath -> IO a) -> IO a
+withTempDir =
+#ifdef _WINDOWS
+  withTempDirectory "."
+#else
+  withSystemTempDirectory
+#endif
