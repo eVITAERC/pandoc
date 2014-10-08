@@ -7,6 +7,12 @@ Scholdoc follows semantic versioning with regards to output schema.
 
 ## In development
 
+### Added
+- The Pandoc-derived portion of Scholdoc is now up to date with Pandoc 1.13.1
+
+### Changed
+- The "--no-standalone" option no longer imply "_bodyOnly" writers. Instead "--no-standalone" now strictly stops all template usage.
+
 
 ## 0.1.2-alpha - 2014-09-09
 
