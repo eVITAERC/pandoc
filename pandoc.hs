@@ -1147,12 +1147,16 @@ main = do
                                         Nothing  -> (writerName, False)
 
   let writerName' = case map toLower writerNameTrim of
-                          []        -> defaultWriterName outputFile
+                          -- ScholMD defaults to html5
+                          []        -> case defaultWriterName outputFile of
+                                          "html" -> if scholarlyMode
+                                                        then "html5"
+                                                        else "html"
+                                          x      -> x
                           "epub2"   -> "epub"
                           "html4"   -> "html"
                           -- ScholMD only implemented for html5
-                          "html"    -> if scholarlyMode then "html5"
-                                                        else "html"
+                          "html"    -> if scholarlyMode then "html5" else "html"
                           x         -> x
 
   let pdfOutput = map toLower (takeExtension outputFile) == ".pdf"
