@@ -1,3 +1,5 @@
+{-# LANGUAGE PatternGuards #-}
+
 {-
 Copyright (c) 2011-2012, Sergey Astanin
 All rights reserved.
@@ -28,8 +30,8 @@ module Text.Pandoc.Writers.FB2 (writeFB2)  where
 import Control.Monad.State (StateT, evalStateT, get, modify)
 import Control.Monad.State (liftM, liftM2, liftIO)
 import Data.ByteString.Base64 (encode)
-import Data.Char (toUpper, toLower, isSpace, isAscii, isControl)
-import Data.List (intersperse, intercalate, isPrefixOf)
+import Data.Char (toLower, isSpace, isAscii, isControl)
+import Data.List (intersperse, intercalate, isPrefixOf, stripPrefix)
 import Data.Either (lefts, rights)
 import Network.Browser (browse, request, setAllowRedirects, setOutHandler)
 import Network.HTTP (catchIO_, getRequest, getHeaders, getResponseBody)
@@ -44,8 +46,7 @@ import qualified Text.XML.Light.Cursor as XC
 
 import Text.Pandoc.Definition
 import Text.Pandoc.Options (WriterOptions(..), HTMLMathMethod(..), def)
-import Text.Pandoc.Shared (orderedListMarkers, isHeaderBlock)
-import Text.Pandoc.Walk
+import Text.Pandoc.Shared (orderedListMarkers, isHeaderBlock, capitalize)
 
 -- | Data to be written at the end of the document:
 -- (foot)notes, URLs, references, images.
@@ -253,22 +254,21 @@ readDataURI :: String -- ^ URI
             -> Maybe (String,String,Bool,String)
                -- ^ Maybe (mime,charset,isBase64,data)
 readDataURI uri =
-    let prefix = "data:"
-    in  if not (prefix `isPrefixOf` uri)
-        then Nothing
-        else
-            let rest = drop (length prefix) uri
-                meta = takeWhile (/= ',') rest  -- without trailing ','
-                uridata = drop (length meta + 1) rest
-                parts = split (== ';') meta
-                (mime,cs,enc)=foldr upd ("text/plain","US-ASCII",False) parts
-            in  Just (mime,cs,enc,uridata)
+  case stripPrefix "data:" uri of
+    Nothing   -> Nothing
+    Just rest ->
+      let meta = takeWhile (/= ',') rest  -- without trailing ','
+          uridata = drop (length meta + 1) rest
+          parts = split (== ';') meta
+          (mime,cs,enc)=foldr upd ("text/plain","US-ASCII",False) parts
+      in  Just (mime,cs,enc,uridata)
+
  where
    upd str m@(mime,cs,enc)
-       | isMimeType str               = (str,cs,enc)
-       | "charset=" `isPrefixOf` str  = (mime,drop (length "charset=") str,enc)
-       | str ==  "base64"             = (mime,cs,True)
-       | otherwise                    = m
+       | isMimeType str                          = (str,cs,enc)
+       | Just str' <- stripPrefix "charset=" str = (mime,str',enc)
+       | str ==  "base64"                        = (mime,cs,True)
+       | otherwise                               = m
 
 -- Without parameters like ;charset=...; see RFC 2045, 5.1
 isMimeType :: String -> Bool
@@ -296,7 +296,6 @@ fetchURL url = do
      let content_type = lookupHeader HdrContentType (getHeaders r)
      content <- liftM (Just . toStr . encode . toBS) . getResponseBody $ Right r
      return $ liftM2 (,) content_type content
-  where
 
 toBS :: String -> B.ByteString
 toBS = B.pack . map (toEnum . fromEnum)
@@ -421,10 +420,6 @@ indent = indentBlock
   indentLines ins = let lns = split isLineBreak ins :: [[Inline]]
                     in  intercalate [LineBreak] $ map ((Str spacer):) lns
 
-capitalize :: Inline -> Inline
-capitalize (Str xs) = Str $ map toUpper xs
-capitalize x = x
-
 -- | Convert a Pandoc's Inline element to FictionBook XML representation.
 toXml :: Inline -> FBM [Content]
 toXml (Str s) = return [txt s]
@@ -434,7 +429,7 @@ toXml (Strong ss) = list `liftM` wrap "strong" ss
 toXml (Strikeout ss) = list `liftM` wrap "strikethrough" ss
 toXml (Superscript ss) = list `liftM` wrap "sup" ss
 toXml (Subscript ss) = list `liftM` wrap "sub" ss
-toXml (SmallCaps ss) = cMapM toXml $ walk capitalize ss
+toXml (SmallCaps ss) = cMapM toXml $ capitalize ss
 toXml (Quoted SingleQuote ss) = do  -- FIXME: should be language-specific
   inner <- cMapM toXml ss
   return $ [txt "‘"] ++ inner ++ [txt "’"]

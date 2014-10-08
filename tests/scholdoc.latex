@@ -281,19 +281,19 @@ The should not be a caption
 The following is a normal Pandoc table
 
 \begin{longtable}[c]{@{}rllc@{}}
-\toprule\addlinespace
-Right & Left & Default & Center
-\\\addlinespace
-\midrule\endhead
-12 & 12 & 12 & 12
-\\\addlinespace
-123 & 123 & 123 & 123
-\\\addlinespace
-1 & 1 & 1 & 1
-\\\addlinespace
+\caption{Thisis a caption}\tabularnewline
+\toprule
+Right & Left & Default & Center\tabularnewline
+\midrule
+\endfirsthead
+\toprule
+Right & Left & Default & Center\tabularnewline
+\midrule
+\endhead
+12 & 12 & 12 & 12\tabularnewline
+123 & 123 & 123 & 123\tabularnewline
+1 & 1 & 1 & 1\tabularnewline
 \bottomrule
-\addlinespace
-\caption{Thisis a caption}
 \end{longtable}
 
 This should not be a caption
@@ -306,15 +306,11 @@ The following is a floated ScholMD table
 \centering
 \begin{tabular}{rllc}
 \toprule\addlinespace
-Right & Left & Default & Center
-\\\addlinespace
+Right & Left & Default & Center\tabularnewline
 \midrule
-12 & 12 & 12 & 12
-\\\addlinespace
-123 & 123 & 123 & 123
-\\\addlinespace
-1 & 1 & 1 & 1
-\\\addlinespace
+12 & 12 & 12 & 12\tabularnewline
+123 & 123 & 123 & 123\tabularnewline
+1 & 1 & 1 & 1\tabularnewline
 \bottomrule
 \end{tabular}
 \caption{This is a really really really really really really really

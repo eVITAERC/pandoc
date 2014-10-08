@@ -117,6 +117,18 @@ h2. Nested
 *** ui 2.1.1
 *** ui 2.1.2
 
+h2. Issue #1500
+
+* one
+* two
+-> and more
+
+h2.  Issue #1513
+
+List:
+* one
+* two
+
 h2. Definition List
 
 - coffee := Hot and black
@@ -139,8 +151,8 @@ _*This is strong and em.*_
 So is *_this_* word and __**that one**__.
 -This is strikeout and *strong*-
 
-Superscripts: a[^bc^]d a^*hello*^ a[^hello there^].
-Subscripts: ~here~ H[~2~]O, H[~23~]O, H[~many of them~]O.
+Superscripts: a[^bc^]d a ^*hello*^ a[^hello there^].
+Subscripts: ~here~ H[ ~2~]O, H[ ~23~]O, H[ ~many of them~]O.
 
 Dashes : How cool -- automatic dashes.
 
@@ -187,7 +199,7 @@ h2. With headers
 
 h1. Images
 
-Textile inline image syntax, like 
+Textile inline image syntax, like
 here !this_is_an_image.png(this is the alt text)!
 and here !this_is_an_image.png!.
 
@@ -222,17 +234,6 @@ Html blocks can be <div>inlined</div> as well.
 * but this <strong> will produce inline html </strong>
 
 Can you prove that 2 < 3 ?
-
-h1. Raw LaTeX
-
-This Textile reader also accepts raw LaTeX for blocks :
-
-\begin{itemize}
-  \item one
-  \item two
-\end{itemize}
-
-and for \emph{inlines}.
 
 h1. Acronyms and marks
 

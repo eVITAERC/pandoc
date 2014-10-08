@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings, CPP #-}
 {-# OPTIONS_GHC -fno-warn-deprecations #-}
 {-
-Copyright (C) 2006-2010 John MacFarlane <jgm@berkeley.edu>
+Copyright (C) 2006-2014 John MacFarlane <jgm@berkeley.edu>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 {- |
    Module      : Text.Pandoc.Writers.HTML
-   Copyright   : Copyright (C) 2006-2010 John MacFarlane
+   Copyright   : Copyright (C) 2006-2014 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -41,6 +41,7 @@ import Text.Pandoc.Highlighting ( highlight, styleToCss,
                                   formatHtmlInline, formatHtmlBlock )
 import Text.Pandoc.XML (fromEntities, escapeStringForXML)
 import Text.Pandoc.Scholarly
+import Network.URI ( parseURIReference, URI(..), unEscapeString )
 import Network.HTTP ( urlEncode )
 import Numeric ( showHex )
 import Data.Char ( ord, toLower )
@@ -63,6 +64,7 @@ import Text.XML.Light.Output
 import System.FilePath (takeExtension)
 import Data.Monoid
 import Data.Aeson (Value)
+import Control.Applicative ((<$>))
 
 data WriterState = WriterState
     { stNotes            :: [Html]  -- ^ List of notes
@@ -255,6 +257,9 @@ showSecNum = concat . intersperse "." . map show
 -- | Converts an Element to a list item for a table of contents,
 -- retrieving the appropriate identifier from state.
 elementToListItem :: WriterOptions -> Element -> State WriterState (Maybe Html)
+-- Don't include the empty headers created in slide shows
+-- shows when an hrule is used to separate slides without a new title:
+elementToListItem _ (Sec _ _ _ [Str "\0"] _) = return Nothing
 elementToListItem opts (Sec lev num (id',classes,_) headerText subsecs)
   | lev <= writerTOCDepth opts = do
   let num' = zipWith (+) num (writerNumberOffset opts ++ repeat 0)
@@ -377,13 +382,13 @@ obfuscateLink opts txt s =
                 ReferenceObfuscation ->
                      -- need to use preEscapedString or &'s are escaped to &amp; in URL
                      preEscapedString $ "<a href=\"" ++ (obfuscateString s')
-                     ++ "\">" ++ (obfuscateString txt) ++ "</a>"
+                     ++ "\" class=\"email\">" ++ (obfuscateString txt) ++ "</a>"
                 JavascriptObfuscation ->
                      (H.script ! A.type_ "text/javascript" $
                      preEscapedString ("\n<!--\nh='" ++
                      obfuscateString domain ++ "';a='" ++ at' ++ "';n='" ++
                      obfuscateString name' ++ "';e=n+a+h;\n" ++
-                     "document.write('<a h'+'ref'+'=\"ma'+'ilto'+':'+e+'\">'+" ++
+                     "document.write('<a h'+'ref'+'=\"ma'+'ilto'+':'+e+'\" clas'+'s=\"em' + 'ail\">'+" ++
                      linkText  ++ "+'<\\/'+'a'+'>');\n// -->\n")) >>
                      H.noscript (preEscapedString $ obfuscateString altText)
                 _ -> error $ "Unknown obfuscation method: " ++ show meth
@@ -417,7 +422,10 @@ imageExts = [ "art", "bmp", "cdr", "cdt", "cpt", "cr2", "crw", "djvu", "erf",
 
 treatAsImage :: FilePath -> Bool
 treatAsImage fp =
-  let ext = map toLower $ drop 1 $ takeExtension fp
+  let path = case uriPath `fmap` parseURIReference fp of
+                  Nothing -> fp
+                  Just up -> up
+      ext  = map toLower $ drop 1 $ takeExtension path
   in  null ext || ext `elem` imageExts
 
 setImageWidthFromHistory :: Inline -> State WriterState Inline
@@ -449,9 +457,11 @@ blockToHtml opts (Div attr@(_,classes,_) bs) = do
   let contents' = nl opts >> contents >> nl opts
   return $
      if "notes" `elem` classes
-        then case writerSlideVariant opts of
-                  RevealJsSlides -> addAttrs opts attr $ H5.aside $ contents'
-                  NoSlides       -> addAttrs opts attr $ H.div $ contents'
+        then let opts' = opts{ writerIncremental = False } in
+             -- we don't want incremental output inside speaker notes
+             case writerSlideVariant opts of
+                  RevealJsSlides -> addAttrs opts' attr $ H5.aside $ contents'
+                  NoSlides       -> addAttrs opts' attr $ H.div $ contents'
                   _              -> mempty
         else addAttrs opts attr $ H.div $ contents'
 blockToHtml _ (RawBlock f str)
@@ -557,11 +567,16 @@ blockToHtml opts (Table capt aligns widths headers rows') = do
   let percent w = show (truncate (100*w) :: Integer) ++ "%"
   let coltags = if all (== 0.0) widths
                    then mempty
-                   else mconcat $ map (\w ->
-                          if writerHtml5 opts
-                             then H.col ! A.style (toValue $ "width: " ++ percent w)
-                             else H.col ! A.width (toValue $ percent w) >> nl opts)
-                          widths
+                   else do
+                     H.colgroup $ do
+                       nl opts
+                       mapM_ (\w -> do
+                            if writerHtml5 opts
+                               then H.col ! A.style (toValue $ "width: " ++
+                                                      percent w)
+                               else H.col ! A.width (toValue $ percent w)
+                            nl opts) widths
+                     nl opts
   head' <- if all null headers
               then return mempty
               else do
@@ -728,12 +743,12 @@ inlineToHtml opts inline =
                                               else DisplayBlock
                                   let conf = useShortEmptyTags (const False)
                                                defaultConfigPP
-                                  case texMathToMathML dt str of
-                                        Right r -> return $ preEscapedString $
-                                                    ppcElement conf r
-                                        Left  _ -> inlineListToHtml opts
-                                                   (readTeXMath' t str) >>= return .
-                                                     (H.span ! A.class_ "math")
+                                  case writeMathML dt <$> readTeX str of
+                                        Right r  -> return $ preEscapedString $
+                                            ppcElement conf r
+                                        Left _   -> inlineListToHtml opts
+                                            (texMathToInlines t str) >>=
+                                            return .  (H.span ! A.class_ "math")
                                MathJax _ -> if writerScholarly opts
                                                then return $ mathToMathJax opts t str
                                                else return $ H.span ! A.class_ "math" $ toHtml $
@@ -741,7 +756,7 @@ inlineToHtml opts inline =
                                                       InlineMath  -> "\\(" ++ str ++ "\\)"
                                                       DisplayMath _ -> "\\[" ++ str ++ "\\]"
                                PlainMath -> do
-                                  x <- inlineListToHtml opts (readTeXMath' t str)
+                                  x <- inlineListToHtml opts (texMathToInlines t str)
                                   let m = H.span ! A.class_ "math" $ x
                                   let brtag = if writerHtml5 opts then H5.br else H.br
                                   return  $ case t of
@@ -755,10 +770,6 @@ inlineToHtml opts inline =
                                _             -> return mempty
       | f == Format "html" -> return $ preEscapedString str
       | otherwise          -> return mempty
-    (Link [Str str] (s,_)) | "mailto:" `isPrefixOf` s &&
-                             s == escapeURI ("mailto" ++ str) ->
-                        -- autolink
-                        return $ obfuscateLink opts str s
     (Link txt (s,_)) | "mailto:" `isPrefixOf` s -> do
                         linkText <- inlineListToHtml opts txt
                         return $ obfuscateLink opts (renderHtml linkText) s
@@ -769,9 +780,12 @@ inlineToHtml opts inline =
                                             RevealJsSlides -> '#':'/':xs
                                       _ -> s
                         let link = H.a ! A.href (toValue s') $ linkText
+                        let link' = if txt == [Str (unEscapeString s)]
+                                       then link ! A.class_ "uri"
+                                       else link
                         return $ if null tit
-                                    then link
-                                    else link ! A.title (toValue tit)
+                                    then link'
+                                    else link' ! A.title (toValue tit)
     (Image attr txt (s,tit)) | treatAsImage s -> do
                         let alternate' = stringify txt
                         let attributes = [A.src $ toValue s] ++

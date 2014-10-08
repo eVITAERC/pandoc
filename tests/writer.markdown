@@ -9,7 +9,7 @@ title: Pandoc Test Suite
 This is a set of tests for pandoc. Most of them are adapted from John Gruber’s
 markdown test suite.
 
-* * * * *
+------------------------------------------------------------------------------
 
 Headers
 =======
@@ -38,7 +38,7 @@ Level 2
 
 with no blank line
 
-* * * * *
+------------------------------------------------------------------------------
 
 Paragraphs
 ==========
@@ -54,7 +54,7 @@ Here’s one with a bullet. \* criminey.
 There should be a hard line break\
 here.
 
-* * * * *
+------------------------------------------------------------------------------
 
 Block Quotes
 ============
@@ -84,7 +84,7 @@ This should not be a block quote: 2 \> 1.
 
 And a following paragraph.
 
-* * * * *
+------------------------------------------------------------------------------
 
 Code Blocks
 ===========
@@ -105,7 +105,7 @@ And:
 
     These should not be escaped:  \$ \\ \> \[ \{
 
-* * * * *
+------------------------------------------------------------------------------
 
 Lists
 =====
@@ -268,7 +268,7 @@ M.A. 2007
 
 B. Williams
 
-* * * * *
+------------------------------------------------------------------------------
 
 Definition Lists
 ================
@@ -277,8 +277,10 @@ Tight using spaces:
 
 apple
 :   red fruit
+
 orange
 :   orange fruit
+
 banana
 :   yellow fruit
 
@@ -286,30 +288,37 @@ Tight using tabs:
 
 apple
 :   red fruit
+
 orange
 :   orange fruit
+
 banana
 :   yellow fruit
 
 Loose:
 
 apple
+
 :   red fruit
 
 orange
+
 :   orange fruit
 
 banana
+
 :   yellow fruit
 
 Multiple blocks with italics:
 
 *apple*
+
 :   red fruit
 
     contains seeds, crisp, pleasant to taste
 
 *orange*
+
 :   orange fruit
 
         { orange code block }
@@ -321,6 +330,7 @@ Multiple definitions, tight:
 apple
 :   red fruit
 :   computer
+
 orange
 :   orange fruit
 :   bank
@@ -328,11 +338,13 @@ orange
 Multiple definitions, loose:
 
 apple
+
 :   red fruit
 
 :   computer
 
 orange
+
 :   orange fruit
 
 :   bank
@@ -340,11 +352,13 @@ orange
 Blank line after term, indented marker, alternate markers:
 
 apple
+
 :   red fruit
 
 :   computer
 
 orange
+
 :   orange fruit
 
     1.  sublist
@@ -395,9 +409,7 @@ And this is **strong**
 </td>
 </tr>
 </table>
-
 <script type="text/javascript">document.write('This *should not* be interpreted as markdown');</script>
-
 Here’s a simple block:
 
 <div>
@@ -435,26 +447,22 @@ foo
 This should just be an HTML comment:
 
 <!-- Comment -->
-
 Multiline:
 
 <!--
 Blah
 Blah
 -->
-
 <!--
     This is another comment.
 -->
-
 Code block:
 
     <!-- Comment -->
 
 Just plain comment, with trailing spaces on the line:
 
-<!-- foo -->   
-
+<!-- foo -->
 Code:
 
     <hr />
@@ -462,24 +470,16 @@ Code:
 Hr’s:
 
 <hr>
-
 <hr />
-
 <hr />
-
-<hr>   
-
-<hr />  
-
-<hr /> 
-
+<hr>
+<hr />
+<hr />
 <hr class="foo" id="bar" />
-
 <hr class="foo" id="bar" />
-
 <hr class="foo" id="bar">
 
-* * * * *
+------------------------------------------------------------------------------
 
 Inline Markup
 =============
@@ -509,7 +509,7 @@ Subscripts: H~2~O, H~23~O, H~many of them~O.
 These should not be superscripts or subscripts, because of the unescaped
 spaces: a\^b c\^d, a\~b c\~d.
 
-* * * * *
+------------------------------------------------------------------------------
 
 Smart quotes, ellipses, dashes
 ==============================
@@ -531,7 +531,7 @@ Dashes between numbers: 5–7, 255–66, 1987–1999.
 
 Ellipses…and…and….
 
-* * * * *
+------------------------------------------------------------------------------
 
 LaTeX
 =====
@@ -562,7 +562,7 @@ Dog    & 2      \\
 Cat    & 1      \\ \hline
 \end{tabular}
 
-* * * * *
+------------------------------------------------------------------------------
 
 Special Characters
 ==================
@@ -617,7 +617,7 @@ Plus: +
 
 Minus: -
 
-* * * * *
+------------------------------------------------------------------------------
 
 Links
 =====
@@ -699,7 +699,7 @@ Auto-links should not occur here: `<http://example.com/>`
 
     or here: <http://example.com/>
 
-* * * * *
+------------------------------------------------------------------------------
 
 Images
 ======
@@ -710,7 +710,7 @@ From “Voyage dans la Lune” by Georges Melies (1902):
 
 Here is a movie ![movie](movie.jpg) icon.
 
-* * * * *
+------------------------------------------------------------------------------
 
 Footnotes
 =========

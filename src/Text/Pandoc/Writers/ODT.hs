@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-
-Copyright (C) 2008-2010 John MacFarlane <jgm@berkeley.edu>
+Copyright (C) 2008-2014 John MacFarlane <jgm@berkeley.edu>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 {- |
    Module      : Text.Pandoc.Writers.ODT
-   Copyright   : Copyright (C) 2008-2010 John MacFarlane
+   Copyright   : Copyright (C) 2008-2014 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -30,15 +30,16 @@ Conversion of 'Pandoc' documents to ODT.
 -}
 module Text.Pandoc.Writers.ODT ( writeODT ) where
 import Data.IORef
-import Data.List ( isPrefixOf, isSuffixOf )
+import Data.List ( isPrefixOf )
 import Data.Maybe ( fromMaybe )
 import Text.XML.Light.Output
 import Text.TeXMath
 import qualified Data.ByteString.Lazy as B
 import Text.Pandoc.UTF8 ( fromStringLazy )
 import Codec.Archive.Zip
+import Control.Applicative ((<$>))
 import Text.Pandoc.Options ( WriterOptions(..) )
-import Text.Pandoc.Shared ( stringify, readDataFile, fetchItem, warn )
+import Text.Pandoc.Shared ( stringify, readDataFile, fetchItem', warn )
 import Text.Pandoc.ImageSize ( imageSize, sizeInPoints )
 import Text.Pandoc.MIME ( getMimeType )
 import Text.Pandoc.Definition
@@ -76,11 +77,7 @@ writeODT opts doc@(Pandoc meta _) = do
                 $ contentEntry : picEntries
   -- construct META-INF/manifest.xml based on archive
   let toFileEntry fp = case getMimeType fp of
-                        Nothing  -> if "Formula-" `isPrefixOf` fp && "/" `isSuffixOf` fp
-                                       then selfClosingTag "manifest:file-entry"
-                                             [("manifest:media-type","application/vnd.oasis.opendocument.formula")
-                                             ,("manifest:full-path",fp)]
-                                       else empty
+                        Nothing  -> empty
                         Just m   -> selfClosingTag "manifest:file-entry"
                                      [("manifest:media-type", m)
                                      ,("manifest:full-path", fp)
@@ -131,7 +128,7 @@ writeODT opts doc@(Pandoc meta _) = do
 
 transformPicMath :: WriterOptions -> IORef [Entry] -> Inline -> IO Inline
 transformPicMath opts entriesRef (Image attr lab (src,_)) = do
-  res <- fetchItem (writerSourceURL opts) src
+  res <- fetchItem' (writerMediaBag opts) (writerSourceURL opts) src
   case res of
      Left (_ :: E.SomeException) -> do
        warn $ "Could not find image `" ++ src ++ "', skipping..."
@@ -150,7 +147,7 @@ transformPicMath opts entriesRef (Image attr lab (src,_)) = do
 transformPicMath _ entriesRef (Math t math) = do
   entries <- readIORef entriesRef
   let dt = if t == InlineMath then DisplayInline else DisplayBlock
-  case texMathToMathML dt math of
+  case writeMathML dt <$> readTeX math of
        Left  _ -> return $ Math t math
        Right r -> do
          let conf = useShortEmptyTags (const False) defaultConfigPP

@@ -28,7 +28,7 @@
 \stop[a2]
 \stop[a2]
 
-## URLs with spaces
+## URLs with spaces and punctuation
 
 [foo](/bar and baz)
 [foo](/bar
@@ -41,6 +41,8 @@
 [baz]: /foo foo
 [bam]:  /foo fee   
 [bork]:  /foo/zee zob   (title)
+
+[Ward's method.](http://en.wikipedia.org/wiki/Ward's_method)
 
 ## Horizontal rules with spaces at end
 
@@ -58,6 +60,10 @@
 
 $\$2 + \$3$
 
+This should not be math:
+
+$PATH 90 $PATH
+
 ## Commented-out list item
 
 - one
@@ -65,6 +71,22 @@ $\$2 + \$3$
 - two
 -->
 - three
+
+## Indented code at beginning of list
+
+-       code
+        code
+
+  1.    code
+        code
+
+  12345678.    code
+        code
+
+  -     code
+        code
+
+  -    no code
 
 ## Backslash newline
 
@@ -235,3 +257,11 @@ Empty cells
 ## Reference link fallbacks
 
 [*not a link*] [*nope*]...
+
+## Empty reference links
+
+[foo2]:
+
+bar
+
+[foo2]

@@ -1,51 +1,57 @@
-# This Makefile is for development only.  It requires cabal-dev.
-# To get started, do 'make prep' and then 'make' or 'make quick'.
-
-.PHONY: prep submodules all quick bench clean veryclean install sdist
-
-all:
-	cabal-dev configure --enable-tests --enable-benchmarks && cabal-dev build
-
-test: all
-	cabal test
-
-prof:
-	cabal-dev configure --disable-tests --enable-library-profiling --enable-executable-profiling && cabal-dev build
-
-prep: submodules pandoc-types citeproc-hs
-	(cabal-dev --version || (cabal update && cabal install cabal-dev)) && \
-	cabal-dev update && \
-	cabal-dev install-deps --enable-library-profiling --enable-tests --enable-benchmarks
-
-submodules:
-	git submodule update --init
+version=$(shell grep '^Version:' pandoc.cabal | awk '{print $$2;}')
+makemanpages=$(shell find dist -type f -name make-pandoc-man-pages)
+ifeq "${makemanpages}" ""
+	makemanpages=@echo "You need to 'cabal configure -fmake-pandoc-man-pages && cabal build'" && exit 1
+endif
+setup=dist/setup/setup
+MANPAGES=man/man1/pandoc.1 man/man5/pandoc_markdown.5
 
 quick:
-	cabal-dev configure --enable-tests --disable-optimization && cabal-dev build
+	cabal configure --enable-tests --disable-optimization
+	cabal build
 
-relocatable:
-	cabal-dev configure -fembed_data_files && cabal-dev build
+full:
+	cabal configure --enable-tests --enable-optimization -ftrypandoc -fmake-pandoc-man-pages -fembed_data_files --enable-benchmarks
+	cabal build
+	cabal haddock
+
+deps:
+	cabal install --only-dependencies --enable-tests -ftrypandoc -fmake-pandoc-man-pages -fembed_data_files --enable-benchmarks
+
+prof:
+	cabal configure --enable-library-profiling --enable-executable-profiling --enable-optimization --enable-tests
+	cabal build
+
+test:
+	cabal test
 
 bench:
-	cabal-dev configure --enable-benchmarks && cabal-dev build
+	cabal bench
 
-sdist:
-	dist/setup/setup sdist
-	# cabal sdist won't work, see https://github.com/haskell/cabal/issues/403
+install: full
+	cabal copy
+	cabal register
+
+dist: man
+	cabal sdist
+	rm -rf "pandoc-${version}"
+	tar xvzf dist/pandoc-${version}.tar.gz
+	cd pandoc-${version}
+	cabal configure ${CABALARGS} && cabal build && cabal test && cd .. && rm -rf "pandoc-${version}"
+
+man: ${MANPAGES}
+
+osxpkg:
+	./make_osx_package.sh
+
+%.1: %.1.template README
+	${makemanpages}
+
+%.5: %.5.template README
+	${makemanpages}
 
 clean:
-	cabal-dev clean
+	cabal clean
+	-rm ${MANPAGES}
 
-veryclean: clean
-	rm -rf pandoc-types citeproc-hs dist cabal-dev
-
-pandoc-types:
-	git clone https://github.com/jgm/pandoc-types && \
- 	  cabal-dev add-source pandoc-types
-
-citeproc-hs: pandoc-types
-	darcs get --lazy http://gorgias.mine.nu/repos/citeproc-hs && \
- 	cabal-dev add-source citeproc-hs
-
-install:
-	cabal-dev install --enable-tests
+.PHONY: deps quick full install man clean test bench haddock osxpkg dist prof

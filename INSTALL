@@ -12,11 +12,7 @@ Quick install
 -------------
 
 1.  Install the [Haskell platform].  This will give you [GHC] and
-    the [cabal-install] build tool, as well as `alex` and `happy`.
-    If you do not use the Haskell platform, you'll need to install
-    `alex` and `happy` separately:
-
-        cabal install alex happy
+    the [cabal-install] build tool.
 
 2.  Update your package database:
 
@@ -116,9 +112,8 @@ assume that the pandoc source directory is your working directory.
 
           cabal install hsb2hs
 
-    - `http-conduit`:  use the `http-conduit` library to fetch external
-      resources (default yes -- without this, pandoc cannot make SSL
-      connections)
+    - `https`:  enable support for downloading resources over https
+      (using the `http-client` and `http-client-tls` libraries).
 
 3.  Build:
 

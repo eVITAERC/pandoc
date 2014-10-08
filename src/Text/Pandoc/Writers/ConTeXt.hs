@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-
-Copyright (C) 2007-2010 John MacFarlane <jgm@berkeley.edu>
+Copyright (C) 2007-2014 John MacFarlane <jgm@berkeley.edu>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 {- |
    Module      : Text.Pandoc.Writers.ConTeXt
-   Copyright   : Copyright (C) 2007-2010 John MacFarlane
+   Copyright   : Copyright (C) 2007-2014 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -35,7 +35,7 @@ import Text.Pandoc.Writers.Shared
 import Text.Pandoc.Options
 import Text.Pandoc.Walk (query)
 import Text.Printf ( printf )
-import Data.List ( intercalate, isPrefixOf )
+import Data.List ( intercalate )
 import Control.Monad.State
 import Text.Pandoc.Pretty
 import Text.Pandoc.Templates ( renderTemplate' )
@@ -283,14 +283,6 @@ inlineToConTeXt (RawInline "tex" str) = return $ text str
 inlineToConTeXt (RawInline _ _) = return empty
 inlineToConTeXt (LineBreak) = return $ text "\\crlf" <> cr
 inlineToConTeXt Space = return space
--- autolink
-inlineToConTeXt (Link [Str str] (src, tit))
-  | if "mailto:" `isPrefixOf` src
-    then src == escapeURI ("mailto:" ++ str)
-    else src == escapeURI str =
-  inlineToConTeXt (Link
-    [RawInline "context" "\\hyphenatedurl{", Str str, RawInline "context" "}"]
-    (src, tit))
 -- Handle HTML-like internal document references to sections
 inlineToConTeXt (Link txt          (('#' : ref), _)) = do
   opts <- gets stOptions
@@ -305,6 +297,7 @@ inlineToConTeXt (Link txt          (('#' : ref), _)) = do
            <> brackets (text ref)
 
 inlineToConTeXt (Link txt          (src, _))      = do
+  let isAutolink = txt == [Str (unEscapeString src)]
   st <- get
   let next = stNextRef st
   put $ st {stNextRef = next + 1}
@@ -313,8 +306,9 @@ inlineToConTeXt (Link txt          (src, _))      = do
   return $ "\\useURL"
            <> brackets (text ref)
            <> brackets (text $ escapeStringUsing [('#',"\\#"),('%',"\\%")] src)
-           <> brackets empty
-           <> brackets label
+           <> (if isAutolink
+                  then empty
+                  else brackets empty <> brackets label)
            <> "\\from"
            <> brackets (text ref)
 inlineToConTeXt (Image _ _ (src, _)) = do

@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-
-Copyright (C) 2006-2010 John MacFarlane <jgm@berkeley.edu>
+Copyright (C) 2006-2014 John MacFarlane <jgm@berkeley.edu>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 {- |
    Module      : Text.Pandoc.Readers.RST
-   Copyright   : Copyright (C) 2006-2010 John MacFarlane
+   Copyright   : Copyright (C) 2006-2014 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -47,7 +47,7 @@ import Text.Pandoc.Builder (Inlines, Blocks, trimInlines, (<>))
 import qualified Text.Pandoc.Builder as B
 import Data.Monoid (mconcat, mempty)
 import Data.Sequence (viewr, ViewR(..))
-import Data.Char (toLower)
+import Data.Char (toLower, isHexDigit)
 
 -- | Parse reStructuredText string and return Pandoc document.
 readRST :: ReaderOptions -- ^ Reader options
@@ -113,15 +113,16 @@ titleTransform (bs, meta) =
 metaFromDefList :: [([Inline], [[Block]])] -> Meta -> Meta
 metaFromDefList ds meta = adjustAuthors $ foldr f meta ds
  where f (k,v) = setMeta (map toLower $ stringify k) (mconcat $ map fromList v)
-       adjustAuthors (Meta metamap) = Meta $ M.adjust toPlain "author"
+       adjustAuthors (Meta metamap) = Meta $ M.adjust splitAuthors "author"
                                            $ M.adjust toPlain "date"
                                            $ M.adjust toPlain "title"
-                                           $ M.adjust splitAuthors "authors"
+                                           $ M.mapKeys (\k -> if k == "authors" then "author" else k)
                                            $ metamap
        toPlain (MetaBlocks [Para xs]) = MetaInlines xs
        toPlain x                      = x
-       splitAuthors (MetaBlocks [Para xs]) = MetaList $ map MetaInlines
-                                                      $ splitAuthors' xs
+       splitAuthors (MetaBlocks [Para xs])
+                                      = MetaList $ map MetaInlines
+                                                 $ splitAuthors' xs
        splitAuthors x                 = x
        splitAuthors'                  = map normalizeSpaces .
                                          splitOnSemi . concatMap factorSemi
@@ -185,22 +186,22 @@ block = choice [ codeBlock
 -- field list
 --
 
-rawFieldListItem :: String -> RSTParser (String, String)
-rawFieldListItem indent = try $ do
-  string indent
+rawFieldListItem :: Int -> RSTParser (String, String)
+rawFieldListItem minIndent = try $ do
+  indent <- length <$> many (char ' ')
+  guard $ indent >= minIndent
   char ':'
   name <- many1Till (noneOf "\n") (char ':')
   (() <$ lookAhead newline) <|> skipMany1 spaceChar
   first <- anyLine
-  rest <- option "" $ try $ do lookAhead (string indent >> spaceChar)
+  rest <- option "" $ try $ do lookAhead (count indent (char ' ') >> spaceChar)
                                indentedBlock
   let raw = (if null first then "" else (first ++ "\n")) ++ rest ++ "\n"
   return (name, raw)
 
-fieldListItem :: String
-              -> RSTParser (Inlines, [Blocks])
-fieldListItem indent = try $ do
-  (name, raw) <- rawFieldListItem indent
+fieldListItem :: Int -> RSTParser (Inlines, [Blocks])
+fieldListItem minIndent = try $ do
+  (name, raw) <- rawFieldListItem minIndent
   let term = B.str name
   contents <- parseFromString parseBlocks raw
   optional blanklines
@@ -208,7 +209,7 @@ fieldListItem indent = try $ do
 
 fieldList :: RSTParser Blocks
 fieldList = try $ do
-  indent <- lookAhead $ many spaceChar
+  indent <- length <$> lookAhead (many spaceChar)
   items <- many1 $ fieldListItem indent
   case items of
      []     -> return mempty
@@ -459,7 +460,7 @@ listItem :: RSTParser Int
 listItem start = try $ do
   (markerLength, first) <- rawListItem start
   rest <- many (listContinuation markerLength)
-  blanks <- choice [ try (many blankline >>~ lookAhead start),
+  blanks <- choice [ try (many blankline <* lookAhead start),
                      many1 blankline ]  -- whole list must end with blank.
   -- parsing with ListItemState forces markers at beginning of lines to
   -- count as list item markers, even if not separated by blank space.
@@ -479,7 +480,7 @@ listItem start = try $ do
 
 orderedList :: RSTParser Blocks
 orderedList = try $ do
-  (start, style, delim) <- lookAhead (anyOrderedListMarker >>~ spaceChar)
+  (start, style, delim) <- lookAhead (anyOrderedListMarker <* spaceChar)
   items <- many1 (listItem (orderedListStart style delim))
   let items' = compactify' items
   return $ B.orderedListWith (start, style, delim) items'
@@ -521,11 +522,11 @@ directive' = do
   skipMany spaceChar
   top <- many $ satisfy (/='\n')
              <|> try (char '\n' <*
-                      notFollowedBy' (rawFieldListItem "   ") <*
+                      notFollowedBy' (rawFieldListItem 3) <*
                       count 3 (char ' ') <*
                       notFollowedBy blankline)
   newline
-  fields <- many $ rawFieldListItem "   "
+  fields <- many $ rawFieldListItem 3
   body <- option "" $ try $ blanklines >> indentedBlock
   optional blanklines
   let body' = body ++ "\n\n"
@@ -576,6 +577,9 @@ directive' = do
                                      role -> role })
         "code" -> codeblock (lookup "number-lines" fields) (trim top) body
         "code-block" -> codeblock (lookup "number-lines" fields) (trim top) body
+        "aafig" -> do
+          let attribs = ("", ["aafig"], map (\(k,v) -> (k, trimr v)) fields)
+          return $ B.codeBlockWith attribs $ stripTrailingNewlines body
         "math" -> return $ B.para $ mconcat $ map B.displayMath
                          $ toChunks $ top ++ "\n\n" ++ body
         "figure" -> do
@@ -651,9 +655,6 @@ extractUnicodeChar :: String -> Maybe (Char, String)
 extractUnicodeChar s = maybe Nothing (\c -> Just (c,rest)) mbc
   where (ds,rest) = span isHexDigit s
         mbc = safeRead ('\'':'\\':'x':ds ++ "'")
-
-isHexDigit :: Char -> Bool
-isHexDigit c = c `elem` "0123456789ABCDEFabcdef"
 
 extractCaption :: RSTParser (Inlines, Blocks)
 extractCaption = do
@@ -743,7 +744,7 @@ simpleReferenceName = do
 
 referenceName :: RSTParser Inlines
 referenceName = quotedReferenceName <|>
-                (try $ simpleReferenceName >>~ lookAhead (char ':')) <|>
+                (try $ simpleReferenceName <* lookAhead (char ':')) <|>
                 unquotedReferenceName
 
 referenceKey :: RSTParser [Char]
@@ -1005,7 +1006,7 @@ renderRole contents fmt role attr = case role of
      where rfcUrl = "http://www.faqs.org/rfcs/rfc" ++ rfcNo ++ ".html"
    pepLink pepNo = B.link pepUrl ("PEP " ++ pepNo) $ B.str ("PEP " ++ pepNo)
      where padNo = replicate (4 - length pepNo) '0' ++ pepNo
-           pepUrl = "http://http://www.python.org/dev/peps/pep-" ++ padNo ++ "/"
+           pepUrl = "http://www.python.org/dev/peps/pep-" ++ padNo ++ "/"
 
 roleNameEndingIn :: RSTParser Char -> RSTParser String
 roleNameEndingIn end = many1Till (letter <|> char '-') end
@@ -1072,7 +1073,7 @@ explicitLink = try $ do
 
 referenceLink :: RSTParser Inlines
 referenceLink = try $ do
-  (label',ref) <- withRaw (quotedReferenceName <|> simpleReferenceName) >>~
+  (label',ref) <- withRaw (quotedReferenceName <|> simpleReferenceName) <*
                    char '_'
   state <- getState
   let keyTable = stateKeys state
@@ -1140,7 +1141,7 @@ smart :: RSTParser Inlines
 smart = do
   getOption readerSmart >>= guard
   doubleQuoted <|> singleQuoted <|>
-    choice (map (B.singleton <$>) [apostrophe, dash, ellipses])
+    choice [apostrophe, dash, ellipses]
 
 singleQuoted :: RSTParser Inlines
 singleQuoted = try $ do

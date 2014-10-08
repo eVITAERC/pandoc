@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-
-Copyright (C) 2006-2010 John MacFarlane <jgm@berkeley.edu>
+Copyright (C) 2006-2014 John MacFarlane <jgm@berkeley.edu>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 {- |
    Module      : Text.Pandoc.Writers.AsciiDoc
-   Copyright   : Copyright (C) 2006-2010 John MacFarlane
+   Copyright   : Copyright (C) 2006-2014 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -43,16 +43,19 @@ import Text.Pandoc.Shared
 import Text.Pandoc.Writers.Shared
 import Text.Pandoc.Options
 import Text.Pandoc.Parsing hiding (blankline, space)
-import Data.List ( isPrefixOf, intersperse, intercalate )
+import Data.Maybe (fromMaybe)
+import Data.List ( stripPrefix, intersperse, intercalate )
 import Text.Pandoc.Pretty
 import Control.Monad.State
 import qualified Data.Map as M
 import Data.Aeson (Value(String), fromJSON, toJSON, Result(..))
 import qualified Data.Text as T
+import Control.Applicative ((<*), (*>))
 
 data WriterState = WriterState { defListMarker :: String
                                , orderedListLevel :: Int
                                , bulletListLevel  :: Int
+                               , intraword        :: Bool
                                }
 
 -- | Convert Pandoc to AsciiDoc.
@@ -62,6 +65,7 @@ writeAsciiDoc opts document =
       defListMarker = "::"
     , orderedListLevel = 1
     , bulletListLevel = 1
+    , intraword = False
     }
 
 -- | Return asciidoc representation of document.
@@ -123,7 +127,7 @@ blockToAsciiDoc _ Null = return empty
 blockToAsciiDoc opts (Plain inlines) = do
   contents <- inlineListToAsciiDoc opts inlines
   return $ contents <> cr
-blockToAsciiDoc opts (Para [Image attr alt (src,'f':'i':'g':':':tit)]) =
+blockToAsciiDoc opts (Para [Image attr alt (src,'f':'i':'g':':':tit)]) = do
   blockToAsciiDoc opts (Para [Image attr alt (src,tit)])
 blockToAsciiDoc opts (Para inlines) = do
   contents <- inlineListToAsciiDoc opts inlines
@@ -142,10 +146,10 @@ blockToAsciiDoc opts (Header level (ident,_,_) inlines) = do
   let len = offset contents
   -- ident seem to be empty most of the time and asciidoc will generate them automatically
   -- so lets make them not show up when null
-  let identifier = if (null ident) then empty else ("[[" <> text ident <> "]]") 
+  let identifier = if (null ident) then empty else ("[[" <> text ident <> "]]")
   let setext = writerSetextHeaders opts
-  return $ 
-         (if setext 
+  return $
+         (if setext
             then
               identifier $$ contents $$
               (case level of
@@ -155,7 +159,7 @@ blockToAsciiDoc opts (Header level (ident,_,_) inlines) = do
                4  -> text $ replicate len '+'
                _  -> empty) <> blankline
             else
-              identifier $$ text (replicate level '=') <> space <> contents <> blankline) 
+              identifier $$ text (replicate level '=') <> space <> contents <> blankline)
 blockToAsciiDoc _ (CodeBlock (_,classes,_) str) = return $
   flush (attrs <> dashes <> space <> attrs <> cr <> text str <>
            cr <> dashes) <> blankline
@@ -217,7 +221,9 @@ blockToAsciiDoc opts (Table caption aligns widths headers rows) =  do
   let makeCell [Plain x] = do d <- blockListToAsciiDoc opts [Plain x]
                               return $ text "|" <> chomp d
       makeCell [Para x]  = makeCell [Plain x]
-      makeCell _         = return $ text "|" <> "[multiblock cell omitted]"
+      makeCell []        = return $ text "|"
+      makeCell bs        = do d <- blockListToAsciiDoc opts bs
+                              return $ text "a|" $$ d
   let makeRow cells = hsep `fmap` mapM makeCell cells
   rows' <- mapM makeRow rows
   head' <- makeRow headers
@@ -227,7 +233,7 @@ blockToAsciiDoc opts (Table caption aligns widths headers rows) =  do
                     else 100000
   let maxwidth = maximum $ map offset (head':rows')
   let body = if maxwidth > colwidth then vsep rows' else vcat rows'
-  let border = text $ "|" ++ replicate ((min maxwidth colwidth) - 1) '='
+  let border = text $ "|" ++ replicate (max 5 (min maxwidth colwidth) - 1) '='
   return $
     caption'' $$ tablespec $$ border $$ head'' $$ body $$ border $$ blankline
 blockToAsciiDoc opts (BulletList items) = do
@@ -315,17 +321,51 @@ blockListToAsciiDoc opts blocks = cat `fmap` mapM (blockToAsciiDoc opts) blocks
 
 -- | Convert list of Pandoc inline elements to asciidoc.
 inlineListToAsciiDoc :: WriterOptions -> [Inline] -> State WriterState Doc
-inlineListToAsciiDoc opts lst =
-  mapM (inlineToAsciiDoc opts) lst >>= return . cat
+inlineListToAsciiDoc opts lst = do
+  oldIntraword <- gets intraword
+  setIntraword False
+  result <- go lst
+  setIntraword oldIntraword
+  return result
+ where go [] = return empty
+       go (y:x:xs)
+         | not (isSpacy y) = do
+           y' <- if isSpacy x
+                    then inlineToAsciiDoc opts y
+                    else withIntraword $ inlineToAsciiDoc opts y
+           x' <- withIntraword $ inlineToAsciiDoc opts x
+           xs' <- go xs
+           return (y' <> x' <> xs')
+         | x /= Space && x /= LineBreak = do
+           y' <- withIntraword $ inlineToAsciiDoc opts y
+           xs' <- go (x:xs)
+           return (y' <> xs')
+       go (x:xs) = do
+           x' <- inlineToAsciiDoc opts x
+           xs' <- go xs
+           return (x' <> xs')
+       isSpacy Space = True
+       isSpacy LineBreak = True
+       isSpacy _ = False
+
+setIntraword :: Bool -> State WriterState ()
+setIntraword b = modify $ \st -> st{ intraword = b }
+
+withIntraword :: State WriterState a -> State WriterState a
+withIntraword p = setIntraword True *> p <* setIntraword False
 
 -- | Convert Pandoc inline element to asciidoc.
 inlineToAsciiDoc :: WriterOptions -> Inline -> State WriterState Doc
 inlineToAsciiDoc opts (Emph lst) = do
   contents <- inlineListToAsciiDoc opts lst
-  return $ "_" <> contents <> "_"
+  isIntraword <- gets intraword
+  let marker = if isIntraword then "__" else "_"
+  return $ marker <> contents <> marker
 inlineToAsciiDoc opts (Strong lst) = do
   contents <- inlineListToAsciiDoc opts lst
-  return $ "*" <> contents <> "*"
+  isIntraword <- gets intraword
+  let marker = if isIntraword then "**" else "*"
+  return $ marker <> contents <> marker
 inlineToAsciiDoc opts (Strikeout lst) = do
   contents <- inlineListToAsciiDoc opts lst
   return $ "[line-through]*" <> contents <> "*"
@@ -336,12 +376,10 @@ inlineToAsciiDoc opts (Subscript lst) = do
   contents <- inlineListToAsciiDoc opts lst
   return $ "~" <> contents <> "~"
 inlineToAsciiDoc opts (SmallCaps lst) = inlineListToAsciiDoc opts lst
-inlineToAsciiDoc opts (Quoted SingleQuote lst) = do
-  contents <- inlineListToAsciiDoc opts lst
-  return $ "`" <> contents <> "'"
-inlineToAsciiDoc opts (Quoted DoubleQuote lst) = do
-  contents <- inlineListToAsciiDoc opts lst
-  return $ "``" <> contents <> "''"
+inlineToAsciiDoc opts (Quoted SingleQuote lst) =
+  inlineListToAsciiDoc opts (Str "`" : lst ++ [Str "'"])
+inlineToAsciiDoc opts (Quoted DoubleQuote lst) =
+  inlineListToAsciiDoc opts (Str "``" : lst ++ [Str "''"])
 inlineToAsciiDoc _ (Code _ str) = return $
   text "`" <> text (escapeStringUsing (backslashEscapes "`") str) <> "`"
 inlineToAsciiDoc _ (Str str) = return $ text $ escapeString str
@@ -364,7 +402,7 @@ inlineToAsciiDoc opts (Link txt (src, _tit)) = do
   let prefix = if isRelative
                   then text "link:"
                   else empty
-  let srcSuffix = if isPrefixOf "mailto:" src then drop 7 src else src
+  let srcSuffix = fromMaybe src (stripPrefix "mailto:" src)
   let useAuto = case txt of
                       [Str s] | escapeURI s == srcSuffix -> True
                       _                                  -> False
