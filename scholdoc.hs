@@ -88,8 +88,8 @@ copyrightMessage = intercalate "\n" [
 
 compileInfo :: String
 compileInfo =
-  "\nCompiled with texmath " ++
-  VERSION_texmath ++ ", highlighting-kate " ++ VERSION_highlighting_kate ++
+  "\nCompiled with scholdoc-texmath " ++
+  VERSION_scholdoc_texmath ++ ", highlighting-kate " ++ VERSION_highlighting_kate ++
    ".\nSyntax highlighting is supported for the following languages:\n    " ++
        wrapWords 4 78
        [map toLower l | l <- languages, l /= "Alert" && l /= "Alert_indent"]

@@ -173,7 +173,7 @@ import qualified Data.Set as Set
 import Text.Parsec
 import Text.Parsec.Error
 import qualified Text.Pandoc.UTF8 as UTF8
-import Paths_pandoc (version)
+import Paths_scholdoc (version)
 
 -- | Version number of pandoc library.
 pandocVersion :: String

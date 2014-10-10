@@ -131,7 +131,7 @@ import qualified Data.Text as T (toUpper, pack, unpack)
 #ifdef EMBED_DATA_FILES
 import Text.Pandoc.Data (dataFiles)
 #else
-import Paths_pandoc (getDataFileName)
+import Paths_scholdoc (getDataFileName)
 #endif
 #ifdef HTTP_CLIENT
 import Data.ByteString.Lazy (toChunks)

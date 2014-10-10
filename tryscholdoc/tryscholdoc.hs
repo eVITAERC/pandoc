@@ -33,8 +33,8 @@ app req respond = do
   let output = encode $ object [ T.pack "result" .= result
                                , T.pack "name" .=
                                   if fromFormat == "markdown_strict"
-                                     then T.pack "pandoc (strict)"
-                                     else T.pack "pandoc"
+                                     then T.pack "scholdoc (strict)"
+                                     else T.pack "scholdoc"
                                , T.pack "version" .= pandocVersion]
   respond $ responseLBS status200 [(hContentType,"text/json; charset=UTF-8")] output
 

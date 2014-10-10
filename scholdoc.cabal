@@ -1,5 +1,5 @@
-Name:            pandoc
-Version:         1.13.1
+Name:            scholdoc
+Version:         0.1.3
 Cabal-Version:   >= 1.10
 Build-Type:      Custom
 License:         GPL
@@ -194,8 +194,8 @@ Flag embed_data_files
   Description:   Embed data files in binary for relocatable executable.
   Default:       False
 
-Flag trypandoc
-  Description:   Build trypandoc cgi executable.
+Flag tryscholdoc
+  Description:   Build tryscholdoc cgi executable.
   Default:       False
 
 Flag https
@@ -227,11 +227,11 @@ Library
                  old-locale >= 1 && < 1.1,
                  time >= 1.2 && < 1.5,
                  HTTP >= 4000.0.5 && < 4000.3,
-                 texmath >= 0.8 && < 0.9,
+                 scholdoc-texmath >= 0.1 && < 0.2,
                  xml >= 1.3.12 && < 1.4,
                  random >= 1 && < 1.1,
                  extensible-exceptions >= 0.1 && < 0.2,
-                 pandoc-types >= 1.12.4 && < 1.13,
+                 scholdoc-types >= 0.1.3 && < 0.1.4,
                  aeson >= 0.7 && < 0.9,
                  tagsoup >= 0.13.1 && < 0.14,
                  base64-bytestring >= 0.1 && < 1.1,
@@ -342,13 +342,13 @@ Library
                    Text.Pandoc.Compat.Except,
                    Text.Pandoc.Compat.TagSoupEntity,
                    Text.Pandoc.Compat.Directory
-                   Paths_pandoc
+                   Paths_scholdoc
 
   Buildable:       True
 
-Executable pandoc
-  Build-Depends: pandoc,
-                 pandoc-types >= 1.12.4 && < 1.13,
+Executable scholdoc
+  Build-Depends: scholdoc,
+                 scholdoc-types >= 0.1.3 && < 0.1.4,
                  base >= 4.2 && <5,
                  directory >= 1 && < 1.3,
                  filepath >= 1.1 && < 1.4,
@@ -374,15 +374,15 @@ Executable pandoc
                     RelaxedPolyRec, DeriveDataTypeable, TypeSynonymInstances,
                     FlexibleInstances
   Hs-Source-Dirs:  .
-  Main-Is:         pandoc.hs
+  Main-Is:         scholdoc.hs
   Buildable:       True
 
-Executable trypandoc
-  Main-Is:         trypandoc.hs
-  Hs-Source-Dirs:  trypandoc
+Executable tryscholdoc
+  Main-Is:         tryscholdoc.hs
+  Hs-Source-Dirs:  tryscholdoc
   default-language: Haskell2010
-  if flag(trypandoc)
-    Build-Depends: base, aeson, pandoc, highlighting-kate,
+  if flag(tryscholdoc)
+    Build-Depends: base, aeson, scholdoc, highlighting-kate,
                    text, wai-extra, wai >= 0.3, http-types
     Buildable:     True
   else
@@ -392,7 +392,7 @@ Executable trypandoc
 Executable make-pandoc-man-pages
   Main-Is:       make-pandoc-man-pages.hs
   Hs-Source-Dirs: man
-  Build-Depends: pandoc,
+  Build-Depends: scholdoc,
                  base >= 4.2 && < 5,
                  directory >= 1 && < 1.3,
                  filepath >= 1.1 && < 1.4,
@@ -410,8 +410,8 @@ Test-Suite test-pandoc
   Hs-Source-Dirs: tests
   Build-Depends:  base >= 4.2 && < 5,
                   syb >= 0.1 && < 0.5,
-                  pandoc,
-                  pandoc-types >= 1.12.4 && < 1.13,
+                  scholdoc,
+                  scholdoc-types >= 0.1.3 && < 0.1.4,
                   bytestring >= 0.9 && < 0.11,
                   text >= 0.11 && < 1.2,
                   directory >= 1 && < 1.3,
@@ -455,7 +455,7 @@ benchmark benchmark-pandoc
   Type:            exitcode-stdio-1.0
   Main-Is:         benchmark-pandoc.hs
   Hs-Source-Dirs:  benchmark
-  Build-Depends:   pandoc,
+  Build-Depends:   scholdoc,
                    base >= 4.2 && < 5,
                    syb >= 0.1 && < 0.5,
                    criterion >= 0.5 && < 0.9
