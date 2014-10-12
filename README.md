@@ -1,7 +1,7 @@
 Scholdoc
 ========
 
-### Converts [ScholarlyMarkdown][scholmd] documents into HTML5/LaTeX/Docx
+### Converts [ScholarlyMarkdown][scholmd] documents into HTML5, LaTeX, or Docx
 
 **Current stable version:** 0.1.3
 
@@ -31,7 +31,7 @@ Scholdoc is currently up to date with [Pandoc][pandoc] version 1.13.1
 
 ### HTML output
 
-***Important:** A ScholarlyMarkdown [core CSS][corecss] is required for proper
+***Important:*** *A ScholarlyMarkdown [core CSS][corecss] is required for proper
 formatting of most HTML files output by Scholdoc.*
 
 Scholdoc's HTML output is strictly limited to HTML5 due to its enhanced
@@ -49,6 +49,9 @@ the `html_bodyonly` output format. By default, Scholdoc will always include
 proper [MathJax] settings for the way [ScholarlyMarkdown][scholmd] prescribes
 math content in HTML.
 
+### Docx output
+
+The Docx writer currently isn't fully functional yet. It does not yet output structures specific to ScholarlyMarkdown (such as figures).
 
 [scholmd]: http://scholarlymarkdown.com
 [scholdoc]: https://github.com/timtylin/scholdoc
