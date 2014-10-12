@@ -872,6 +872,11 @@ options =
                   (\opt -> return opt { optIgnoreArgs = True }))
                  "" -- "Ignore command-line arguments."
 
+    , Option "" ["emulate-pandoc"]
+                 (NoArg
+                  (\opt -> return opt))
+                 "" -- "Make defaults same as Pandoc (picked up in rawArgs)"
+
     , Option "v" ["version"]
                  (NoArg
                   (\_ -> do
@@ -1033,12 +1038,14 @@ main = do
      err 2 $ concat $ errors ++
         ["Try " ++ prg ++ " --help for more information."]
 
+  let preventScholarly = "--emulate-pandoc" `elem` rawArgs
+
   let defaultOpts' = if compatMode
                        then defaultOpts { optReader = "markdown_strict"
                                         , optWriter = "html"
                                         , optEmailObfuscation =
                                            ReferenceObfuscation }
-                       else if scholarlyPandoc
+                       else if scholarlyPandoc && not preventScholarly
                             then defaultOpts { optReader = "markdown_scholarly"
                                              , optSmart = True
                                              , optParseRaw = True

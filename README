@@ -9,8 +9,8 @@ Scholdoc
 **Stable build status** [![build status][scholarly-travisimage]][travis_stat]
 
 **Scholdoc** is a command-line utility that converts
-[ScholarlyMarkdown][scholmd] documents into HTML5, LaTeX, and Docx (OOML)
-files. It is intended to facilitate academic writing in a cross-platform,
+[ScholarlyMarkdown][scholmd] documents into the HTML5, LaTeX, and Docx (OOML)
+formats. It is intended to facilitate academic writing in a cross-platform,
 semantic-aware, plaintext format that can be quickly used in modern publishing
 pipelines.
 

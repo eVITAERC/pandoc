@@ -222,7 +222,7 @@ fb2WriterTest title opts inputfile normfile =
 
 -- | Run a test without normalize function, return True if test passed.
 test :: String    -- ^ Title of test
-     -> [String]  -- ^ Options to pass to pandoc
+     -> [String]  -- ^ Options to pass to scholdoc
      -> String    -- ^ Input filepath
      -> FilePath  -- ^ Norm (for test results) filepath
      -> Test
@@ -231,29 +231,29 @@ test = testWithNormalize id
 -- | Run a test with normalize function, return True if test passed.
 testWithNormalize  :: (String -> String) -- ^ Normalize function for output
                    -> String    -- ^ Title of test
-                   -> [String]  -- ^ Options to pass to pandoc
+                   -> [String]  -- ^ Options to pass to scholdoc
                    -> String    -- ^ Input filepath
                    -> FilePath  -- ^ Norm (for test results) filepath
                    -> Test
 testWithNormalize normalizer testname opts inp norm = testCase testname $ do
-  -- find pandoc executable relative to test-pandoc
+  -- find scholdoc executable relative to test-scholdoc
   -- First, try in same directory (e.g. if both in ~/.cabal/bin)
-  -- Second, try ../pandoc (e.g. if in dist/XXX/build/test-pandoc)
-  pandocPath <- do
+  -- Second, try ../scholdoc (e.g. if in dist/XXX/build/test-scholdoc)
+  scholdocPath <- do
     testExePath <- getExecutablePath
     let testExeDir = takeDirectory testExePath
-    found <- doesFileExist (testExeDir </> "pandoc")
+    found <- doesFileExist (testExeDir </> "scholdoc")
     return $ if found
-                then testExeDir </> "pandoc"
+                then testExeDir </> "scholdoc"
                 else case splitDirectories testExeDir of
-                           [] -> error "test-pandoc: empty testExeDir"
-                           xs -> joinPath (init xs) </> "pandoc" </> "pandoc"
-  (outputPath, hOut) <- openTempFile "" "pandoc-test"
+                           [] -> error "test-scholdoc: empty testExeDir"
+                           xs -> joinPath (init xs) </> "scholdoc" </> "scholdoc"
+  (outputPath, hOut) <- openTempFile "" "scholdoc-test"
   let inpPath = inp
   let normPath = norm
-  let options = ["--data-dir", ".." </> "data"] ++ [inpPath] ++ opts
-  let cmd = pandocPath ++ " " ++ unwords options
-  ph <- runProcess pandocPath options Nothing
+  let options = ["--emulate-pandoc", "--data-dir", ".." </> "data"] ++ [inpPath] ++ opts
+  let cmd = scholdocPath ++ " " ++ unwords options
+  ph <- runProcess scholdocPath options Nothing
         (Just [("TMP","."),("LANG","en_US.UTF-8"),("HOME", "./")]) Nothing (Just hOut)
         (Just stderr)
   ec <- waitForProcess ph

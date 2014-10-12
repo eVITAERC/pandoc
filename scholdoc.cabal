@@ -4,40 +4,40 @@ Cabal-Version:   >= 1.10
 Build-Type:      Custom
 License:         GPL
 License-File:    COPYING
-Copyright:       (c) 2006-2014 John MacFarlane
-Author:          John MacFarlane <jgm@berkeley.edu>
-Maintainer:      John MacFarlane <jgm@berkeley.edu>
-Bug-Reports:     https://github.com/jgm/pandoc/issues
+Copyright:       (c) 2014 Tim T.Y. Lin, (c) 2006-2014 John MacFarlane
+Author:          Tim T.Y. Lin <timtylin@gmail.com>
+Maintainer:      Tim T.Y. Lin <timtylin@gmail.com>
+Bug-Reports:     https://github.com/timtylin/scholdoc/issues
 Stability:       alpha
-Homepage:        http://johnmacfarlane.net/pandoc
+Homepage:        http://scholarlymarkdown.com
 Category:        Text
 Tested-With:     GHC == 7.4.2, GHC == 7.6.3, GHC == 7.8.2
-Synopsis:        Conversion between markup formats
-Description:     Pandoc is a Haskell library for converting from one markup
-                 format to another, and a command-line tool that uses
-                 this library. It can read markdown and (subsets of) HTML,
-                 reStructuredText, LaTeX, DocBook, MediaWiki markup, Haddock
-                 markup, OPML, Emacs Org-Mode, txt2tags and Textile, and it can write
-                 markdown, reStructuredText, HTML, LaTeX, ConTeXt, Docbook,
-                 OPML, OpenDocument, ODT, Word docx, RTF, MediaWiki, DokuWiki,
-                 Textile, groff man pages, plain text, Emacs Org-Mode, AsciiDoc,
-                 Haddock markup, EPUB (v2 and v3), FictionBook2,
-                 InDesign ICML, and several kinds of HTML/javascript
-                 slide shows (S5, Slidy, Slideous, DZSlides, reveal.js).
+Synopsis:        Converts ScholarlyMarkdown documents to HTML5/LaTeX/Docx format
+Description:     Scholdoc is a command-line utility that converts
+                 ScholarlyMarkdown documents into the HTML5, LaTeX, and Docx
+                 (OOML) formats. It is intended to facilitate academic writing
+                 in a cross-platform, semantic-aware, plaintext format that can
+                 be quickly used in modern publishing pipelines.
                  .
-                 Pandoc extends standard markdown syntax with footnotes,
-                 embedded LaTeX, definition lists, tables, and other
-                 features. A compatibility mode is provided for those
-                 who need a drop-in replacement for Markdown.pl.
+                 Scholdoc is implemented as (rather crude) fork of @pandoc@,
+                 and the command-line executable mostly retains the same user
+                 interface (including the custom template and filter system).
+                 It essentially understands a new input format
+                 @markdown_scholarly@ (implemented in the markdown reader a
+                 superset of @markdown_pandoc@ features), and limits itself to
+                 HTML5/LaTeX/Docx output.
                  .
-                 In contrast to existing tools for converting markdown
-                 to HTML, which use regex substitutions, pandoc has
-                 a modular design: it consists of a set of readers,
-                 which parse text in a given format and produce a native
-                 representation of the document, and a set of writers,
-                 which convert this native representation into a target
-                 format. Thus, adding an input or output format requires
-                 only adding a reader or writer.
+                 Unfortunately, currently Scholdoc occupies the @Pandoc@
+                 namespace. This is done to avoid problems when merging in
+                 fixes and changes from the core Pandoc project, and to
+                 potentially allow enhancements from Scholdoc to be contributed
+                 back to Pandoc. It is thus not recommended to use the library
+                 directly, as Scholdoc is not backwards-compatible with Pandoc,
+                 to avoid confusion.
+                 .
+                 For descriptions of the original @pandoc@ package, please
+                 visit <http://hackage.haskell.org/package/pandoc>
+
 Data-Files:
                  -- templates
                  data/templates/default.html
@@ -85,7 +85,7 @@ Data-Files:
                  -- sample lua custom writer
                  data/sample.lua
                  -- documentation
-                 README, COPYRIGHT
+                 README, README-pandoc, COPYRIGHT
 Extra-Source-Files:
                  -- documentation
                  INSTALL, BUGS, CONTRIBUTING.md, changelog
@@ -96,9 +96,9 @@ Extra-Source-Files:
                  -- generated man pages (produced post-build)
                  man/man1/pandoc.1
                  man/man5/pandoc_markdown.5
-                 -- trypandoc
-                 trypandoc/Makefile
-                 trypandoc/index.html
+                 -- tryscholdoc
+                 tryscholdoc/Makefile
+                 tryscholdoc/index.html
                  -- tests
                  tests/bodybg.gif
                  tests/*.native
@@ -185,10 +185,11 @@ Extra-Source-Files:
                  tests/epub/*.epub
                  tests/epub/*.native
                  tests/txt2tags.t2t
+                 tests/scholdoc.*
 
 Source-repository head
   type:          git
-  location:      git://github.com/jgm/pandoc.git
+  location:      git://github.com/timtylin/scholdoc.git
 
 Flag embed_data_files
   Description:   Embed data files in binary for relocatable executable.
@@ -404,9 +405,9 @@ Executable make-pandoc-man-pages
   else
     Buildable:   False
 
-Test-Suite test-pandoc
+Test-Suite test-scholdoc
   Type:           exitcode-stdio-1.0
-  Main-Is:        test-pandoc.hs
+  Main-Is:        test-scholdoc.hs
   Hs-Source-Dirs: tests
   Build-Depends:  base >= 4.2 && < 5,
                   syb >= 0.1 && < 0.5,
@@ -451,9 +452,9 @@ Test-Suite test-pandoc
   Ghc-Options:  -rtsopts -Wall -fno-warn-unused-do-bind
   Default-Language: Haskell98
 
-benchmark benchmark-pandoc
+benchmark benchmark-scholdoc
   Type:            exitcode-stdio-1.0
-  Main-Is:         benchmark-pandoc.hs
+  Main-Is:         benchmark-scholdoc.hs
   Hs-Source-Dirs:  benchmark
   Build-Depends:   scholdoc,
                    base >= 4.2 && < 5,
