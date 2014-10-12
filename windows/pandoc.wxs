@@ -77,14 +77,6 @@
             Name="SystemPathUpdated" Type="integer" Value="1" KeyPath="yes"/>
           </Component>
 
-          <Component Id="Documentation"
-          Guid="A8D54A76-1A3D-4647-8327-81B69D39D8A3">
-            <File Id="pandocREADME" Name="Pandoc User's Guide.html"
-            Source="..\README.html" KeyPath="yes">
-              <Shortcut Id="ApplicationStartMenuShortcut" Directory="ApplicationProgramsFolder"
-              Name="Pandoc User’s Guide" Advertise="yes" />
-            </File>
-          </Component>
         </Directory>
       </Directory>
 
@@ -105,10 +97,6 @@
         <ComponentRef Id="MainExecutable" />
         <ComponentRef Id="UpdatePathUser" />
         <ComponentRef Id="UpdatePathMachine" />
-      </Feature>
-      <Feature Id="Manual" Title="Manual">
-        <ComponentRef Id="Documentation" />
-        <ComponentRef Id="ApplicationShortcut" />
       </Feature>
       <Feature Id="Citation" Title="Citation Support" Description="Citation support.">
         <ComponentRef Id="CitationSupport" />

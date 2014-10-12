@@ -9,10 +9,6 @@ cabal install -v1 --force --reinstall --flags="embed_data_files" . pandoc-citepr
 if %errorlevel% neq 0 exit /b %errorlevel%
 strip .\.cabal-sandbox\bin\pandoc.exe
 strip .\.cabal-sandbox\bin\pandoc-citeproc.exe
-.\.cabal-sandbox\bin\pandoc.exe -s --template data\templates\default.html -S README -o README.html
-if %errorlevel% neq 0 exit /b %errorlevel%
-.\.cabal-sandbox\bin\pandoc.exe -s --template data\templates\default.rtf COPYING -t rtf -S -o COPYING.rtf
-if %errorlevel% neq 0 exit /b %errorlevel%
 copy COPYRIGHT COPYRIGHT.txt
 for /f "tokens=1-2 delims= " %%a in ('.\.cabal-sandbox\bin\pandoc --version') do (
   @set VERSION=%%b

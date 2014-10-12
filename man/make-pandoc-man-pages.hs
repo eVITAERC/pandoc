@@ -21,12 +21,12 @@ import System.Directory
 main :: IO ()
 main = do
   ds1 <- modifiedDependencies ("man" </> "man1" </> "pandoc.1")
-    ["README", "man" </> "man1" </> "pandoc.1.template"]
+    ["README-pandoc", "man" </> "man1" </> "pandoc.1.template"]
   ds2 <- modifiedDependencies ("man" </> "man5" </> "pandoc_markdown.5")
-    ["README", "man" </> "man5" </> "pandoc_markdown.5.template"]
+    ["README-pandoc", "man" </> "man5" </> "pandoc_markdown.5.template"]
 
   unless (null ds1 && null ds2) $ do
-    rmContents <- UTF8.readFile "README"
+    rmContents <- UTF8.readFile "README-pandoc"
     let (Pandoc meta blocks) = normalize $ readMarkdown def rmContents
     let manBlocks = removeSect [Str "Wrappers"]
                   $ removeSect [Str "Pandoc's",Space,Str "markdown"] blocks
