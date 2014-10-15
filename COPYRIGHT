@@ -1,5 +1,5 @@
-Pandoc
-Copyright (C) 2006-2014 John MacFarlane <jgm at berkeley dot edu>
+Scholdoc
+Copyright (C) 2014 Tim T.Y. Lin <timtylin at gmail do com>
 
 This code is released under the [GPL], version 2 or later:
 
@@ -21,7 +21,18 @@ The GNU General Public License is available in the file COPYING in
 the source distribution.  On Debian systems, the complete text of the
 GPL can be found in `/usr/share/common-licenses/GPL`.
 
+Scholdoc's complete source code is available on [Github][scholdoc repo].
+
 [GPL]: http://www.gnu.org/copyleft/gpl.html
+[scholdoc repo]: https://github.com/timtylin/scholdoc
+
+----------------------------------------------------------------------
+Scholdoc is a fork of:
+
+Pandoc
+Copyright (C) 2006-2014 John MacFarlane <jgm at berkeley dot edu>
+
+Released under the GNU General Public License version 2 or later.
 
 Pandoc's complete source code is available from the [Pandoc home page].
 

@@ -1,9 +1,13 @@
-# Scholdoc change log
+Scholdoc changelog
+==================
+
 All notable changes to Scholdoc will be documented in this file.
 
-This log pertains to Scholdoc development *only*. Pandoc changes remain in the `changelog` file.
+This log pertains to Scholdoc development *only*. Pandoc's changelog can be found in the `changelog-pandoc` file.
 
-Scholdoc follows semantic versioning with regards to output schema.
+Scholdoc's version numbers reflect Scholdoc changes only, and does not necessarily correspond to Pandoc's version number. Scholdoc strives to track the latest official Pandoc release. Whenever new Pandoc commits are merged into Scholdoc, it will be noted in the changelog below.
+
+Scholdoc follows semantic versioning with regards to its output schema.
 
 ## In development
 
@@ -12,7 +16,6 @@ Scholdoc follows semantic versioning with regards to output schema.
 
 ### Changed
 - The "--no-standalone" option no longer imply "_bodyOnly" writers. Instead "--no-standalone" now strictly stops all template usage.
-
 
 ## 0.1.2-alpha - 2014-09-09
 
