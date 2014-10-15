@@ -85,7 +85,7 @@ import Text.Pandoc.Readers.Docx.Reducible
 import Text.Pandoc.Shared
 import Text.Pandoc.MediaBag (insertMedia, MediaBag)
 import Data.Maybe (isJust)
-import Data.List (delete, stripPrefix, (\\), intersect)
+import Data.List (delete, stripPrefix, (\\), intersect, isPrefixOf)
 import Data.Monoid
 import Text.TeXMath (writeTeX)
 import Data.Default (Default)
@@ -202,6 +202,13 @@ blockQuoteDivs = ["Quote", "BlockQuote", "BlockQuotation"]
 
 codeDivs :: [String]
 codeDivs = ["SourceCode"]
+
+
+-- For the moment, we have English, Danish, German, and French. This
+-- is fairly ad-hoc, and there might be a more systematic way to do
+-- it, but it's better than nothing.
+headerPrefixes :: [String]
+headerPrefixes = ["Heading", "Overskrift", "berschrift", "Titre"]
 
 runElemToInlines :: RunElem -> Inlines
 runElemToInlines (TextRun s) = text s
@@ -461,12 +468,11 @@ bodyPartToBlocks (Paragraph pPr parparts)
     $ codeBlock
     $ concatMap parPartToString parparts
   | (c : cs) <- filter (isJust . isHeaderClass) $ pStyle pPr
-  , Just n <- isHeaderClass c = do
+  , Just (prefix, n) <- isHeaderClass c = do
     ils <- local (\s-> s{docxInHeaderBlock=True}) $
            (concatReduce <$> mapM parPartToInlines parparts)
-
     makeHeaderAnchor $
-      headerWith ("", delete ("Heading" ++ show n) cs, []) n ils
+      headerWith ("", delete (prefix ++ show n) cs, []) n ils
   | otherwise = do
     ils <- concatReduce <$> mapM parPartToInlines parparts >>=
            (return . fromList . trimLineBreaks . normalizeSpaces . toList)
@@ -535,23 +541,18 @@ rewriteLink' l@(Link ils ('#':target, title)) = do
     Nothing        -> l
 rewriteLink' il = return il
 
-rewriteLink :: Blocks -> DocxContext Blocks
-rewriteLink ils = case viewl $ unMany ils of
-  (x :< xs) -> do
-    x' <- walkM rewriteLink' x
-    xs' <- rewriteLink $ Many xs
-    return $ (singleton x') <> xs'
-  EmptyL -> return ils
+rewriteLinks :: [Block] -> DocxContext [Block]
+rewriteLinks = mapM (walkM rewriteLink')
 
 bodyToOutput :: Body -> DocxContext (Meta, [Block], MediaBag)
 bodyToOutput (Body bps) = do
   let (metabps, blkbps) = sepBodyParts bps
   meta <- bodyPartsToMeta metabps
   blks <- concatReduce <$> mapM bodyPartToBlocks blkbps
-  blks' <- rewriteLink blks
+  blks' <- rewriteLinks $ blocksToDefinitions $ blocksToBullets $ toList blks
   mediaBag <- gets docxMediaBag
   return $ (meta,
-            blocksToDefinitions $ blocksToBullets $ toList blks',
+            blks',
             mediaBag)
 
 docxToOutput :: ReaderOptions -> Docx -> (Meta, [Block], MediaBag)
@@ -559,10 +560,11 @@ docxToOutput opts (Docx (Document _ body)) =
   let dEnv   = def { docxOptions  = opts} in
    evalDocxContext (bodyToOutput body) dEnv def
 
-isHeaderClass :: String -> Maybe Int
-isHeaderClass s | Just s' <- stripPrefix "Heading" s =
-  case reads s' :: [(Int, String)] of
-    [] -> Nothing
-    ((n, "") : []) -> Just n
-    _       -> Nothing
+isHeaderClass :: String -> Maybe (String, Int)
+isHeaderClass s | (pref:_) <- filter (\h -> isPrefixOf h s) headerPrefixes
+                , Just s' <- stripPrefix pref s =
+                  case reads s' :: [(Int, String)] of
+                   [] -> Nothing
+                   ((n, "") : []) -> Just (pref, n)
+                   _       -> Nothing
 isHeaderClass _ = Nothing

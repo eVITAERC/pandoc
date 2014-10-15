@@ -57,6 +57,7 @@ data WriterState =
   WriterState { stInNote        :: Bool          -- true if we're in a note
               , stInQuote       :: Bool          -- true if in a blockquote
               , stInMinipage    :: Bool          -- true if in minipage
+              , stInHeading     :: Bool          -- true if in a section heading
               , stNotes         :: [Doc]         -- notes in a minipage
               , stOLLevel       :: Int           -- level of ordered list nesting
               , stOptions       :: WriterOptions -- writer options, so they don't have to be parameter
@@ -85,9 +86,9 @@ writeLaTeX :: WriterOptions -> Pandoc -> String
 writeLaTeX options document =
   evalState (pandocToLaTeX options document) $
   WriterState { stInNote = False, stInQuote = False,
-                stInMinipage = False, stNotes = [],
-                stOLLevel = 1, stOptions = options,
-                stVerbInNote = False,
+                stInMinipage = False, stInHeading = False,
+                stNotes = [], stOLLevel = 1,
+                stOptions = options, stVerbInNote = False,
                 stTable = False, stStrikeout = False,
                 stUrl = False, stGraphics = False,
                 stFloats = False, stSubfigs = False,
@@ -218,7 +219,9 @@ pandocToLaTeX options (Pandoc meta blocks) = do
 elementToLaTeX :: WriterOptions -> Element -> State WriterState Doc
 elementToLaTeX _ (Blk block) = blockToLaTeX block
 elementToLaTeX opts (Sec level _ (id',classes,_) title' elements) = do
+  modify $ \s -> s{stInHeading = True}
   header' <- sectionHeader ("unnumbered" `elem` classes) id' level title'
+  modify $ \s -> s{stInHeading = False}
   innerContents <- mapM (elementToLaTeX opts) elements
   return $ vsep (header' : innerContents)
 
@@ -499,8 +502,11 @@ blockToLaTeX (DefinitionList lst) = do
                "\\end{description}"
 blockToLaTeX HorizontalRule = return $
   "\\begin{center}\\rule{0.5\\linewidth}{\\linethickness}\\end{center}"
-blockToLaTeX (Header level (id',classes,_) lst) =
-  sectionHeader ("unnumbered" `elem` classes) id' level lst
+blockToLaTeX (Header level (id',classes,_) lst) = do
+  modify $ \s -> s{stInHeading = True}
+  hdr <- sectionHeader ("unnumbered" `elem` classes) id' level lst
+  modify $ \s -> s{stInHeading = False}
+  return hdr
 blockToLaTeX (Table caption aligns widths heads rows) = do
   headers <- if all null heads
                 then return empty
@@ -610,7 +616,13 @@ tableCellToLaTeX header (width, align, blocks) = do
                           $ reverse ns)
 
 listItemToLaTeX :: [Block] -> State WriterState Doc
-listItemToLaTeX lst = blockListToLaTeX lst >>= return .  (text "\\item" $$) .
+listItemToLaTeX lst
+  -- we need to put some text before a header if it's the first
+  -- element in an item. This will look ugly in LaTeX regardless, but
+  -- this will keep the typesetter from throwing an error.
+  | ((Header _ _ _) :_) <- lst =
+    blockListToLaTeX lst >>= return . (text "\\item ~" $$) . (nest 2)
+  | otherwise = blockListToLaTeX lst >>= return .  (text "\\item" $$) .
                       (nest 2)
 
 defListItemToLaTeX :: ([Inline], [[Block]]) -> State WriterState Doc
@@ -624,7 +636,11 @@ defListItemToLaTeX (term, defs) = do
                     then braces term'
                     else term'
     def'  <- liftM vsep $ mapM blockListToLaTeX defs
-    return $ "\\item" <> brackets term'' $$ def'
+    return $ case defs of
+     (((Header _ _ _) : _) : _) ->
+       "\\item" <> brackets term'' <> " ~ " $$ def'
+     _                          ->
+       "\\item" <> brackets term'' $$ def'
 
 -- | Craft the section header, inserting the secton reference, if supplied.
 sectionHeader :: Bool    -- True for unnumbered
@@ -774,7 +790,9 @@ inlineToLaTeX (Code (_,classes,_) str) = do
    where listingsCode = do
            inNote <- gets stInNote
            when inNote $ modify $ \s -> s{ stVerbInNote = True }
-           let chr = ((enumFromTo '!' '~') \\ str) !! 0
+           let chr = case "!\"&'()*,-./:;?@_" \\ str of
+                          (c:_) -> c
+                          []    -> '!'
            return $ text $ "\\lstinline" ++ [chr] ++ str ++ [chr]
          highlightCode = do
            case highlight formatLaTeXInline ("",classes,[]) str of
@@ -841,8 +859,10 @@ inlineToLaTeX (Link txt (src, _)) =
                 return $ text ("\\href{" ++ src' ++ "}{") <>
                          contents <> char '}'
 inlineToLaTeX (Image attr _ (source, _)) = do
+  modify $ \s -> s{ stGraphics = True }
   source' <- handleImageSrc source
-  return $ imageWithAttrToLatex "\\textwidth" attr source'
+  inHeading <- gets stInHeading
+  return $ imageWithAttrToLatex "\\textwidth" attr source' inHeading
 inlineToLaTeX (Note contents) = do
   inMinipage <- gets stInMinipage
   modify (\s -> s{stInNote = True})
@@ -987,6 +1007,7 @@ figureToLaTeXfloat ListingFigure = codeFloatToLaTeX
 imageGridToLaTeX ::  Attr -> [Block] -> PreparedContent -> [Inline] -> State WriterState Doc
 imageGridToLaTeX attr imageGrid _fallback caption = do
   modify $ \s -> s{ stFloats = True }
+  modify $ \s -> s{ stGraphics = True }
   let ident = getIdentifier attr
   let (subfigRows, snglImg) = case (head imageGrid) of
                               -- get rid of any subcaption and label for single image
@@ -1033,7 +1054,7 @@ subfigsToLaTeX fullWidth singleImage (Image attr txt (src,_)) = do
   let label = if (not $ null ident) then ("\\label" <> braces (text ident)) else empty
   src' <- handleImageSrc src
   attr' <- setWidthFromHistory attr
-  let img = imageWithAttrToLatex fullWidth attr' src'
+  let img = imageWithAttrToLatex fullWidth attr' src' False
   return $ if singleImage
               then img <> label
               else "\\subfloat" <> brackets (capt <> label) <> braces img
@@ -1061,8 +1082,8 @@ setWidthFromHistory attr = do
 -- Extracts dimension attributes and include in the @includegraphics@ directive
 -- (requires "fullWidth" argument, which is a command that defines 100% width
 -- of container, such as @\\textwidth@)
-imageWithAttrToLatex :: String -> Attr -> String -> Doc
-imageWithAttrToLatex fullWidth attr src =
+imageWithAttrToLatex :: String -> Attr -> String -> Bool -> Doc
+imageWithAttrToLatex fullWidth attr src needProtect =
   let keyval' = M.fromList $ getKeyVals attr
       width = case M.lookup "width" keyval' of
                    Just len -> filterLength fullWidth len
@@ -1081,7 +1102,8 @@ imageWithAttrToLatex fullWidth attr src =
                            else ""
       graphicxAttr = intercalate ","
                     [ x | x <- [width', hight', keepAspectRatio], not $ null x]
-  in "\\includegraphics" <> brackets (text graphicxAttr) <> braces (text src)
+      graphicsCmd = if needProtect then "\\protect\\includegraphics" else "\\includegraphics"
+  in graphicsCmd <> brackets (text graphicxAttr) <> braces (text src)
 
 -- Ensures that dimension is understandable by LaTeX,
 -- mostly converts unit of percentage @%@ to measure of relative width.

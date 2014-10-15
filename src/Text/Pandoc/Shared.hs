@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable, CPP, MultiParamTypeClasses,
-    FlexibleContexts, ScopedTypeVariables, PatternGuards #-}
+    FlexibleContexts, ScopedTypeVariables, PatternGuards,
+    ViewPatterns #-}
 {-
 Copyright (C) 2006-2014 John MacFarlane <jgm@berkeley.edu>
 
@@ -107,7 +108,7 @@ import Network.URI ( escapeURIString, isURI, nonStrictRelativeTo,
                      unEscapeString, parseURIReference, isAllowedInURI )
 import qualified Data.Set as Set
 import System.Directory
-import System.FilePath (joinPath, splitDirectories)
+import System.FilePath (joinPath, splitDirectories, pathSeparator, isPathSeparator)
 import Text.Pandoc.MIME (MimeType, getMimeType)
 import System.FilePath ( (</>), takeExtension, dropExtension)
 import Data.Generics (Typeable, Data)
@@ -127,6 +128,7 @@ import Text.Pandoc.Compat.Monoid
 import Data.ByteString.Base64 (decodeLenient)
 import Data.Sequence (ViewR(..), ViewL(..), viewl, viewr)
 import qualified Data.Text as T (toUpper, pack, unpack)
+import Data.ByteString.Lazy (toChunks)
 
 #ifdef EMBED_DATA_FILES
 import Text.Pandoc.Data (dataFiles)
@@ -134,7 +136,6 @@ import Text.Pandoc.Data (dataFiles)
 import Paths_scholdoc (getDataFileName)
 #endif
 #ifdef HTTP_CLIENT
-import Data.ByteString.Lazy (toChunks)
 import Network.HTTP.Client (httpLbs, parseUrl, withManager,
                             responseBody, responseHeaders,
                             Request(port,host))
@@ -744,12 +745,10 @@ renderTags' = renderTagsOptions
 
 -- | Perform an IO action in a directory, returning to starting directory.
 inDirectory :: FilePath -> IO a -> IO a
-inDirectory path action = do
-  oldDir <- getCurrentDirectory
-  setCurrentDirectory path
-  result <- action
-  setCurrentDirectory oldDir
-  return result
+inDirectory path action = E.bracket
+                             getCurrentDirectory
+                             setCurrentDirectory
+                             (const $ setCurrentDirectory path >> action)
 
 readDefaultDataFile :: FilePath -> IO BS.ByteString
 readDefaultDataFile fname =
@@ -881,11 +880,14 @@ collapseFilePath = joinPath . reverse . foldl go [] . splitDirectories
     go rs "." = rs
     go r@(p:rs) ".." = case p of
                             ".." -> ("..":r)
-                            "/" -> ("..":r)
+                            (checkPathSeperator -> Just True) -> ("..":r)
                             _ -> rs
-    go _ "/" = ["/"]
+    go _ (checkPathSeperator -> Just True) = [[pathSeparator]]
     go rs x = x:rs
-
+    isSingleton [] = Nothing
+    isSingleton [x] = Just x
+    isSingleton _ = Nothing
+    checkPathSeperator = fmap isPathSeparator . isSingleton
 
 --
 -- Safe read

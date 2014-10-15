@@ -53,6 +53,16 @@ tests = [ testGroup "code blocks"
             headerWith ("foo",["unnumbered"],[]) 1
               (text "Header 1" <> note (plain $ text "note")) =?>
             "\\section*{Header 1\\footnote{note}}\\label{foo}\n\\addcontentsline{toc}{section}{Header 1}\n"
+          , "in list item" =:
+            bulletList [header 2 (text "foo")] =?>
+            "\\begin{itemize}\n\\item ~\n  \\subsection{foo}\n\\end{itemize}"
+          , "in definition list item" =:
+            definitionList [(text "foo", [header 2 (text "bar"),
+                                          para $ text "baz"])] =?>
+            "\\begin{description}\n\\item[foo] ~ \n\\subsection{bar}\n\nbaz\n\\end{description}"
+          , "containing image" =:
+            header 1 (image "imgs/foo.jpg" "" (text "Alt text")) =?>
+            "\\section{\\protect\\includegraphics[]{imgs/foo.jpg}}"
           ]
         , testGroup "inline code"
           [ "struck out and highlighted" =:

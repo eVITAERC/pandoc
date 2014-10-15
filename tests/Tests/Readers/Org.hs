@@ -126,6 +126,10 @@ tests =
                        , (emph "b") <> "."
                        ])
 
+      , "Markup should work properly after a blank line" =:
+        unlines ["foo", "", "/bar/"] =?>
+        (para $ text "foo") <> (para $ emph $ text "bar")
+
       , "Inline math must stay within three lines" =:
           unlines [ "$a", "b", "c$", "$d", "e", "f", "g$" ] =?>
           para ((math "a\nb\nc") <> space <>
@@ -698,7 +702,9 @@ tests =
                                      ]
                                    ])
                          ]
-
+      , "Definition list with multi-word term" =:
+        " - Elijah Wood :: He plays Frodo" =?>
+         definitionList [ ("Elijah" <> space <> "Wood", [plain $ "He" <> space <> "plays" <> space <> "Frodo"])]
       , "Compact definition list" =:
           unlines [ "- ATP :: adenosine 5' triphosphate"
                   , "- DNA :: deoxyribonucleic acid"
@@ -944,7 +950,7 @@ tests =
                    , ""
                    , "#+RESULTS:"
                    , ": 65" ] =?>
-           rawBlock "html" ""   
+           rawBlock "html" ""
 
       , "Example block" =:
            unlines [ "#+begin_example"

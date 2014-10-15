@@ -35,7 +35,7 @@ import Data.Maybe ( fromMaybe )
 import Data.List ( isPrefixOf, isInfixOf, intercalate )
 import System.Environment ( getEnv )
 import Text.Printf (printf)
-import System.FilePath ( (</>), takeExtension, takeFileName )
+import System.FilePath ( takeExtension, takeFileName )
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Lazy.Char8 as B8
 import qualified Text.Pandoc.UTF8 as UTF8
@@ -64,7 +64,6 @@ import Text.XML.Light ( unode, Element(..), unqual, Attr(..), add_attrs
 import Text.Pandoc.UUID (getRandomUUID)
 import Text.Pandoc.Writers.HTML (writeHtmlString, writeHtml)
 import Data.Char ( toLower, isDigit, isAlphaNum )
-import Network.URI ( unEscapeString )
 import Text.Pandoc.MIME (MimeType, getMimeType)
 import qualified Control.Exception as E
 import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
@@ -406,7 +405,7 @@ writeEPUB opts doc@(Pandoc meta _) = do
                 $ case blocks of
                       (Header 1 _ _ : _) -> blocks
                       _                  -> Header 1 ("",["unnumbered"],[])
-                                                 (docTitle meta) : blocks
+                                                 (docTitle' meta) : blocks
 
   let chapterHeaderLevel = writerEpubChapterLevel opts
   -- internal reference IDs change when we chunk the file,
@@ -484,7 +483,7 @@ writeEPUB opts doc@(Pandoc meta _) = do
                            [("id", toId $ eRelativePath ent),
                             ("href", eRelativePath ent),
                             ("media-type", fromMaybe "" $ getMimeType $ eRelativePath ent)] $ ()
-  let plainTitle = case docTitle meta of
+  let plainTitle = case docTitle' meta of
                         [] -> case epubTitle metadata of
                                    []   -> "UNTITLED"
                                    (x:_) -> titleText x
@@ -524,13 +523,12 @@ writeEPUB opts doc@(Pandoc meta _) = do
                     Just _ -> [ unode "itemref" !
                                 [("idref", "cover_xhtml"),("linear","no")] $ () ]
               ++ ((unode "itemref" ! [("idref", "title_page_xhtml")
-                                     ,("linear", if null (docTitle meta)
-                                                    then "no"
-                                                    else "yes")] $ ()) :
-                  (unode "itemref" ! [("idref", "nav")
-                                     ,("linear", if writerTableOfContents opts
-                                                    then "yes"
-                                                    else "no")] $ ()) :
+                                     ,("linear",
+                                         case lookupMeta "title" meta of
+                                               Just _  -> "yes"
+                                               Nothing -> "no")] $ ()) :
+                  [unode "itemref" ! [("idref", "nav")] $ ()
+                         | writerTableOfContents opts ] ++
                   map chapterRefNode chapterEntries)
           , unode "guide" $
              [ unode "reference" !
@@ -578,7 +576,7 @@ writeEPUB opts doc@(Pandoc meta _) = do
                   ] ++ subs
 
   let tpNode = unode "navPoint" !  [("id", "navPoint-0")] $
-                  [ unode "navLabel" $ unode "text" (stringify $ docTitle meta)
+                  [ unode "navLabel" $ unode "text" (stringify $ docTitle' meta)
                   , unode "content" ! [("src","title_page.xhtml")] $ () ]
 
   let tocData = UTF8.fromStringLazy $ ppTopElement $
@@ -731,8 +729,8 @@ metadataElement version md currentTime =
         toTitleNode id' title
           | version == EPUB2 = [dcNode "title" !
              (("id",id') :
-              maybe [] (\x -> [("opf:file-as",x)]) (titleFileAs title) ++
-              maybe [] (\x -> [("opf:title-type",x)]) (titleType title)) $
+              -- note: EPUB2 doesn't accept opf:title-type
+              maybe [] (\x -> [("opf:file-as",x)]) (titleFileAs title)) $
               titleText title]
           | otherwise = [dcNode "title" ! [("id",id')] $ titleText title]
               ++
@@ -766,23 +764,20 @@ metadataElement version md currentTime =
 showDateTimeISO8601 :: UTCTime -> String
 showDateTimeISO8601 = formatTime defaultTimeLocale "%FT%TZ"
 
-transformTag :: WriterOptions
-             -> IORef [(FilePath, FilePath)] -- ^ (oldpath, newpath) media
+transformTag :: IORef [(FilePath, FilePath)] -- ^ (oldpath, newpath) media
              -> Tag String
              -> IO (Tag String)
-transformTag opts mediaRef tag@(TagOpen name attr)
+transformTag mediaRef tag@(TagOpen name attr)
   | name `elem` ["video", "source", "img", "audio"] = do
   let src = fromAttrib "src" tag
   let poster = fromAttrib "poster" tag
-  let oldsrc = maybe src (</> src) $ writerSourceURL opts
-  let oldposter = maybe poster (</> poster) $ writerSourceURL opts
-  newsrc <- modifyMediaRef mediaRef oldsrc
-  newposter <- modifyMediaRef mediaRef oldposter
+  newsrc <- modifyMediaRef mediaRef src
+  newposter <- modifyMediaRef mediaRef poster
   let attr' = filter (\(x,_) -> x /= "src" && x /= "poster") attr ++
               [("src", newsrc) | not (null newsrc)] ++
               [("poster", newposter) | not (null newposter)]
   return $ TagOpen name attr'
-transformTag _ _ tag = return tag
+transformTag _ tag = return tag
 
 modifyMediaRef :: IORef [(FilePath, FilePath)] -> FilePath -> IO FilePath
 modifyMediaRef _ "" = return ""
@@ -792,7 +787,7 @@ modifyMediaRef mediaRef oldsrc = do
          Just n  -> return n
          Nothing -> do
            let new = "media/file" ++ show (length media) ++
-                    takeExtension oldsrc
+                    takeExtension (takeWhile (/='?') oldsrc) -- remove query
            modifyIORef mediaRef ( (oldsrc, new): )
            return new
 
@@ -800,10 +795,10 @@ transformBlock  :: WriterOptions
                 -> IORef [(FilePath, FilePath)] -- ^ (oldpath, newpath) media
                 -> Block
                 -> IO Block
-transformBlock opts mediaRef (RawBlock fmt raw)
+transformBlock _ mediaRef (RawBlock fmt raw)
   | fmt == Format "html" = do
   let tags = parseTags raw
-  tags' <- mapM (transformTag opts mediaRef)  tags
+  tags' <- mapM (transformTag mediaRef)  tags
   return $ RawBlock fmt (renderTags' tags')
 transformBlock _ _ b = return b
 
@@ -811,19 +806,17 @@ transformInline  :: WriterOptions
                  -> IORef [(FilePath, FilePath)] -- ^ (oldpath, newpath) media
                  -> Inline
                  -> IO Inline
-transformInline opts mediaRef (Image attr lab (src,tit)) = do
-    let src' = unEscapeString src
-    let oldsrc = maybe src' (</> src) $ writerSourceURL opts
-    newsrc <- modifyMediaRef mediaRef oldsrc
+transformInline _ mediaRef (Image attr lab (src,tit)) = do
+    newsrc <- modifyMediaRef mediaRef src
     return $ Image attr lab (newsrc, tit)
 transformInline opts _ (x@(Math _ _))
   | WebTeX _ <- writerHTMLMathMethod opts = do
     raw <- makeSelfContained opts $ writeHtmlInline opts x
     return $ RawInline (Format "html") raw
-transformInline opts mediaRef  (RawInline fmt raw)
+transformInline _ mediaRef  (RawInline fmt raw)
   | fmt == Format "html" = do
   let tags = parseTags raw
-  tags' <- mapM (transformTag opts mediaRef) tags
+  tags' <- mapM (transformTag mediaRef) tags
   return $ RawInline fmt (renderTags' tags')
 transformInline _ _ x = return x
 
@@ -1191,4 +1184,18 @@ relatorMap =
            ,("writer of added lyrics", "wal")
            ,("writer of added text", "wat")
            ]
+
+docTitle' :: Meta -> [Inline]
+docTitle' meta = fromMaybe [] $ go <$> lookupMeta "title" meta
+  where go (MetaString s) = [Str s]
+        go (MetaInlines xs) = xs
+        go (MetaBlocks [Para xs]) = xs
+        go (MetaBlocks [Plain xs]) = xs
+        go (MetaMap m) =
+              case M.lookup "type" m of
+                   Just x | stringify x == "main" ->
+                              maybe [] go $ M.lookup "text" m
+                   _ -> []
+        go (MetaList xs) = concatMap go xs
+        go _ = []
 
