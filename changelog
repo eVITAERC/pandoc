@@ -3,18 +3,23 @@ Scholdoc changelog
 
 All notable changes to Scholdoc will be documented in this file.
 
-This log pertains to Scholdoc development *only*. Pandoc's changelog can be found in the `changelog-pandoc` file.
+This log pertains to Scholdoc development **only**. Pandoc's changelog can be found in the `changelog-pandoc` file.
 
 Scholdoc's version numbers reflect Scholdoc changes only, and does not necessarily correspond to Pandoc's version number. Scholdoc strives to track the latest official Pandoc release. Whenever new Pandoc commits are merged into Scholdoc, it will be noted in the changelog below.
 
 Scholdoc follows semantic versioning with regards to its output schema.
 
-## In development
+## 0.1.3-alpha - 2014-10-15
+
+**Note:** *This version largely consists of major cleanups under the hood. It bring the development of Scholdoc up-to-date with the latest Pandoc development version, and removed many unnecessary source files related to unused reader/writers.*
 
 ### Added
 - The Pandoc-derived portion of Scholdoc is now up to date with Pandoc 1.13.1 (commit 8b60d430)
+- The build-chain of Scholdoc have been cleaned-up and is now ready for production. Running `make deps && make install` under the source directory now fully builds using its own `scholdoc-types` and `scholdoc-texmath` packages.
+- Updated documentation to reflect the Scholdoc project: README.md, CONTRIBUTING.md, BUGS, COPYRIGHT
 
 ### Changed
+- Scholdoc now looks for custom template files under the `~/.scholdoc/` directory, instead of `~/.pandoc`
 - The "--no-standalone" option no longer imply "_bodyOnly" writers. Instead "--no-standalone" now strictly stops all template usage.
 
 ## 0.1.2-alpha - 2014-09-09
