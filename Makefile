@@ -1,5 +1,4 @@
 version=$(shell grep '^Version:' scholdoc.cabal | awk '{print $$2;}')
-setup=dist/setup/setup
 
 quick:
 	cabal configure --enable-tests --disable-optimization
@@ -37,7 +36,12 @@ dist:
 osxpkg:
 	./make_osx_package.sh
 
+unuseddeps:  # finds redundant Cabal package dependencies, requires `packunused`
+	cabal configure --enable-tests --enable-benchmarks -ftryscholdoc -fembed_data_files --disable-optimization
+	cabal build --ghc-option="-ddump-minimal-imports"
+	packunused
+
 clean:
 	cabal clean
 
-.PHONY: deps quick full install clean test bench haddock osxpkg dist prof
+.PHONY: deps quick full install clean test bench haddock osxpkg dist prof unuseddeps
