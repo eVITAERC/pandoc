@@ -1147,18 +1147,18 @@ main = do
             (Just js, ss) -> KaTeX js (fromMaybe csscdn ss)
 
 
-  -- --bibliography implies -F pandoc-citeproc for backwards compatibility:
+  -- --bibliography implies -F scholdoc-citeproc for backwards compatibility:
   let needsCiteproc = isJust (M.lookup "bibliography" metadata) &&
                       optCiteMethod opts `notElem` [Natbib, Biblatex] &&
-                      "pandoc-citeproc" `notElem` map takeBaseName filters
-  let filters' = if needsCiteproc then "scholpandoc-citeproc" : filters
+                      "scholdoc-citeproc" `notElem` map takeBaseName filters
+  let filters' = if needsCiteproc then "scholdoc-citeproc" : filters
                                   else filters
 
   let sources = if ignoreArgs then [] else args
 
   datadir <- case mbDataDir of
                   Nothing   -> E.catch
-                                 (Just <$> getAppUserDataDirectory "pandoc")
+                                 (Just <$> getAppUserDataDirectory "scholdoc")
                                  (\e -> let _ = (e :: E.SomeException)
                                         in  return Nothing)
                   Just _    -> return mbDataDir
