@@ -7,7 +7,6 @@ import Tests.Helpers
 import Tests.Arbitrary()
 import Text.Pandoc.Builder
 import Text.Pandoc
-import Text.Pandoc.Readers.LaTeX
 
 latex :: String -> Pandoc
 latex = readLaTeX def

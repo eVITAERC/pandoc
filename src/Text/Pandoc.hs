@@ -64,49 +64,22 @@ module Text.Pandoc
                -- * Readers: converting /to/ Pandoc format
                , Reader (..)
                , mkStringReader
-               -- , readDocx
                , readMarkdown
-               -- , readMediaWiki
-               -- , readRST
-               -- , readOrg
                , readLaTeX
                , readHtml
-               -- , readTextile
-               -- , readDocBook
-               -- , readOPML
-               -- , readHaddock
                , readNative
                , readJSON
-               -- , readTxt2Tags
-               -- , readTxt2TagsNoMacros
-               -- , readEPUB
                -- * Writers: converting /from/ Pandoc format
                , Writer (..)
                , writeNative
                , writeJSON
                , writeMarkdown
                , writePlain
-               -- , writeRST
                , writeLaTeX
-               -- , writeConTeXt
-               -- , writeTexinfo
                , writeHtml
                , writeHtmlString
-               -- , writeICML
-               -- , writeDocbook
-               -- , writeOPML
-               -- , writeOpenDocument
                , writeMan
-               -- , writeMediaWiki
-               -- , writeDokuWiki
-               -- , writeTextile
-               -- , writeRTF
-               -- , writeODT
                , writeDocx
-               -- , writeEPUB
-               -- , writeFB2
-               -- , writeOrg
-               -- , writeAsciiDoc
                , writeHaddock
                , writeCustom
                -- * Rendering templates and default templates
@@ -123,41 +96,15 @@ import Text.Pandoc.Definition
 import Text.Pandoc.Generic
 import Text.Pandoc.JSON
 import Text.Pandoc.Readers.Markdown
--- import Text.Pandoc.Readers.MediaWiki
--- import Text.Pandoc.Readers.RST
--- import Text.Pandoc.Readers.Org
--- import Text.Pandoc.Readers.DocBook
--- import Text.Pandoc.Readers.OPML
 import Text.Pandoc.Readers.LaTeX
 import Text.Pandoc.Readers.HTML
--- import Text.Pandoc.Readers.Textile
 import Text.Pandoc.Readers.Native
--- import Text.Pandoc.Readers.Haddock
--- import Text.Pandoc.Readers.Docx
--- import Text.Pandoc.Readers.Txt2Tags
--- import Text.Pandoc.Readers.EPUB
 import Text.Pandoc.Writers.Native
 import Text.Pandoc.Writers.Markdown
--- import Text.Pandoc.Writers.RST
 import Text.Pandoc.Writers.LaTeX
--- import Text.Pandoc.Writers.ConTeXt
--- import Text.Pandoc.Writers.Texinfo
 import Text.Pandoc.Writers.HTML
--- import Text.Pandoc.Writers.ODT
 import Text.Pandoc.Writers.Docx
--- import Text.Pandoc.Writers.EPUB
--- import Text.Pandoc.Writers.FB2
--- import Text.Pandoc.Writers.ICML
--- import Text.Pandoc.Writers.Docbook
--- import Text.Pandoc.Writers.OPML
--- import Text.Pandoc.Writers.OpenDocument
 import Text.Pandoc.Writers.Man
--- import Text.Pandoc.Writers.RTF
--- import Text.Pandoc.Writers.MediaWiki
--- import Text.Pandoc.Writers.DokuWiki
--- import Text.Pandoc.Writers.Textile
--- import Text.Pandoc.Writers.Org
--- import Text.Pandoc.Writers.AsciiDoc
 import Text.Pandoc.Writers.Haddock
 import Text.Pandoc.Writers.Custom
 import Text.Pandoc.Templates
@@ -212,9 +159,6 @@ data Reader = StringReader (ReaderOptions -> String -> IO Pandoc)
 mkStringReader :: (ReaderOptions -> String -> Pandoc) -> Reader
 mkStringReader r = StringReader (\o s -> return $ r o s)
 
--- mkBSReader :: (ReaderOptions -> BL.ByteString -> (Pandoc, MediaBag)) -> Reader
--- mkBSReader r = ByteStringReader (\o s -> return $ r o s)
-
 -- | Association list of formats and readers.
 readers :: [(String, Reader)]
 readers = [ ("native"       , StringReader $ \_ s -> return $ readNative s)
@@ -225,18 +169,6 @@ readers = [ ("native"       , StringReader $ \_ s -> return $ readNative s)
            ,("markdown_github" , StringReader markdown)
            ,("markdown_mmd",  StringReader markdown)
            ,("markdown_scholarly", StringReader markdown)
-           -- ,("rst"          , mkStringReader readRST )
-           -- ,("mediawiki"    , mkStringReader readMediaWiki)
-           -- ,("docbook"      , mkStringReader readDocBook)
-           -- ,("opml"         , mkStringReader readOPML)
-           -- ,("org"          , mkStringReader readOrg)
-           -- ,("textile"      , mkStringReader readTextile) -- TODO : textile+lhs
-           -- ,("html"         , mkStringReader readHtml)
-           -- ,("latex"        , mkStringReader readLaTeX)
-           -- ,("haddock"      , mkStringReader readHaddock)
-           -- ,("docx"         , mkBSReader readDocx)
-           -- ,("t2t"          , mkStringReader readTxt2TagsNoMacros)
-           -- ,("epub"         , mkBSReader readEPUB)
            ]
 
 data Writer = PureStringWriter   (WriterOptions -> Pandoc -> String)
@@ -249,12 +181,6 @@ writers = [
    ("native"       , PureStringWriter writeNative)
   ,("json"         , PureStringWriter writeJSON)
   ,("docx"         , IOByteStringWriter writeDocx)
-  -- ,("odt"          , IOByteStringWriter writeODT)
-  -- ,("epub"         , IOByteStringWriter $ \o ->
-  --                     writeEPUB o{ writerEpubVersion = Just EPUB2 })
-  -- ,("epub3"        , IOByteStringWriter $ \o ->
-  --                      writeEPUB o{ writerEpubVersion = Just EPUB3 })
-  -- ,("fb2"          , IOStringWriter writeFB2)
   ,("html"         , PureStringWriter writeHtmlString)
   ,("html5"        , PureStringWriter $ \o ->
      writeHtmlString o{ writerHtml5 = True })
@@ -272,14 +198,9 @@ writers = [
   ,("revealjs"      , PureStringWriter $ \o ->
      writeHtmlString o{ writerSlideVariant = RevealJsSlides
                       , writerHtml5 = True })
-  -- ,("docbook"      , PureStringWriter writeDocbook)
-  -- ,("opml"         , PureStringWriter writeOPML)
-  -- ,("opendocument" , PureStringWriter writeOpenDocument)
   ,("latex"        , PureStringWriter writeLaTeX)
   ,("beamer"       , PureStringWriter $ \o ->
      writeLaTeX o{ writerBeamer = True })
-  -- ,("context"      , PureStringWriter writeConTeXt)
-  -- ,("texinfo"      , PureStringWriter writeTexinfo)
   ,("man"          , PureStringWriter writeMan)
   ,("markdown"     , PureStringWriter writeMarkdown)
   ,("markdown_strict" , PureStringWriter writeMarkdown)
@@ -288,13 +209,6 @@ writers = [
   ,("markdown_mmd" , PureStringWriter writeMarkdown)
   ,("markdown_scholarly" , PureStringWriter writeMarkdown)
   ,("plain"        , PureStringWriter writePlain)
-  -- ,("rst"          , PureStringWriter writeRST)
-  -- ,("mediawiki"    , PureStringWriter writeMediaWiki)
-  -- ,("dokuwiki"     , PureStringWriter writeDokuWiki)
-  -- ,("textile"      , PureStringWriter writeTextile)
-  -- ,("rtf"          , IOStringWriter writeRTFWithEmbeddedImages)
-  -- ,("org"          , PureStringWriter writeOrg)
-  -- ,("asciidoc"     , PureStringWriter writeAsciiDoc)
   ,("haddock"      , PureStringWriter writeHaddock)
   ]
 
@@ -306,17 +220,10 @@ getDefaultExtensions "markdown_github" = githubMarkdownExtensions
 getDefaultExtensions "markdown_scholarly" = scholarlyMarkdownExtensions
 getDefaultExtensions "markdown"        = pandocExtensions
 getDefaultExtensions "plain"           = pandocExtensions
--- getDefaultExtensions "org"             = Set.fromList [Ext_citations]
--- getDefaultExtensions "textile"         = Set.fromList [Ext_auto_identifiers]
 getDefaultExtensions "html"            = Set.fromList [Ext_auto_identifiers,
                                                        Ext_native_divs,
                                                        Ext_native_spans]
 getDefaultExtensions "html5"           = getDefaultExtensions "html"
--- getDefaultExtensions "epub"            = Set.fromList [Ext_auto_identifiers,
---                                                        Ext_raw_html,
---                                                        Ext_native_divs,
---                                                        Ext_native_spans,
---                                                        Ext_epub_html_exts]
 getDefaultExtensions _                 = Set.fromList [Ext_auto_identifiers]
 
 -- | Retrieve reader based on formatSpec (format+extensions).
