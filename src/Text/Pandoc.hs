@@ -69,8 +69,8 @@ module Text.Pandoc
                -- , readMediaWiki
                -- , readRST
                -- , readOrg
-               -- , readLaTeX
-               -- , readHtml
+               , readLaTeX
+               , readHtml
                -- , readTextile
                -- , readDocBook
                -- , readOPML
@@ -128,8 +128,8 @@ import Text.Pandoc.Readers.Markdown
 -- import Text.Pandoc.Readers.Org
 -- import Text.Pandoc.Readers.DocBook
 -- import Text.Pandoc.Readers.OPML
--- import Text.Pandoc.Readers.LaTeX
--- import Text.Pandoc.Readers.HTML
+import Text.Pandoc.Readers.LaTeX
+import Text.Pandoc.Readers.HTML
 -- import Text.Pandoc.Readers.Textile
 import Text.Pandoc.Readers.Native
 -- import Text.Pandoc.Readers.Haddock

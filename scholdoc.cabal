@@ -187,7 +187,6 @@ Library
                  binary >= 0.5 && < 0.8,
                  SHA >= 1.6 && < 1.7,
                  old-time,
-                 deepseq-generics >= 0.1 && < 0.2,
                  JuicyPixels >= 3.1.6.1 && < 3.2
   if flag(network-uri)
      Build-Depends: network-uri >= 2.6 && < 2.7, network >= 2.6
@@ -224,7 +223,6 @@ Library
                    Text.Pandoc.Readers.Markdown,
                    Text.Pandoc.Readers.TeXMath,
                    Text.Pandoc.Readers.Native,
-                   Text.Pandoc.Readers.EPUB,
                    Text.Pandoc.Writers.Native,
                    Text.Pandoc.Writers.HTML,
                    Text.Pandoc.Writers.LaTeX,
