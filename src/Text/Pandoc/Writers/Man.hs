@@ -229,6 +229,10 @@ blockToMan opts (OrderedList attribs items) = do
 blockToMan opts (DefinitionList items) = do
   contents <- mapM (definitionListItemToMan opts) items
   return (vcat contents)
+blockToMan _ (Figure _ _ _ _ _) = return empty
+blockToMan _ (ImageGrid _) = return empty
+blockToMan _ (Statement _ _) = return empty
+blockToMan _ (Proof _ _) = return empty
 
 -- | Convert bullet list item (list of blocks) to man.
 bulletListItemToMan :: WriterOptions -> [Block] -> State WriterState Doc
@@ -363,4 +367,4 @@ inlineToMan _ (Note contents) = do
   notes <- liftM stNotes get
   let ref = show $ (length notes)
   return $ char '[' <> text ref <> char ']'
-
+inlineToMan _ (NumRef _ _) = return empty

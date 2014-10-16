@@ -67,27 +67,12 @@ tests = [ testGroup "markdown"
               "markdown-citations.txt" "markdown-citations.native"
             ]
           ]
-        , testGroup "rst"
-          [ testGroup "writer" (writerTests "rst" ++ lhsWriterTests "rst")
-          , testGroup "reader"
-            [ test "basic" ["-r", "rst", "-w", "native",
-              "-s", "-S", "--columns=80"] "rst-reader.rst" "rst-reader.native"
-            , test "tables" ["-r", "rst", "-w", "native", "--columns=80"]
-              "tables.rst" "tables-rstsubset.native"
-            , lhsReaderTest "rst+lhs"
-            ]
-          ]
         , testGroup "latex"
           [ testGroup "writer" (writerTests "latex" ++ lhsWriterTests "latex" ++
             [ test "scholdoc"  ["-r", "markdown_scholarly", "-w", "latex", "-S", "-R",
                                 "--chapters", "--columns=72"]
               "scholdoc.txt" "scholdoc.latex"
             ])
-          , testGroup "reader"
-            [ test "basic" ["-r", "latex", "-w", "native", "-s", "-R"]
-              "latex-reader.latex" "latex-reader.native"
-            , lhsReaderTest "latex+lhs"
-            ]
           ]
         , testGroup "html"
           [ testGroup "writer" (writerTests "html" ++ lhsWriterTests "html" ++
@@ -96,8 +81,6 @@ tests = [ testGroup "markdown"
                                 "--mathjax", "--no-mathjax-cdn", "--columns=72"]
               "scholdoc.txt" "scholdoc.html"
             ])
-          , test "reader" ["-r", "html", "-w", "native", "-s"]
-            "html-reader.html" "html-reader.native"
           ]
         , testGroup "s5"
           [ s5WriterTest "basic" ["-s"] "s5"
@@ -106,67 +89,16 @@ tests = [ testGroup "markdown"
           , s5WriterTest "inserts"  ["-s", "-H", "insert",
             "-B", "insert", "-A", "insert", "-c", "main.css"] "html"
           ]
-        , testGroup "textile"
-          [ testGroup "writer" $ writerTests "textile"
-          , test "reader" ["-r", "textile", "-w", "native", "-s"]
-            "textile-reader.textile" "textile-reader.native"
-          ]
-        , testGroup "docbook"
-          [ testGroup "writer" $ writerTests "docbook"
-          , test "reader" ["-r", "docbook", "-w", "native", "-s"]
-            "docbook-reader.docbook" "docbook-reader.native"
-          ]
         , testGroup "native"
           [ testGroup "writer" $ writerTests "native"
           , test "reader" ["-r", "native", "-w", "native", "-s"]
             "testsuite.native" "testsuite.native"
           ]
-        , testGroup "fb2"
-          [ fb2WriterTest "basic" [] "fb2/basic.markdown" "fb2/basic.fb2"
-          , fb2WriterTest "titles" [] "fb2/titles.markdown" "fb2/titles.fb2"
-          , fb2WriterTest "images" [] "fb2/images.markdown" "fb2/images.fb2"
-          , fb2WriterTest "images-embedded" [] "fb2/images-embedded.html" "fb2/images-embedded.fb2"
-          , fb2WriterTest "math" [] "fb2/math.markdown" "fb2/math.fb2"
-          , fb2WriterTest "tables" [] "tables.native" "tables.fb2"
-          , fb2WriterTest "testsuite" [] "testsuite.native" "writer.fb2"
-          ]
-        , testGroup "mediawiki"
-          [ testGroup "writer" $ writerTests "mediawiki"
-          , test "reader" ["-r", "mediawiki", "-w", "native", "-s"]
-            "mediawiki-reader.wiki" "mediawiki-reader.native"
-          ]
-        , testGroup "dokuwiki"
-          [ testGroup "writer" $ writerTests "dokuwiki"
-          , test "inline_formatting" ["-r", "native", "-w", "dokuwiki", "-s"]
-            "dokuwiki_inline_formatting.native" "dokuwiki_inline_formatting.dokuwiki"
-          , test "multiblock table" ["-r", "native", "-w", "dokuwiki", "-s"]
-            "dokuwiki_multiblock_table.native" "dokuwiki_multiblock_table.dokuwiki"
-          ]
-        , testGroup "opml"
-          [ test "basic" ["-r", "native", "-w", "opml", "--columns=78", "-s"]
-             "testsuite.native" "writer.opml"
-          , test "reader" ["-r", "opml", "-w", "native", "-s"]
-            "opml-reader.opml" "opml-reader.native"
-          ]
         , testGroup "haddock"
           [ testGroup "writer" $ writerTests "haddock"
-          , test "reader" ["-r", "haddock", "-w", "native", "-s"]
-            "haddock-reader.haddock" "haddock-reader.native"
-          ]
-        , testGroup "txt2tags"
-          [ test "reader" ["-r", "t2t", "-w", "native", "-s"]
-              "txt2tags.t2t" "txt2tags.native" ]
-        , testGroup "epub" [
-            test "features" ["-r", "epub", "-w", "native"]
-              "epub/features.epub" "epub/features.native"
-          , test "wasteland" ["-r", "epub", "-w", "native"]
-              "epub/wasteland.epub" "epub/wasteland.native"
-          , test "formatting" ["-r", "epub", "-w", "native"]
-              "epub/formatting.epub" "epub/formatting.native"
           ]
         , testGroup "other writers" $ map (\f -> testGroup f $ writerTests f)
-          [ "opendocument" , "context" , "texinfo", "icml"
-          , "man" , "plain" , "rtf", "org", "asciidoc"
+          [ "man" , "plain"
           ]
         ]
 
@@ -206,19 +138,6 @@ s5WriterTest modifier opts format
   = test (format ++ " writer (" ++ modifier ++ ")")
     (["-r", "native", "-w", format] ++ opts)
     "s5.native"  ("s5-" ++ modifier <.> "html")
-
-fb2WriterTest :: String -> [String] -> String -> String -> Test
-fb2WriterTest title opts inputfile normfile =
-  testWithNormalize (ignoreBinary . formatXML)
-                    title (["-t", "fb2"]++opts) inputfile normfile
-  where
-    formatXML xml = splitTags $ zip xml (drop 1 xml)
-    splitTags [] = []
-    splitTags [end] = fst end : snd end : []
-    splitTags (('>','<'):rest) = ">\n" ++ splitTags rest
-    splitTags ((c,_):rest) = c : splitTags rest
-    ignoreBinary = unlines . filter (not . startsWith "<binary ") . lines
-    startsWith tag str = all (uncurry (==)) $ zip tag str
 
 -- | Run a test without normalize function, return True if test passed.
 test :: String    -- ^ Title of test

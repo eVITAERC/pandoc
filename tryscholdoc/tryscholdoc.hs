@@ -47,7 +47,8 @@ checkLength t =
 writerOpts :: WriterOptions
 writerOpts = def { writerReferenceLinks = True,
                    writerEmailObfuscation = NoObfuscation,
-                   writerHTMLMathMethod = MathJax "http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML",
+                   writerHTMLMathMethod = MathJax "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML-full",
+                   writerScholarly = True,
                    writerHighlight = True,
                    writerHighlightStyle = pygments }
 
@@ -59,26 +60,8 @@ fromFormats :: [(Text, String -> Pandoc)]
 fromFormats = [
             ("native"       , readNative)
            ,("json"         , Text.Pandoc.readJSON readerOpts)
-           ,("markdown"     , readMarkdown readerOpts)
-           ,("markdown_strict" , readMarkdown readerOpts{
-                    readerExtensions = strictExtensions,
-                    readerSmart = False })
-           ,("markdown_phpextra" , readMarkdown readerOpts{
-                    readerExtensions = phpMarkdownExtraExtensions })
-           ,("markdown_github" , readMarkdown readerOpts{
-                    readerExtensions = githubMarkdownExtensions })
-           ,("markdown_mmd",  readMarkdown readerOpts{
-                    readerExtensions = multimarkdownExtensions })
-           ,("rst"          , readRST readerOpts)
-           ,("mediawiki"    , readMediaWiki readerOpts)
-           ,("docbook"      , readDocBook readerOpts)
-           ,("opml"         , readOPML readerOpts)
-           ,("t2t"          , readTxt2TagsNoMacros readerOpts)
-           ,("org"          , readOrg readerOpts)
-           ,("textile"      , readTextile readerOpts) -- TODO : textile+lhs
-           ,("html"         , readHtml readerOpts)
-           ,("latex"        , readLaTeX readerOpts)
-           ,("haddock"      , readHaddock readerOpts)
+           ,("markdown_scholarly", readMarkdown readerOpts{
+                    readerExtensions = scholarlyMarkdownExtensions})
            ]
 
 toFormats :: [(Text, Pandoc -> String)]
@@ -91,10 +74,8 @@ toFormats = mapMaybe (\(x,y) ->
                                   "markdown_phpextra" -> phpMarkdownExtraExtensions
                                   "markdown_mmd" -> multimarkdownExtensions
                                   "markdown_github" -> githubMarkdownExtensions
-                                  _ -> pandocExtensions
+                                  "markdown" -> pandocExtensions
+                                  _ -> scholarlyMarkdownExtensions
                                  })
-                         _                  ->
-                            case x of
-                                 "rtf"     -> Just (T.pack x, writeRTF writerOpts)
-                                 _         -> Nothing) writers
+                         _                  -> Nothing) writers
 

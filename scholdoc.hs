@@ -70,7 +70,7 @@ import Data.Yaml (decode)
 import qualified Data.Yaml as Yaml
 import qualified Data.Text as T
 import Control.Applicative ((<$>), (<|>))
-import Text.Pandoc.Readers.Txt2Tags (getT2TMeta)
+-- import Text.Pandoc.Readers.Txt2Tags (getT2TMeta)
 import Data.Monoid
 
 type Transform = Pandoc -> Pandoc
@@ -955,25 +955,25 @@ defaultReaderName :: String -> [FilePath] -> String
 defaultReaderName fallback [] = fallback
 defaultReaderName fallback (x:xs) =
   case takeExtension (map toLower x) of
-    ".xhtml"    -> "html"
-    ".html"     -> "html"
-    ".htm"      -> "html"
-    ".tex"      -> "latex"
-    ".latex"    -> "latex"
-    ".ltx"      -> "latex"
-    ".rst"      -> "rst"
-    ".org"      -> "org"
+    -- ".xhtml"    -> "html"
+    -- ".html"     -> "html"
+    -- ".htm"      -> "html"
+    -- ".tex"      -> "latex"
+    -- ".latex"    -> "latex"
+    -- ".ltx"      -> "latex"
+    -- ".rst"      -> "rst"
+    -- ".org"      -> "org"
     ".lhs"      -> "markdown+lhs"
-    ".db"       -> "docbook"
-    ".opml"     -> "opml"
-    ".wiki"     -> "mediawiki"
-    ".dokuwiki" -> "dokuwiki"
-    ".textile"  -> "textile"
+    -- ".db"       -> "docbook"
+    -- ".opml"     -> "opml"
+    -- ".wiki"     -> "mediawiki"
+    -- ".dokuwiki" -> "dokuwiki"
+    -- ".textile"  -> "textile"
     ".native"   -> "native"
     ".json"     -> "json"
-    ".docx"     -> "docx"
-    ".t2t"      -> "t2t"
-    ".epub"     -> "epub"
+    -- ".docx"     -> "docx"
+    -- ".t2t"      -> "t2t"
+    -- ".epub"     -> "epub"
     _           -> defaultReaderName fallback xs
 
 -- Returns True if extension of first source is .lhs
@@ -990,30 +990,30 @@ defaultWriterName x =
     ".tex"      -> "latex"
     ".latex"    -> "latex"
     ".ltx"      -> "latex"
-    ".context"  -> "context"
-    ".ctx"      -> "context"
-    ".rtf"      -> "rtf"
-    ".rst"      -> "rst"
-    ".s5"       -> "s5"
+    -- ".context"  -> "context"
+    -- ".ctx"      -> "context"
+    -- ".rtf"      -> "rtf"
+    -- ".rst"      -> "rst"
+    -- ".s5"       -> "s5"
     ".native"   -> "native"
     ".json"     -> "json"
     ".txt"      -> "markdown"
     ".text"     -> "markdown"
     ".md"       -> "markdown"
     ".markdown" -> "markdown"
-    ".textile"  -> "textile"
+    -- ".textile"  -> "textile"
     ".lhs"      -> "markdown+lhs"
-    ".texi"     -> "texinfo"
-    ".texinfo"  -> "texinfo"
-    ".db"       -> "docbook"
-    ".odt"      -> "odt"
+    -- ".texi"     -> "texinfo"
+    -- ".texinfo"  -> "texinfo"
+    -- ".db"       -> "docbook"
+    -- ".odt"      -> "odt"
     ".docx"     -> "docx"
-    ".epub"     -> "epub"
-    ".org"      -> "org"
-    ".asciidoc" -> "asciidoc"
-    ".pdf"      -> "latex"
-    ".fb2"      -> "fb2"
-    ".opml"     -> "opml"
+    -- ".epub"     -> "epub"
+    -- ".org"      -> "org"
+    -- ".asciidoc" -> "asciidoc"
+    -- ".pdf"      -> "latex"
+    -- ".fb2"      -> "fb2"
+    -- ".opml"     -> "opml"
     ['.',y] | y `elem` ['1'..'9'] -> "man"
     _           -> "html"
 
@@ -1214,11 +1214,7 @@ main = do
                               else e
                          Right w -> return w
 
-  reader <- if "t2t" == readerName'
-              then (mkStringReader .
-                    readTxt2Tags) <$>
-                      (getT2TMeta sources outputFile)
-              else case getReader readerName' of
+  reader <- case getReader readerName' of
                 Right r  -> return r
                 Left e   -> err 7 e
 
@@ -1226,7 +1222,7 @@ main = do
 
   -- Begin Scholarly Markdown specific settings
   when scholarlyMode $ do
-    unless (writerName' `elem` ["html5","dzslides","revealjs","latex","beamer","native","json","docx"])
+    unless (writerName' `elem` ["html5","dzslides","revealjs","s5","slidy","slideous","latex","beamer","native","json","docx"])
       $ err 101 "Scholarly Markdown currently only renders to html5, latex/pdf, or native/json"
     case mathMethod of
          MathJax _ -> return ()

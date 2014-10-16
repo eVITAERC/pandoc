@@ -1024,7 +1024,7 @@ imageGridToLaTeX attr imageGrid _fallback caption = do
   let subfiglist = intercalate [LineBreak] subfigRows
   let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
   let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
-  -- | this requires the "caption" package which is provided by "subfig"
+  -- this requires the "caption" package which is provided by "subfig"
   let capstar = if (not addCaptPrefix) then text "*" else empty
   let widestar = if hasClass "wide" attr then text "*" else empty
   let fullWidth = "\\hsize"
@@ -1129,7 +1129,7 @@ algorithmToLaTeX attr alg _fallback caption = do
   let ident = getIdentifier attr
   let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
   let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
-  -- | this requires the "caption" package which is provided by "subfig"
+  -- this requires the "caption" package which is provided by "subfig"
   let capstar = if (not addCaptPrefix) then text "*" else empty
   let widestar = if hasClass "wide" attr then text "*" else empty
   capt <- if null caption
@@ -1148,7 +1148,7 @@ tableFloatToLaTeX attr tabl _fallback caption = do
   let ident = getIdentifier attr
   let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
   let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
-  -- | this requires the "caption" package which is provided by "subfig"
+  -- this requires the "caption" package which is provided by "subfig"
   let capstar = if (not addCaptPrefix) then text "*" else empty
   let widestar = if hasClass "wide" attr then text "*" else empty
   capt <- if null caption

@@ -470,6 +470,11 @@ blockToMarkdown opts (OrderedList (start,sty,delim) items) = do
 blockToMarkdown opts (DefinitionList items) = do
   contents <- mapM (definitionListItemToMarkdown opts) items
   return $ cat contents <> blankline
+blockToMarkdown _ (Figure _ _ _ _ _) = return empty
+blockToMarkdown _ (ImageGrid _) = return empty
+blockToMarkdown _ (Statement _ _) = return empty
+blockToMarkdown _ (Proof _ _) = return empty
+
 
 addMarkdownAttribute :: String -> String
 addMarkdownAttribute s =
@@ -873,6 +878,7 @@ inlineToMarkdown opts (Note contents) = do
   if isEnabled Ext_footnotes opts
      then return $ "[^" <> ref <> "]"
      else return $ "[" <> ref <> "]"
+inlineToMarkdown _ (NumRef _ _) = return empty
 
 makeMathPlainer :: [Inline] -> [Inline]
 makeMathPlainer = walk go

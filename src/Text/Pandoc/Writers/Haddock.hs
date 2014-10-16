@@ -164,6 +164,10 @@ blockToHaddock opts (OrderedList (start,_,delim) items) = do
 blockToHaddock opts (DefinitionList items) = do
   contents <- mapM (definitionListItemToHaddock opts) items
   return $ cat contents <> blankline
+blockToHaddock _ (Figure _ _ _ _ _) = return empty
+blockToHaddock _ (ImageGrid _) = return empty
+blockToHaddock _ (Statement _ _) = return empty
+blockToHaddock _ (Proof _ _) = return empty
 
 pandocTable :: WriterOptions -> Bool -> [Alignment] -> [Double]
             -> [Doc] -> [[Doc]] -> State WriterState Doc
@@ -344,3 +348,4 @@ inlineToHaddock opts (Note contents) = do
   st <- get
   let ref = text $ writerIdentifierPrefix opts ++ show (length $ stNotes st)
   return $ "<#notes [" <> ref <> "]>"
+inlineToHaddock _ (NumRef _ _) = return empty
