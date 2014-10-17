@@ -38,7 +38,7 @@ $(document).ready(function() {
     var from = "markdown_scholarly";
     var text = $.QueryString["text"];
     $("#text").val(text);
-    var to = $.QueryString["to"] || "html";
+    var to = $.QueryString["to"] || "html5";
     $("#to").val(to);
     if (text && text != "") {
        $.getJSON("http://scholarlymarkdown.com/cgi-bin/tryscholdoc", { from: from, to: to, text: text }, process);
@@ -69,14 +69,14 @@ $(document).ready(function() {
       ScholarlyMarkdown source
       </label>
       <br/>
-      <textarea id="text" maxlength="3000" rows="15"></textarea>
+      <textarea id="text" maxlength="3000" rows="15" placeholder="Type ScholarlyMarkdown here, then press the Convert button on the right"></textarea>
     </div>
     <div class="col-md-6">
       <label for="to">
       to
       </label>
       <select id="to">
-        <option value="html5">HTML 5</option>
+        <option value="html5" selected>HTML 5</option>
         <option value="latex">LaTeX</option>
         <option value="beamer">LaTeX Beamer</option>
       </select>
@@ -88,7 +88,7 @@ $(document).ready(function() {
   </div>
 </div>
 <footer>
- <p class="version">Scholdoc <span id="version"></span></p>
+ <p class="version">Using scholdoc <span id="version"></span></p>
  <p>&copy; 2014 <a href="https://github.com/timtylin/">Tim T.Y. Lin</a></p>
  based on trypandoc <p>&copy; 2013&ndash;2014 <a href="http://johnmacfarlane.net">John MacFarlane</a></p>
 </footer>

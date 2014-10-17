@@ -3,6 +3,7 @@
     ViewPatterns #-}
 {-
 Copyright (C) 2006-2014 John MacFarlane <jgm@berkeley.edu>
+Copyright (C) 2014 Tim T.Y. Lin <timtylin@gmail.com>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
