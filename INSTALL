@@ -1,8 +1,7 @@
 Installing Scholdoc
 ===================
 
-These instructions are largely adapted from Pandoc's installation instructions.
-They describe how to completely install Scholdoc from source.
+This document describe how to completely install Scholdoc from source. The instructions are largely adapted from Pandoc's installation instructions.
 
 If you are installing the development version from Github, the procedure is identical to Pandoc:
 
@@ -15,8 +14,28 @@ post:
 http://forum.scholarlymarkdown.com/t/scholdoc-repository-information/ 
 
 
-Quick install (release version)
--------------------------------
+Setting up a Haskell build chain
+--------------------------------
+
+Scholdoc is written in pure Haskell. It requires the [GHC] compiler and the [cabal-install] build system. The easiest way to get it is by installing the [Haskell platform]  (unless you are using [Homebrew] with OSX or Ubuntu >12.04, see below).
+
+### Using [Homebrew]
+
+OSX users running [Homebrew] can easily get the prerequisites by running
+    
+    brew update
+    brew install ghc cabal-install
+
+### Using the `hvr/ghc` PPA on Ubuntu (12.04 or later)
+
+Herbert V. Riedel have conveniently provided a [PPA of pre-compiled GHC and Cabal][hvr-PPA] for recent Ubuntu systems. Here's an example of how to get recommended versions of [GHC] and [cabal-install] using `apt-get`
+
+    sudo add-apt-repository ppa:hvr/ghc
+    sudo apt-get update && apt-get install ghc-7.8.3 cabal-install-1.20
+
+
+Quick install (stable release from Hackage)
+-------------------------------------------
 
 1.  Install the [Haskell platform].  This will give you [GHC] and
     the [cabal-install] build tool.
@@ -58,9 +77,9 @@ of Scholdoc instead, switch to the source directory.
     to fetch the contents of `data/templates` before `cabal install`.
 
 4.  Make sure the `$CABALDIR/bin` directory is in your path.  You should now be 
-    able to run `pandoc`:
+    able to run `scholdoc`:
 
-        pandoc --help
+        scholdoc --help
 
     [Not sure where `$CABALDIR` is?](http://www.haskell.org/haskellwiki/Cabal-Install#The_cabal-install_configuration_file)
 
@@ -74,11 +93,11 @@ separate package, `scholdoc-citeproc`. This can be installed using cabal:
 
 ### Locale-sensitive unicode collation
 
-By default `pandoc-citeproc` uses the "i;unicode-casemap" method to sort
+By default `scholdoc-citeproc` uses the "i;unicode-casemap" method to sort
 bibliography entries (RFC 5051). If you would like to use the locale-sensitive
 unicode collation algorithm instead, specify the `unicode_collation` flag:
 
-   cabal install pandoc-citeproc -funicode_collation
+   cabal install scholdoc-citeproc -funicode_collation
 
 Note that this requires the `text-icu` library, which in turn depends on the C
 library `icu4c`. Installation directions vary by platform. Here is how it might
@@ -87,7 +106,7 @@ work on OSX with homebrew:
     brew install icu4c
     cabal install --extra-lib-dirs=/usr/local/Cellar/icu4c/51.1/lib \
       --extra-include-dirs=/usr/local/Cellar/icu4c/51.1/include \
-      -funicode_collation text-icu pandoc-citeproc
+      -funicode_collation text-icu scholdoc-citeproc
 
 
 Custom install
@@ -227,4 +246,5 @@ To run just the markdown benchmarks:
 [highlighting-kate]: http://hackage.haskell.org/package/highlighting-kate
 [blaze-html]: http://hackage.haskell.org/package/blaze-html
 [Cabal User's Guide]: http://www.haskell.org/cabal/release/latest/doc/users-guide/builders.html#setup-configure-paths
-
+[Homebrew]: http://brew.sh
+[hvr-PPA]: https://launchpad.net/~hvr/+archive/ubuntu/ghc
