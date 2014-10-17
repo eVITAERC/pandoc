@@ -25,7 +25,7 @@ Description:     Scholdoc is a command-line utility that converts
                  It essentially understands a new input format
                  @markdown_scholarly@ (implemented in the markdown reader a
                  superset of @markdown_pandoc@ features), and limits itself to
-                 HTML5/LaTeX/Docx output.
+                 HTML5, LaTeX, and Docx output.
                  .
                  Unfortunately, currently Scholdoc occupies the @Pandoc@
                  namespace. This is done to avoid problems when merging in
