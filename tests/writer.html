@@ -328,7 +328,7 @@ foo
 <div>
 <div>
 <div>
-foo
+<p>foo</p>
 </div>
 </div>
 <div>
@@ -346,12 +346,10 @@ And this is <strong>strong</strong>
 </td>
 </tr>
 </table>
-
 <script type="text/javascript">document.write('This *should not* be interpreted as markdown');</script>
-
 <p>Here’s a simple block:</p>
 <div>
-foo
+<p>foo</p>
 </div>
 <p>This should be a code block, though:</p>
 <pre><code>&lt;div&gt;
@@ -369,43 +367,30 @@ foo
 </div>
 <p>This should just be an HTML comment:</p>
 <!-- Comment -->
-
 <p>Multiline:</p>
 <!--
 Blah
 Blah
 -->
-
 <!--
     This is another comment.
 -->
-
 <p>Code block:</p>
 <pre><code>&lt;!-- Comment --&gt;</code></pre>
 <p>Just plain comment, with trailing spaces on the line:</p>
-<!-- foo -->   
-
+<!-- foo -->
 <p>Code:</p>
 <pre><code>&lt;hr /&gt;</code></pre>
 <p>Hr’s:</p>
 <hr>
-
 <hr />
-
 <hr />
-
-<hr>   
-
-<hr />  
-
-<hr /> 
-
+<hr>
+<hr />
+<hr />
 <hr class="foo" id="bar" />
-
 <hr class="foo" id="bar" />
-
 <hr class="foo" id="bar">
-
 <hr />
 <h1 id="inline-markup">Inline Markup</h1>
 <p>This is <em>emphasized</em>, and so <em>is this</em>.</p>
@@ -495,7 +480,7 @@ Blah
 <p><script type="text/javascript">
 <!--
 h='&#110;&#x6f;&#x77;&#104;&#x65;&#114;&#x65;&#46;&#110;&#x65;&#116;';a='&#64;';n='&#110;&#x6f;&#98;&#x6f;&#100;&#x79;';e=n+a+h;
-document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+'Email link'+'<\/'+'a'+'>');
+document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+'Email link'+'<\/'+'a'+'>');
 // -->
 </script><noscript>&#x45;&#x6d;&#x61;&#x69;&#108;&#32;&#108;&#x69;&#110;&#x6b;&#32;&#40;&#110;&#x6f;&#98;&#x6f;&#100;&#x79;&#32;&#x61;&#116;&#32;&#110;&#x6f;&#x77;&#104;&#x65;&#114;&#x65;&#32;&#100;&#x6f;&#116;&#32;&#110;&#x65;&#116;&#x29;</noscript></p>
 <p><a href="">Empty</a>.</p>
@@ -518,29 +503,32 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+'Email link'+'<\/'+'a'+'>')
 <p>Here’s an <a href="/script?foo=1&amp;bar=2">inline link</a>.</p>
 <p>Here’s an <a href="/script?foo=1&amp;bar=2">inline link in pointy braces</a>.</p>
 <h2 id="autolinks">Autolinks</h2>
-<p>With an ampersand: <a href="http://example.com/?foo=1&amp;bar=2">http://example.com/?foo=1&amp;bar=2</a></p>
+<p>With an ampersand: <a href="http://example.com/?foo=1&amp;bar=2" class="uri">http://example.com/?foo=1&amp;bar=2</a></p>
 <ul>
 <li>In a list?</li>
-<li><a href="http://example.com/">http://example.com/</a></li>
+<li><a href="http://example.com/" class="uri">http://example.com/</a></li>
 <li>It should.</li>
 </ul>
 <p>An e-mail address: <script type="text/javascript">
 <!--
 h='&#110;&#x6f;&#x77;&#104;&#x65;&#114;&#x65;&#46;&#110;&#x65;&#116;';a='&#64;';n='&#110;&#x6f;&#98;&#x6f;&#100;&#x79;';e=n+a+h;
-document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
+document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\/'+'a'+'>');
 // -->
 </script><noscript>&#110;&#x6f;&#98;&#x6f;&#100;&#x79;&#32;&#x61;&#116;&#32;&#110;&#x6f;&#x77;&#104;&#x65;&#114;&#x65;&#32;&#100;&#x6f;&#116;&#32;&#110;&#x65;&#116;</noscript></p>
 <blockquote>
-<p>Blockquoted: <a href="http://example.com/">http://example.com/</a></p>
+<p>Blockquoted: <a href="http://example.com/" class="uri">http://example.com/</a></p>
 </blockquote>
 <p>Auto-links should not occur here: <code>&lt;http://example.com/&gt;</code></p>
 <pre><code>or here: &lt;http://example.com/&gt;</code></pre>
 <hr />
 <h1 id="images">Images</h1>
 <p>From “Voyage dans la Lune” by Georges Melies (1902):</p>
-<div class="figure">
-<img src="lalune.jpg" title="Voyage dans la Lune" alt="lalune" /><p class="caption">lalune</p>
-</div>
+<figure class="scholmd-float scholmd-figure">
+<div class="scholmd-float-content"><figure class="scholmd-subfig" style="display: inline-block; width: ">
+<img src="lalune.jpg" title="Voyage dans la Lune" />
+</figure></div>
+<div class="scholmd-float-caption"><figcaption><span class="scholmd-caption-text">lalune</span></figcaption></div>
+</figure>
 <p>Here is a movie <img src="movie.jpg" alt="movie" /> icon.</p>
 <hr />
 <h1 id="footnotes">Footnotes</h1>

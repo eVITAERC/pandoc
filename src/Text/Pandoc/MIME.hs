@@ -1,5 +1,5 @@
 {-
-Copyright (C) 2011 John MacFarlane <jgm@berkeley.edu>
+Copyright (C) 2011-2014 John MacFarlane <jgm@berkeley.edu>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 {- |
    Module      : Text.Pandoc.MIME
-   Copyright   : Copyright (C) 2011 John MacFarlane
+   Copyright   : Copyright (C) 2011-2014 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -27,24 +27,44 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Mime type lookup for ODT writer.
 -}
-module Text.Pandoc.MIME ( getMimeType, extensionFromMimeType )
-where
+module Text.Pandoc.MIME ( MimeType, getMimeType, getMimeTypeDef,
+                          extensionFromMimeType )where
 import System.FilePath
 import Data.Char ( toLower )
+import Data.List (isPrefixOf, isSuffixOf)
+import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 
+type MimeType = String
+
 -- | Determine mime type appropriate for file path.
-getMimeType :: FilePath -> Maybe String
-getMimeType "layout-cache" = Just "application/binary"  -- in ODT
-getMimeType f = M.lookup (map toLower $ drop 1 $ takeExtension f) mimeTypes
-  where mimeTypes = M.fromList mimeTypesList
+getMimeType :: FilePath -> Maybe MimeType
+getMimeType fp
+  -- ODT
+  | fp == "layout-cache" =
+        Just "application/binary"
+  | "Formula-" `isPrefixOf` fp && "/" `isSuffixOf` fp =
+        Just "application/vnd.oasis.opendocument.formula"
+  -- generic
+  | otherwise = M.lookup (map toLower $ drop 1 $ takeExtension fp) mimeTypes
 
-extensionFromMimeType :: String -> Maybe String
-extensionFromMimeType mimetype = M.lookup (takeWhile (/=';') mimetype) reverseMimeTypes
+-- | Determime mime type appropriate for file path, defaulting to
+-- “application/octet-stream” if nothing else fits.
+getMimeTypeDef :: FilePath -> MimeType
+getMimeTypeDef = fromMaybe "application/octet-stream" . getMimeType
+
+extensionFromMimeType :: MimeType -> Maybe String
+extensionFromMimeType mimetype =
+  M.lookup (takeWhile (/=';') mimetype) reverseMimeTypes
   -- note:  we just look up the basic mime type, dropping the content-encoding etc.
-  where reverseMimeTypes = M.fromList $ map (\(k,v) -> (v,k)) mimeTypesList
 
-mimeTypesList :: [(String, String)]
+reverseMimeTypes :: M.Map MimeType String
+reverseMimeTypes = M.fromList $ map (\(k,v) -> (v,k)) mimeTypesList
+
+mimeTypes :: M.Map String MimeType
+mimeTypes = M.fromList mimeTypesList
+
+mimeTypesList :: [(String, MimeType)]
 mimeTypesList = -- List borrowed from happstack-server.
            [("gz","application/x-gzip")
            ,("cabal","application/x-cabal")
@@ -246,6 +266,7 @@ mimeTypesList = -- List borrowed from happstack-server.
            ,("lzx","application/x-lzx")
            ,("m3u","audio/mpegurl")
            ,("m4a","audio/mpeg")
+           ,("m4v","video/x-m4v")
            ,("maker","application/x-maker")
            ,("man","application/x-troff-man")
            ,("mcif","chemical/x-mmcif")
@@ -456,6 +477,7 @@ mimeTypesList = -- List borrowed from happstack-server.
            ,("vrml","model/vrml")
            ,("vs","text/plain")
            ,("vsd","application/vnd.visio")
+           ,("vtt","text/vtt")
            ,("wad","application/x-doom")
            ,("wav","audio/x-wav")
            ,("wax","audio/x-ms-wax")

@@ -1,6 +1,7 @@
-{-# LANGUAGE OverlappingInstances, FlexibleInstances, OverloadedStrings #-}
+{-# LANGUAGE OverlappingInstances, FlexibleInstances, OverloadedStrings,
+    ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{- Copyright (C) 2012 John MacFarlane <jgm@berkeley.edu>
+{- Copyright (C) 2012-2014 John MacFarlane <jgm@berkeley.edu>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,7 +20,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 {- |
    Module      : Text.Pandoc.Writers.Custom
-   Copyright   : Copyright (C) 2012 John MacFarlane
+   Copyright   : Copyright (C) 2012-2014 John MacFarlane
    License     : GNU GPL, version 2 or above
 
    Maintainer  : John MacFarlane <jgm@berkeley.edu>
@@ -35,12 +36,14 @@ import Text.Pandoc.Options
 import Data.List ( intersperse )
 import Data.Char ( toLower )
 import Scripting.Lua (LuaState, StackValue, callfunc)
+import Text.Pandoc.Writers.Shared
 import qualified Scripting.Lua as Lua
 import Text.Pandoc.UTF8 (fromString, toString)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C8
 import Data.Monoid
 import qualified Data.Map as M
+import Text.Pandoc.Templates
 
 attrToMap :: Attr -> M.Map ByteString ByteString
 attrToMap (id',classes,keyvals) = M.fromList
@@ -128,18 +131,77 @@ instance StackValue MetaValue where
   valuetype (MetaInlines _) = Lua.TSTRING
   valuetype (MetaBlocks _) = Lua.TSTRING
 
+instance StackValue Citation where
+  push lua cit = do
+    Lua.createtable lua 6 0
+    let addValue ((k :: String), v) = Lua.push lua k >> Lua.push lua v >>
+                          Lua.rawset lua (-3)
+    addValue ("citationId", citationId cit)
+    addValue ("citationPrefix", citationPrefix cit)
+    addValue ("citationSuffix", citationSuffix cit)
+    addValue ("citationMode", show (citationMode cit))
+    addValue ("citationNoteNum", citationNoteNum cit)
+    addValue ("citationHash", citationHash cit)
+  peek = undefined
+  valuetype _ = Lua.TTABLE
+
+instance StackValue PreparedContent where
+  push lua pc = do
+    Lua.createtable lua 2 0
+    let addValue ((k :: String), v) = Lua.push lua k >> Lua.push lua v >>
+                          Lua.rawset lua (-3)
+    addValue ("preparedImageContent", [preparedImageContent pc])
+    addValue ("preparedLaTeXContent", preparedLaTeXContent pc)
+  peek = undefined
+  valuetype _ = Lua.TTABLE
+
+instance StackValue StatementAttr where
+  push lua stmattr = do
+    Lua.createtable lua 7 0
+    let addValue ((k :: String), v) = Lua.push lua k >> Lua.push lua v >>
+                          Lua.rawset lua (-3)
+    addValue ("statementId", statementId stmattr)
+    addValue ("statementStyle", show (statementStyle stmattr))
+    addValue ("statementLabel", statementLabel stmattr)
+    addValue ("statementCounter", statementCounter stmattr)
+    addValue ("statementLevel", statementLevel stmattr)
+    addValue ("statementNum", statementNum stmattr)
+    addValue ("statementCaption", statementCaption stmattr)
+  peek = undefined
+  valuetype _ = Lua.TTABLE
+
+instance StackValue NumberedReference where
+  push lua numref = do
+    Lua.createtable lua 3 0
+    let addValue ((k :: String), v) = Lua.push lua k >> Lua.push lua v >>
+                          Lua.rawset lua (-3)
+    addValue ("numRefId", numRefId numref)
+    addValue ("numRefStyle", show (numRefStyle numref))
+    addValue ("numRefLabel", numRefLabel numref)
+  peek = undefined
+  valuetype _ = Lua.TTABLE
+
 -- | Convert Pandoc to custom markup.
 writeCustom :: FilePath -> WriterOptions -> Pandoc -> IO String
-writeCustom luaFile opts doc = do
-  luaScript <- readFile luaFile
+writeCustom luaFile opts doc@(Pandoc meta _) = do
+  luaScript <- C8.unpack `fmap` C8.readFile luaFile
   lua <- Lua.newstate
   Lua.openlibs lua
   Lua.loadstring lua luaScript "custom"
   Lua.call lua 0 0
   -- TODO - call hierarchicalize, so we have that info
   rendered <- docToCustom lua opts doc
+  context <- metaToJSON opts
+             (fmap toString . blockListToCustom lua)
+             (fmap toString . inlineListToCustom lua)
+             meta
   Lua.close lua
-  return $ toString rendered
+  let body = toString rendered
+  if writerStandalone opts
+     then do
+       let context' = setField "body" body context
+       return $ renderTemplate' (writerTemplate opts) context'
+     else return body
 
 docToCustom :: LuaState -> WriterOptions -> Pandoc -> IO ByteString
 docToCustom lua opts (Pandoc (Meta metamap) blocks) = do
@@ -155,7 +217,7 @@ blockToCustom _ Null = return ""
 
 blockToCustom lua (Plain inlines) = callfunc lua "Plain" inlines
 
-blockToCustom lua (Para [Image txt (src,tit)]) =
+blockToCustom lua (Para [Image _ txt (src,tit)]) =
   callfunc lua "CaptionedImage" src tit txt
 
 blockToCustom lua (Para inlines) = callfunc lua "Para" inlines
@@ -183,6 +245,18 @@ blockToCustom lua (OrderedList (num,sty,delim) items) =
 
 blockToCustom lua (DefinitionList items) =
   callfunc lua "DefinitionList" items
+
+blockToCustom lua (Figure figtype attr content pc capt) =
+  callfunc lua "Figure" (show figtype) content capt (attrToMap attr) pc
+
+blockToCustom lua (ImageGrid content) =
+  callfunc lua "ImageGrid" content
+
+blockToCustom lua (Statement stmattr content) =
+  callfunc lua "Statement" content stmattr
+
+blockToCustom lua (Proof capt content) =
+  callfunc lua "Proof" capt content
 
 blockToCustom lua (Div attr items) =
   callfunc lua "Div" items (attrToMap attr)
@@ -225,13 +299,16 @@ inlineToCustom lua (Quoted SingleQuote lst) = callfunc lua "SingleQuoted" lst
 
 inlineToCustom lua (Quoted DoubleQuote lst) = callfunc lua "DoubleQuoted" lst
 
-inlineToCustom lua (Cite _  lst) = callfunc lua "Cite" lst
+inlineToCustom lua (Cite cs lst) = callfunc lua "Cite" lst cs
 
 inlineToCustom lua (Code attr str) =
   callfunc lua "Code" (fromString str) (attrToMap attr)
 
-inlineToCustom lua (Math DisplayMath str) =
+inlineToCustom lua (Math (DisplayMath ("",[],[])) str) =
   callfunc lua "DisplayMath" (fromString str)
+
+inlineToCustom lua (Math (DisplayMath attr) str) =
+  callfunc lua "DisplayMathWithAttr" (fromString str) (attrToMap attr)
 
 inlineToCustom lua (Math InlineMath str) =
   callfunc lua "InlineMath" (fromString str)
@@ -244,8 +321,14 @@ inlineToCustom lua (LineBreak) = callfunc lua "LineBreak"
 inlineToCustom lua (Link txt (src,tit)) =
   callfunc lua "Link" txt (fromString src) (fromString tit)
 
-inlineToCustom lua (Image alt (src,tit)) =
+inlineToCustom lua (Image ("",[],[]) alt (src,tit)) =
   callfunc lua "Image" alt (fromString src) (fromString tit)
+
+inlineToCustom lua (Image attr alt (src,tit)) =
+  callfunc lua "ImageWithAttr" alt (fromString src) (fromString tit) (attrToMap attr)
+
+inlineToCustom lua (NumRef numref str) =
+  callfunc lua "NumRef" (fromString str) numref
 
 inlineToCustom lua (Note contents) = callfunc lua "Note" contents
 

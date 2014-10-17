@@ -230,15 +230,21 @@ Pandoc (Meta {unMeta = fromList [("author",MetaList [MetaInlines [Str "John",Spa
 ,Para [Str "Simple",Space,Str "block",Space,Str "on",Space,Str "one",Space,Str "line:"]
 ,Div ("",[],[]) [Plain [Str "foo"]]
 ,Para [Str "And",Space,Str "nested",Space,Str "without",Space,Str "indentation:"]
-,Div ("",[],[]) [Div ("",[],[]) [Div ("",[],[]) [Plain [Str "foo"]]],Div ("",[],[]) [Plain [Str "bar"]]]
+,Div ("",[],[]) [Div ("",[],[]) [Div ("",[],[]) [Para [Str "foo"]]],Div ("",[],[]) [Plain [Str "bar"]]]
 ,Para [Str "Interpreted",Space,Str "markdown",Space,Str "in",Space,Str "a",Space,Str "table:"]
-,RawBlock (Format "html") "<table>\n<tr>\n<td>"
+,RawBlock (Format "html") "<table>"
+,RawBlock (Format "html") "<tr>"
+,RawBlock (Format "html") "<td>"
 ,Plain [Str "This",Space,Str "is",Space,Emph [Str "emphasized"]]
-,RawBlock (Format "html") "</td>\n<td>"
+,RawBlock (Format "html") "</td>"
+,RawBlock (Format "html") "<td>"
 ,Plain [Str "And",Space,Str "this",Space,Str "is",Space,Strong [Str "strong"]]
-,RawBlock (Format "html") "</td>\n</tr>\n</table>\n\n<script type=\"text/javascript\">document.write('This *should not* be interpreted as markdown');</script>\n"
+,RawBlock (Format "html") "</td>"
+,RawBlock (Format "html") "</tr>"
+,RawBlock (Format "html") "</table>"
+,RawBlock (Format "html") "<script type=\"text/javascript\">document.write('This *should not* be interpreted as markdown');</script>"
 ,Para [Str "Here\8217s",Space,Str "a",Space,Str "simple",Space,Str "block:"]
-,Div ("",[],[]) [Plain [Str "foo"]]
+,Div ("",[],[]) [Para [Str "foo"]]
 ,Para [Str "This",Space,Str "should",Space,Str "be",Space,Str "a",Space,Str "code",Space,Str "block,",Space,Str "though:"]
 ,CodeBlock ("",[],[]) "<div>\n    foo\n</div>"
 ,Para [Str "As",Space,Str "should",Space,Str "this:"]
@@ -246,17 +252,26 @@ Pandoc (Meta {unMeta = fromList [("author",MetaList [MetaInlines [Str "John",Spa
 ,Para [Str "Now,",Space,Str "nested:"]
 ,Div ("",[],[]) [Div ("",[],[]) [Div ("",[],[]) [Plain [Str "foo"]]]]
 ,Para [Str "This",Space,Str "should",Space,Str "just",Space,Str "be",Space,Str "an",Space,Str "HTML",Space,Str "comment:"]
-,RawBlock (Format "html") "<!-- Comment -->\n"
+,RawBlock (Format "html") "<!-- Comment -->"
 ,Para [Str "Multiline:"]
-,RawBlock (Format "html") "<!--\nBlah\nBlah\n-->\n\n<!--\n    This is another comment.\n-->\n"
+,RawBlock (Format "html") "<!--\nBlah\nBlah\n-->"
+,RawBlock (Format "html") "<!--\n    This is another comment.\n-->"
 ,Para [Str "Code",Space,Str "block:"]
 ,CodeBlock ("",[],[]) "<!-- Comment -->"
 ,Para [Str "Just",Space,Str "plain",Space,Str "comment,",Space,Str "with",Space,Str "trailing",Space,Str "spaces",Space,Str "on",Space,Str "the",Space,Str "line:"]
-,RawBlock (Format "html") "<!-- foo -->   \n"
+,RawBlock (Format "html") "<!-- foo -->"
 ,Para [Str "Code:"]
 ,CodeBlock ("",[],[]) "<hr />"
 ,Para [Str "Hr\8217s:"]
-,RawBlock (Format "html") "<hr>\n\n<hr />\n\n<hr />\n\n<hr>   \n\n<hr />  \n\n<hr /> \n\n<hr class=\"foo\" id=\"bar\" />\n\n<hr class=\"foo\" id=\"bar\" />\n\n<hr class=\"foo\" id=\"bar\">\n"
+,RawBlock (Format "html") "<hr>"
+,RawBlock (Format "html") "<hr />"
+,RawBlock (Format "html") "<hr />"
+,RawBlock (Format "html") "<hr>"
+,RawBlock (Format "html") "<hr />"
+,RawBlock (Format "html") "<hr />"
+,RawBlock (Format "html") "<hr class=\"foo\" id=\"bar\" />"
+,RawBlock (Format "html") "<hr class=\"foo\" id=\"bar\" />"
+,RawBlock (Format "html") "<hr class=\"foo\" id=\"bar\">"
 ,HorizontalRule
 ,Header 1 ("inline-markup",[],[]) [Str "Inline",Space,Str "Markup"]
 ,Para [Str "This",Space,Str "is",Space,Emph [Str "emphasized"],Str ",",Space,Str "and",Space,Str "so",Space,Emph [Str "is",Space,Str "this"],Str "."]
@@ -290,7 +305,7 @@ Pandoc (Meta {unMeta = fromList [("author",MetaList [MetaInlines [Str "John",Spa
  ,[Plain [Math InlineMath "\\alpha \\wedge \\omega"]]
  ,[Plain [Math InlineMath "223"]]
  ,[Plain [Math InlineMath "p",Str "-Tree"]]
- ,[Plain [Str "Here\8217s",Space,Str "some",Space,Str "display",Space,Str "math:",Space,Math DisplayMath "\\frac{d}{dx}f(x)=\\lim_{h\\to 0}\\frac{f(x+h)-f(x)}{h}"]]
+ ,[Plain [Str "Here\8217s",Space,Str "some",Space,Str "display",Space,Str "math:",Space,Math (DisplayMath ("",[],[])) "\\frac{d}{dx}f(x)=\\lim_{h\\to 0}\\frac{f(x+h)-f(x)}{h}"]]
  ,[Plain [Str "Here\8217s",Space,Str "one",Space,Str "that",Space,Str "has",Space,Str "a",Space,Str "line",Space,Str "break",Space,Str "in",Space,Str "it:",Space,Math InlineMath "\\alpha + \\omega \\times x^2",Str "."]]]
 ,Para [Str "These",Space,Str "shouldn\8217t",Space,Str "be",Space,Str "math:"]
 ,BulletList
@@ -374,8 +389,8 @@ Pandoc (Meta {unMeta = fromList [("author",MetaList [MetaInlines [Str "John",Spa
 ,HorizontalRule
 ,Header 1 ("images",[],[]) [Str "Images"]
 ,Para [Str "From",Space,Quoted DoubleQuote [Str "Voyage",Space,Str "dans",Space,Str "la",Space,Str "Lune"],Space,Str "by",Space,Str "Georges",Space,Str "Melies",Space,Str "(1902):"]
-,Para [Image [Str "lalune"] ("lalune.jpg","fig:Voyage dans la Lune")]
-,Para [Str "Here",Space,Str "is",Space,Str "a",Space,Str "movie",Space,Image [Str "movie"] ("movie.jpg",""),Space,Str "icon."]
+,Para [Image ("",[],[]) [Str "lalune"] ("lalune.jpg","fig:Voyage dans la Lune")]
+,Para [Str "Here",Space,Str "is",Space,Str "a",Space,Str "movie",Space,Image ("",[],[]) [Str "movie"] ("movie.jpg",""),Space,Str "icon."]
 ,HorizontalRule
 ,Header 1 ("footnotes",[],[]) [Str "Footnotes"]
 ,Para [Str "Here",Space,Str "is",Space,Str "a",Space,Str "footnote",Space,Str "reference,",Note [Para [Str "Here",Space,Str "is",Space,Str "the",Space,Str "footnote.",Space,Str "It",Space,Str "can",Space,Str "go",Space,Str "anywhere",Space,Str "after",Space,Str "the",Space,Str "footnote",Space,Str "reference.",Space,Str "It",Space,Str "need",Space,Str "not",Space,Str "be",Space,Str "placed",Space,Str "at",Space,Str "the",Space,Str "end",Space,Str "of",Space,Str "the",Space,Str "document."]],Space,Str "and",Space,Str "another.",Note [Para [Str "Here\8217s",Space,Str "the",Space,Str "long",Space,Str "note.",Space,Str "This",Space,Str "one",Space,Str "contains",Space,Str "multiple",Space,Str "blocks."],Para [Str "Subsequent",Space,Str "blocks",Space,Str "are",Space,Str "indented",Space,Str "to",Space,Str "show",Space,Str "that",Space,Str "they",Space,Str "belong",Space,Str "to",Space,Str "the",Space,Str "footnote",Space,Str "(as",Space,Str "with",Space,Str "list",Space,Str "items)."],CodeBlock ("",[],[]) "  { <code> }",Para [Str "If",Space,Str "you",Space,Str "want,",Space,Str "you",Space,Str "can",Space,Str "indent",Space,Str "every",Space,Str "line,",Space,Str "but",Space,Str "you",Space,Str "can",Space,Str "also",Space,Str "be",Space,Str "lazy",Space,Str "and",Space,Str "just",Space,Str "indent",Space,Str "the",Space,Str "first",Space,Str "line",Space,Str "of",Space,Str "each",Space,Str "block."]],Space,Str "This",Space,Str "should",Space,Emph [Str "not"],Space,Str "be",Space,Str "a",Space,Str "footnote",Space,Str "reference,",Space,Str "because",Space,Str "it",Space,Str "contains",Space,Str "a",Space,Str "space.[^my",Space,Str "note]",Space,Str "Here",Space,Str "is",Space,Str "an",Space,Str "inline",Space,Str "note.",Note [Para [Str "This",Space,Str "is",Space,Emph [Str "easier"],Space,Str "to",Space,Str "type.",Space,Str "Inline",Space,Str "notes",Space,Str "may",Space,Str "contain",Space,Link [Str "links"] ("http://google.com",""),Space,Str "and",Space,Code ("",[],[]) "]",Space,Str "verbatim",Space,Str "characters,",Space,Str "as",Space,Str "well",Space,Str "as",Space,Str "[bracketed",Space,Str "text]."]]]

@@ -1,0 +1,5 @@
+tabSize = 2
+excludeInFolderSearch = "{$excludeInFolderSearch,$extraExcludes,dist}"
+
+[ source.haskell ]
+softWrap = false

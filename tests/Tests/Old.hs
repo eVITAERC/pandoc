@@ -3,10 +3,10 @@ module Tests.Old (tests) where
 import Test.Framework (testGroup, Test )
 import Test.Framework.Providers.HUnit
 import Test.HUnit ( assertBool )
-import System.Environment ( getArgs )
+import System.Environment.Executable (getExecutablePath)
 import System.IO ( openTempFile, stderr )
 import System.Process ( runProcess, waitForProcess )
-import System.FilePath ( (</>), (<.>) )
+import System.FilePath ( (</>), (<.>), takeDirectory, splitDirectories, joinPath )
 import System.Directory
 import System.Exit
 import Data.Algorithm.Diff
@@ -58,6 +58,8 @@ tests = [ testGroup "markdown"
               "pipe-tables.txt" "pipe-tables.native"
             , test "more" ["-r", "markdown", "-w", "native", "-S"]
               "markdown-reader-more.txt" "markdown-reader-more.native"
+            , test "scholdoc" ["-r", "markdown_scholarly", "-w", "native", "-s", "-S", "-R"]
+              "scholdoc.txt" "scholdoc.native"
             , lhsReaderTest "markdown+lhs"
             ]
           , testGroup "citations"
@@ -65,28 +67,20 @@ tests = [ testGroup "markdown"
               "markdown-citations.txt" "markdown-citations.native"
             ]
           ]
-        , testGroup "rst"
-          [ testGroup "writer" (writerTests "rst" ++ lhsWriterTests "rst")
-          , testGroup "reader"
-            [ test "basic" ["-r", "rst", "-w", "native",
-              "-s", "-S", "--columns=80"] "rst-reader.rst" "rst-reader.native"
-            , test "tables" ["-r", "rst", "-w", "native", "--columns=80"]
-              "tables.rst" "tables-rstsubset.native"
-            , lhsReaderTest "rst+lhs"
-            ]
-          ]
         , testGroup "latex"
-          [ testGroup "writer" (writerTests "latex" ++ lhsWriterTests "latex")
-          , testGroup "reader"
-            [ test "basic" ["-r", "latex", "-w", "native", "-s", "-R"]
-              "latex-reader.latex" "latex-reader.native"
-            , lhsReaderTest "latex+lhs"
-            ]
+          [ testGroup "writer" (writerTests "latex" ++ lhsWriterTests "latex" ++
+            [ test "scholdoc"  ["-r", "markdown_scholarly", "-w", "latex", "-S", "-R",
+                                "--chapters", "--columns=72"]
+              "scholdoc.txt" "scholdoc.latex"
+            ])
           ]
         , testGroup "html"
-          [ testGroup "writer" (writerTests "html" ++ lhsWriterTests "html")
-          , test "reader" ["-r", "html", "-w", "native", "-s"]
-            "html-reader.html" "html-reader.native"
+          [ testGroup "writer" (writerTests "html" ++ lhsWriterTests "html" ++
+            [ test "scholdoc"  ["-r", "markdown_scholarly", "-w", "html5", "-S", "-R",
+                                "--template=scholmdTemplate_bodyOnly.html5",
+                                "--mathjax", "--no-mathjax-cdn", "--columns=72"]
+              "scholdoc.txt" "scholdoc.html"
+            ])
           ]
         , testGroup "s5"
           [ s5WriterTest "basic" ["-s"] "s5"
@@ -95,48 +89,16 @@ tests = [ testGroup "markdown"
           , s5WriterTest "inserts"  ["-s", "-H", "insert",
             "-B", "insert", "-A", "insert", "-c", "main.css"] "html"
           ]
-        , testGroup "textile"
-          [ testGroup "writer" $ writerTests "textile"
-          , test "reader" ["-r", "textile", "-w", "native", "-s"]
-            "textile-reader.textile" "textile-reader.native"
-          ]
-        , testGroup "docbook"
-          [ testGroup "writer" $ writerTests "docbook"
-          , test "reader" ["-r", "docbook", "-w", "native", "-s"]
-            "docbook-reader.docbook" "docbook-reader.native"
-          ]
         , testGroup "native"
           [ testGroup "writer" $ writerTests "native"
           , test "reader" ["-r", "native", "-w", "native", "-s"]
             "testsuite.native" "testsuite.native"
           ]
-        , testGroup "fb2"
-          [ fb2WriterTest "basic" [] "fb2.basic.markdown" "fb2.basic.fb2"
-          , fb2WriterTest "titles" [] "fb2.titles.markdown" "fb2.titles.fb2"
-          , fb2WriterTest "images" [] "fb2.images.markdown" "fb2.images.fb2"
-          , fb2WriterTest "images-embedded" [] "fb2.images-embedded.html" "fb2.images-embedded.fb2"
-          , fb2WriterTest "tables" [] "tables.native" "tables.fb2"
-          , fb2WriterTest "math" [] "fb2.math.markdown" "fb2.math.fb2"
-          , fb2WriterTest "testsuite" [] "testsuite.native" "writer.fb2"
-          ]
-        , testGroup "mediawiki"
-          [ testGroup "writer" $ writerTests "mediawiki"
-          , test "reader" ["-r", "mediawiki", "-w", "native", "-s"]
-            "mediawiki-reader.wiki" "mediawiki-reader.native"
-          ]
-        , testGroup "opml"
-          [ test "basic" ["-r", "native", "-w", "opml", "--columns=78", "-s"]
-             "testsuite.native" "writer.opml"
-          , test "reader" ["-r", "opml", "-w", "native", "-s"]
-            "opml-reader.opml" "opml-reader.native"
-          ]
         , testGroup "haddock"
-          [ test "reader" ["-r", "haddock", "-w", "native", "-s"]
-            "haddock-reader.haddock" "haddock-reader.native"
+          [ testGroup "writer" $ writerTests "haddock"
           ]
         , testGroup "other writers" $ map (\f -> testGroup f $ writerTests f)
-          [ "opendocument" , "context" , "texinfo"
-          , "man" , "plain" , "rtf", "org", "asciidoc"
+          [ "man" , "plain"
           ]
         ]
 
@@ -175,24 +137,11 @@ s5WriterTest :: String -> [String] -> String -> Test
 s5WriterTest modifier opts format
   = test (format ++ " writer (" ++ modifier ++ ")")
     (["-r", "native", "-w", format] ++ opts)
-    "s5.native"  ("s5." ++ modifier <.> "html")
-
-fb2WriterTest :: String -> [String] -> String -> String -> Test
-fb2WriterTest title opts inputfile normfile =
-  testWithNormalize (ignoreBinary . formatXML)
-                    title (["-t", "fb2"]++opts) inputfile normfile
-  where
-    formatXML xml = splitTags $ zip xml (drop 1 xml)
-    splitTags [] = []
-    splitTags [end] = fst end : snd end : []
-    splitTags (('>','<'):rest) = ">\n" ++ splitTags rest
-    splitTags ((c,_):rest) = c : splitTags rest
-    ignoreBinary = unlines . filter (not . startsWith "<binary ") . lines
-    startsWith tag str = all (uncurry (==)) $ zip tag str
+    "s5.native"  ("s5-" ++ modifier <.> "html")
 
 -- | Run a test without normalize function, return True if test passed.
 test :: String    -- ^ Title of test
-     -> [String]  -- ^ Options to pass to pandoc
+     -> [String]  -- ^ Options to pass to scholdoc
      -> String    -- ^ Input filepath
      -> FilePath  -- ^ Norm (for test results) filepath
      -> Test
@@ -201,22 +150,29 @@ test = testWithNormalize id
 -- | Run a test with normalize function, return True if test passed.
 testWithNormalize  :: (String -> String) -- ^ Normalize function for output
                    -> String    -- ^ Title of test
-                   -> [String]  -- ^ Options to pass to pandoc
+                   -> [String]  -- ^ Options to pass to scholdoc
                    -> String    -- ^ Input filepath
                    -> FilePath  -- ^ Norm (for test results) filepath
                    -> Test
 testWithNormalize normalizer testname opts inp norm = testCase testname $ do
-  args <- getArgs
-  let buildDir = case args of
-                      (x:_) -> ".." </> x
-                      _     -> error "test-pandoc: missing buildDir argument"
-  let pandocPath = buildDir </> "pandoc" </> "pandoc"
-  (outputPath, hOut) <- openTempFile "" "pandoc-test"
+  -- find scholdoc executable relative to test-scholdoc
+  -- First, try in same directory (e.g. if both in ~/.cabal/bin)
+  -- Second, try ../scholdoc (e.g. if in dist/XXX/build/test-scholdoc)
+  scholdocPath <- do
+    testExePath <- getExecutablePath
+    let testExeDir = takeDirectory testExePath
+    found <- doesFileExist (testExeDir </> "scholdoc")
+    return $ if found
+                then testExeDir </> "scholdoc"
+                else case splitDirectories testExeDir of
+                           [] -> error "test-scholdoc: empty testExeDir"
+                           xs -> joinPath (init xs) </> "scholdoc" </> "scholdoc"
+  (outputPath, hOut) <- openTempFile "" "scholdoc-test"
   let inpPath = inp
   let normPath = norm
-  let options = ["--data-dir", ".." </> "data"] ++ [inpPath] ++ opts
-  let cmd = pandocPath ++ " " ++ unwords options
-  ph <- runProcess pandocPath options Nothing
+  let options = ["--emulate-pandoc", "--data-dir", ".." </> "data"] ++ [inpPath] ++ opts
+  let cmd = scholdocPath ++ " " ++ unwords options
+  ph <- runProcess scholdocPath options Nothing
         (Just [("TMP","."),("LANG","en_US.UTF-8"),("HOME", "./")]) Nothing (Just hOut)
         (Just stderr)
   ec <- waitForProcess ph

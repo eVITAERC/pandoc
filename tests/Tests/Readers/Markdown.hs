@@ -16,6 +16,10 @@ markdown = readMarkdown def
 markdownSmart :: String -> Pandoc
 markdownSmart = readMarkdown def { readerSmart = True }
 
+markdownCDL :: String -> Pandoc
+markdownCDL = readMarkdown def { readerExtensions = Set.insert
+                 Ext_compact_definition_lists $ readerExtensions def }
+
 infix 4 =:
 (=:) :: ToString c
      => String -> (String, c) -> Test
@@ -135,15 +139,47 @@ tests = [ testGroup "inline code"
           , "with attribute space" =:
             "`*` {.haskell .special x=\"7\"}"
             =?> para (codeWith ("",["haskell","special"],[("x","7")]) "*")
+          , test (readMarkdown def{ readerExtensions = Set.insert
+                       Ext_scholarly_markdown $ readerExtensions def })
+            "double-backtick is inline math" $
+            "what part of ``\\mathbf{x_s}_\\frac{\\omega}{x \\delta}`` don't you understand? Also there's ``(V * \\rho)`` and ``y = Ax`` as well"
+            =?> para ( "what part of " <> math "\\mathbf{x_s}_\\frac{\\omega}{x \\delta}" <> " don't you understand? Also there's " <> math "(V * \\rho)" <> " and " <> math "y = Ax" <> " as well")
+          , test (readMarkdown def{ readerExtensions = Set.insert
+                       Ext_scholarly_markdown $ readerExtensions def })
+            "double-backtick is inline math except followed by whitespace" $
+            "what part of `` \\mathbf{x_s}_\\frac{\\omega}{x \\delta}   `` don't you understand?"
+            =?> para ( "what part of " <> codeWith ([],[],[]) "\\mathbf{x_s}_\\frac{\\omega}{x \\delta}" <> " don't you understand?" )
+          , test (readMarkdown def{ readerExtensions = Set.insert
+                       Ext_scholarly_markdown $ readerExtensions def })
+            "long backticks with Ext_tex_math_double_backtick enabled" $
+            "what part of ````\\mathbf{x_s}_\\frac{\\omega}{x \\delta}  ```` don't you understand?"
+            =?> para ( "what part of " <> codeWith ([],[],[]) "\\mathbf{x_s}_\\frac{\\omega}{x \\delta}" <> " don't you understand?" )
           ]
         , testGroup "emph and strong"
           [ "two strongs in emph" =:
              "***a**b **c**d*" =?> para (emph (strong (str "a") <> str "b" <> space
                                          <> strong (str "c") <> str "d"))
+          , "emph and strong emph alternating" =:
+            "*xxx* ***xxx*** xxx\n*xxx* ***xxx*** xxx"
+            =?> para (emph "xxx" <> space <> strong (emph "xxx") <>
+                      space <> "xxx" <> space <>
+                      emph "xxx" <> space <> strong (emph "xxx") <>
+                      space <> "xxx")
+          , "emph with spaced strong" =:
+            "*x **xx** x*"
+            =?> para (emph ("x" <> space <> strong "xx" <> space <> "x"))
+          , "intraword underscore with opening underscore (#1121)" =:
+            "_foot_ball_" =?> para (emph (text "foot_ball"))
           ]
         , testGroup "raw LaTeX"
           [ "in URL" =:
             "\\begin\n" =?> para (text "\\begin")
+          ]
+        , testGroup "raw HTML"
+          [ "nesting (issue #1330)" =:
+            "<del>test</del>" =?>
+            rawBlock "html" "<del>" <> plain (str "test") <>
+            rawBlock "html" "</del>"
           ]
         , "unbalanced brackets" =:
             "[[[[[[[[[[[[[[[hi" =?> para (text "[[[[[[[[[[[[[[[hi")
@@ -179,17 +215,6 @@ tests = [ testGroup "inline code"
             ("À l'arrivée de la guerre, le thème de l'«impossibilité du socialisme»"
             =?> para "À l’arrivée de la guerre, le thème de l’«impossibilité du socialisme»")
           ]
-        , testGroup "mixed emphasis and strong"
-          [ "emph and strong emph alternating" =:
-            "*xxx* ***xxx*** xxx\n*xxx* ***xxx*** xxx"
-            =?> para (emph "xxx" <> space <> strong (emph "xxx") <>
-                      space <> "xxx" <> space <>
-                      emph "xxx" <> space <> strong (emph "xxx") <>
-                      space <> "xxx")
-          , "emph with spaced strong" =:
-            "*x **xx** x*"
-            =?> para (emph ("x" <> space <> strong "xx" <> space <> "x"))
-          ]
         , testGroup "footnotes"
           [ "indent followed by newline and flush-left text" =:
             "[^1]\n\n[^1]: my note\n\n     \nnot in note\n"
@@ -216,4 +241,50 @@ tests = [ testGroup "inline code"
 --        , testGroup "round trip"
 --          [ property "p_markdown_round_trip" p_markdown_round_trip
 --          ]
+        , testGroup "definition lists"
+          [ "no blank space" =:
+            "foo1\n  :  bar\n\nfoo2\n  : bar2\n  : bar3\n" =?>
+            definitionList [ (text "foo1", [plain (text "bar")])
+                           , (text "foo2", [plain (text "bar2"),
+                                            plain (text "bar3")])
+                           ]
+          , "blank space before first def" =:
+            "foo1\n\n  :  bar\n\nfoo2\n\n  : bar2\n  : bar3\n" =?>
+            definitionList [ (text "foo1", [para (text "bar")])
+                           , (text "foo2", [para (text "bar2"),
+                                            plain (text "bar3")])
+                           ]
+          , "blank space before second def" =:
+            "foo1\n  :  bar\n\nfoo2\n  : bar2\n\n  : bar3\n" =?>
+            definitionList [ (text "foo1", [plain (text "bar")])
+                           , (text "foo2", [plain (text "bar2"),
+                                            para (text "bar3")])
+                           ]
+          , "laziness" =:
+            "foo1\n  :  bar\nbaz\n  : bar2\n" =?>
+            definitionList [ (text "foo1", [plain (text "bar baz"),
+                                            plain (text "bar2")])
+                           ]
+          , "no blank space before first of two paragraphs" =:
+            "foo1\n  : bar\n\n    baz\n" =?>
+            definitionList [ (text "foo1", [para (text "bar") <>
+                                            para (text "baz")])
+                           ]
+          ]
+        , testGroup "+compact_definition_lists"
+          [ test markdownCDL "basic compact list" $
+            "foo1\n:   bar\n    baz\nfoo2\n:   bar2\n" =?>
+            definitionList [ (text "foo1", [plain (text "bar baz")])
+                           , (text "foo2", [plain (text "bar2")])
+                           ]
+          ]
+        , testGroup "lists"
+          [ "issue #1154" =:
+              " -  <div>\n    first div breaks\n    </div>\n\n    <button>if this button exists</button>\n\n    <div>\n    with this div too.\n    </div>\n"
+              =?> bulletList [divWith nullAttr (para $ text "first div breaks") <>
+                              rawBlock "html" "<button>" <>
+                              plain (text "if this button exists") <>
+                              rawBlock "html" "</button>" <>
+                              divWith nullAttr (para $ text "with this div too.")]
+          ]
         ]

@@ -1,4 +1,7 @@
-To view a list of known bugs, or to enter a bug report, please use
-Pandoc's issue tracker: <https://github.com/jgm/pandoc/issues>.
+Scholdoc is fork of Pandoc. While additional capabilities have been added to recognize and output ScholarlyMarkdown-specific features, Scholdoc strives to use most of Pandoc's original code. If you encounter a bug that is not related to features specific to ScholarlyMarkdown, please first check to see if it is already reported in Pandoc's issue tracker <https://github.com/jgm/pandoc/issues>, or on the official Pandoc discussion group <https://groups.google.com/forum/#!forum/pandoc-discuss>.
+
+If you feel confident that a bug is directly related to ScholarlyMarkdown features, you can file a report in the Scholdoc issue tracker: <https://github.com/timtylin/scholdoc/issues>.
+
+Any bugs that are also deemed to impact Pandoc itself will be referred to Pandoc's issue tracker. The official policy is to merge in the fixes only after it has been made in Pandoc.
 
 See also CONTRIBUTING.md.

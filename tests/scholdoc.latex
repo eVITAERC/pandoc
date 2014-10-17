@@ -1,0 +1,366 @@
+\section{ScholarlyMarkdown math
+support}\label{scholarlymarkdown-math-support}
+
+\subsection{Math as (fenced) code
+blocks}\label{math-as-fenced-code-blocks}
+
+This is a line of text with a \texttt{simple code block} in it.
+
+\texttt{`this should be just a `normal` inline code block surrounded by literal backticks`}
+
+This is another line of text. Here should be some math:
+$\mathbf{F = ma}<2\mathbf{ma}$. There should be some displaymath
+environment on the following line
+%
+\begin{equation*}
+    \mathbf{F = ma} < 2\mathbf{ma}
+\end{equation*}
+%
+ and there should be no line breaks between the displaymath block and
+here. \textbf{This should be bold}. \emph{This should be italic.}
+
+The following is a displaymath with an aligned environment in a separate
+paragraph (preceded with, and followed by, two blank lines), with
+identifier \texttt{matheqn1}. It should automatically be wrapped with
+the \texttt{aligned} environment.
+
+%
+\begin{equation}
+\label{matheqn1}
+\begin{aligned}
+\tag{BIGLABEL}
+    \mbox{minimize}\quad & \fx = \max_{i=1,\ldots,m} (a_i^T x + b_i) \\
+    & \|x\|_2 \le \sigma.
+\end{aligned}
+\end{equation}
+%
+
+Here is an implicit align math environment consisting of multiple lines
+of equations with no newline in between, with at least one \texttt{\&}
+symbol in the whole expression. It should be in the same paragraph as
+this one.
+%
+\begin{align}
+\nonumber \sum_{j_1, j_2, \ldots j_m} \sum_{k_1, k_2, \ldots, k_m} & \widetilde{A}_{j_1,k_1}^{\ast} \widetilde{A}_{j_1,k_2} \tilde{A}_{j_2,k_2}^{\ast} \widetilde{A}_{j_2,k_3}  \ldots \widetilde{A}_{j_m,k_m}^{\ast} \widetilde{A}_{j_m,k_1}\\
+\label{middleAlignMathNumber} =   \sum_{j_1, j_2, \ldots j_m} \sum_{k_1, k_2, \ldots, k_m} & \left(  R_{\Lambda} T_{k_1}^{\ast} P_{\Omega} T_{j_1} R_{\Lambda}^{\ast} \right) \left(  R_{\Lambda} T_{j_1}^{\ast} P_{\Omega} T_{k_2} R_{\Lambda}^{\ast} \right)   \left(  R_{\Lambda} T_{k_2}^{\ast} P_{\Omega} T_{j_2} R_{\Lambda}^{\ast} \right)\\
+\nonumber & \left(  R_{\Lambda} T_{j_2}^{\ast} P_{\Omega} T_{k_3} R_{\Lambda}^{\ast} \right) \ldots \left(  R_{\Lambda} T_{k_m}^{\ast} P_{\Omega} T_{j_m} R_{\Lambda}^{\ast} \right) \left(  R_{\Lambda} T_{j_m}^{\ast} P_{\Omega} T_{k_1} R_{\Lambda}^{\ast} \right).
+\end{align}
+%
+ And here is an implicit gather math environment consisting of multiple
+lines of equations with no newline in between, with \texttt{\&} symbol
+not appearing in every statement:
+%
+\begin{gather}
+\label{firstGatherMathNumber} \left.\begin{aligned}
+    B'&=-\partial\times E\\
+    E'&=\partial\times B - 4\pi j
+    \end{aligned}
+    \right\} \quad \textsf{Maxwell's equations}\\
+\label{secondGatherMathNumber} A = B\\
+\label{thirdgathernumber} AAAAAAA = BBBBBB
+\end{gather}
+%
+
+Single math equations that have line-breaks (the
+\texttt{\textbackslash{}\textbackslash{}} command) are automatically
+wrapped in a \texttt{split} environment. If alignment commands (symbol
+\texttt{\&}) also exist, they get wrapped in an \texttt{aligned}
+environment instead. This behaviour can be disabled using the
+\texttt{math\_plain} environment:
+%
+\begin{equation*}
+\begin{split}
+y = ax \\
+f = kg^{-1}
+\end{split}
+\end{equation*}
+%
+%
+\begin{equation*}
+\begin{aligned}
+y &= ax \\
+f &= kg^{-1}
+\end{aligned}
+\end{equation*}
+%
+ The following has an ampersand and line breaks in comma, but is
+actually a single-line equation that should be untouched:
+%
+\begin{equation*}
+|y|\ \&\ |x| % an & and \\ that should be ignored
+= 99\% z    % an & and \\ that should be ignored
+\end{equation*}
+%
+ Below is more internal vertical alignment tests. The first is one that
+uses \texttt{cases} internally:
+%
+\begin{equation}
+\label{matheqn2}
+    P_{r-j}=\begin{cases}
+    0& \ensuremath\text{if $r-j$ is odd},\\
+    r!\,(-1)^{(r-j)/2}& \text{if $r-j$ is even},
+    \end{cases}
+\end{equation}
+%
+ and another one that uses \texttt{aligned} internally.
+%
+\begin{equation}
+\label{matheqn3}
+    \left.\begin{aligned}
+    B'&=-\partial\times E\\
+    E'&=\partial\times B - 4\pi j
+    \end{aligned}
+    \right\}
+    \qquad \text{Maxwell's equations}
+\end{equation}
+%
+
+\subsection{Math and lists}\label{math-and-lists}
+
+Here's a list with both inline and display math environments:
+
+\begin{itemize}
+\itemsep1pt\parskip0pt\parsep0pt
+\item
+  Item 1 is a famous item
+\item
+  Item 2 with a \texttt{code block} and $\mathsf{\text{inline math}}$
+  with equation $\mathbf{y=Ax}$
+\item
+  Item 3
+
+  \begin{itemize}
+  \itemsep1pt\parskip0pt\parsep0pt
+  \item
+    Indented item 4
+  \item
+    Indented item 5, followed by display math, which cannot be indented:
+    %
+    \begin{equation*}
+    \mathbf{F_1 = m_1a}
+    \end{equation*}
+    %
+     with some text below
+  \item
+    Indented item 6, which does not recognize list-item display math
+    surrounded by one additional blank line:
+  \end{itemize}
+\end{itemize}
+
+%
+\begin{equation*}
+\mathbf{F_2 = m_2a}
+\end{equation*}
+%
+
+\begin{verbatim}
+  without breaking this text out of the list and into a pre block
+\end{verbatim}
+
+\begin{itemize}
+\itemsep1pt\parskip0pt\parsep0pt
+\item
+  Item 4
+
+  \begin{enumerate}
+  \def\labelenumi{\arabic{enumi}.}
+  \itemsep1pt\parskip0pt\parsep0pt
+  \item
+    Numerical Item 1
+  \item
+    Numerical item 2
+  \end{enumerate}
+\end{itemize}
+
+\section{Scholarly X-refs}\label{scholarly-x-refs}
+
+\subsection{References to figures}\label{references-to-figures}
+
+This line refers to Figure~\ref{figure2}.
+
+This line refers to Figure 2.
+
+This line refers to subfigure~\eqref{reginfig3}.
+
+\subsection{References to equations}\label{references-to-equations}
+
+This line refers to Equation~\eqref{matheqn3}.
+
+Referencing using the \texttt{\textbackslash{}ref} tag:
+Equation~\ref{matheqn1}.
+
+Referencing using the \texttt{\textbackslash{}eqref} tag:
+Equation~\eqref{middleAlignMathNumber}.
+
+\subsection{Automatic non-breaking
+spaces}\label{automatic-non-breaking-spaces}
+
+Any cross-references (such as Equation~\ref{middleAlignMathNumber}) will
+automatically be prepended with non-breaking spaces.
+
+Unless, they appear in a list like equations~\ref{matheqn1},
+\ref{matheqn2}, \ref{matheqn3}, and~\ref{middleAlignMathNumber}.
+
+\section{ScholarlyMarkdown Figures}\label{scholarlymarkdown-figures}
+
+\subsection{Images with attributes}\label{images-with-attributes}
+
+The following will be a bunch of figures with attributes:
+\includegraphics[width=0.200\textwidth]{lunar_orbit.jpg}
+\includegraphics[width=0.200\textwidth]{lunar_orbit.jpg} Which should
+all show fine and display a picture with a baby seal.
+
+Below is more text so that the css doesn't end abruptly! Now we'll have
+an explicit Scholarly Figure environment!
+
+\subsection{ScholarlyMarkdown
+figure/multifigures}\label{scholarlymarkdown-figuremultifigures}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.500\hsize]{lunar_orbit.jpg}
+\caption{Single-image figure. You can also have citations inside
+captions {[}@Gill{]}.}\label{figure0}
+\end{figure}
+
+\begin{figure}
+\centering
+\subfloat[sub\label{reginfig1}]{\includegraphics[width=0.200\hsize]{lunar_orbit.jpg}}
+\subfloat[subfig]{\includegraphics[width=0.200\hsize]{lunar_orbit.jpg}}
+\subfloat[longer subcaption that
+flows\label{reginfig3}]{\includegraphics[width=0.200\hsize]{lunar_orbit.jpg}}
+\caption{Reference link in its own paragraph and long caption Lorem
+ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy
+nibh euismod tincidunt ut laoreet dolore magna aliquam erat
+volutpat.}\label{figure1}
+\end{figure}
+
+\begin{figure*}
+\centering
+\subfloat[fdsaf\label{reginfig4}]{\includegraphics[width=0.400\hsize]{lunar_orbit.jpg}}
+\subfloat[woogawooga\label{reginfig5}]{\includegraphics[width=0.300\hsize]{lunar_orbit.jpg}}
+\caption{Reference link in its own paragraph and long caption Lorem
+ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy
+nibh euismod tincidunt ut laoreet dolore magna aliquam erat
+volutpat.}\label{figure2}
+\end{figure*}
+
+\section{ScholarlyMarkdown
+Algorithms}\label{scholarlymarkdown-algorithms}
+
+Here are some algorithms using various methods. The ``most canonical
+one'' is currently just using a line-block:
+
+\begin{scholmdAlgorithm}
+\texttt{ 1.}~\textbf{Inputs}:~variables~$A, b$\\\texttt{ 2.}~\textbf{Output}:~$\phi$~~~~~~~~~~~~~~~~\texttt{//this is a comment}
+
+\texttt{ 3.}~Choose~an~initial~guess~$\phi$~to~the~solution\\\texttt{ 4.}~~\textbf{repeat}~until~convergence\\\texttt{ 5.}~~~~\textbf{for}~$i$~\textbf{from}~1~\textbf{until}~$n$~\textbf{do}\\\texttt{ 6.}~~~~~~~~$\sigma \leftarrow 0$\\\texttt{ 7.}~~~~~~~~\textbf{for}~$j$~\textbf{from}~1~\textbf{until}~$n$~\textbf{do}\\\texttt{ 8.}~~~~~~~~~~~~\textbf{if}~$j \ne i$~\textbf{then}\\\texttt{ 9.}~~~~~~~~~~~~~~~$\sigma \leftarrow \sigma + a_{ij} \phi_j$\\\texttt{10.}~~~~~~~~~~~~\textbf{end~if}\\\texttt{11.}~~~~~~~~\textbf{end}~($j$-loop)\\\texttt{12.}~~~~~~~~$\phi_i \leftarrow \frac 1 {a_{ii}} (b_i - \sigma)$\\\texttt{13.}~~~~\textbf{end}~($i$-loop)\\\texttt{14.}~~~~check~if~convergence~is~reached\\\texttt{15.}~\textbf{end}~(repeat)
+\caption{caption for this algorithm}\label{alg:gs}
+\end{scholmdAlgorithm}
+
+\begin{scholmdAlgorithm}
+~\textbf{Inputs}:~variables~$A, b$\\\hspace*{0.333em}\textbf{Output}:~$\phi$
+
+~Choose~an~initial~guess~$\phi$~to~the~solution\\\hspace*{0.333em}\textbf{repeat}~until~convergence\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\textbf{for}~$i$~from~1~to~$n$~\textbf{do}\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}$\sigma \leftarrow 0$\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\textbf{for}~$j$~from~1~to~$n$~\textbf{do}\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\textbf{if}~$j \ne i$~\textbf{then}\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}$\sigma \leftarrow \sigma + a_{ij} \phi_j$\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\textbf{end~if}\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\textbf{end}~($j$-loop)\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}$\phi_i \leftarrow \frac 1 {a_{ii}} (b_i - \sigma)$\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\textbf{end}~($i$-loop)\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}check~if~convergence~is~reached\\\hspace*{0.333em}\textbf{end}~(repeat)
+\label{alg:gs2}
+\end{scholmdAlgorithm}
+
+The should not be a caption
+
+\begin{scholmdAlgorithm}
+~\textbf{Inputs}:~variables~$A, b$\\\hspace*{0.333em}\textbf{Output}:~$\phi$
+
+~Choose~an~initial~guess~$\phi$~to~the~solution\\\hspace*{0.333em}\textbf{repeat}~until~convergence\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\textbf{for}~$i$~from~1~to~$n$~\textbf{do}\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}$\sigma \leftarrow 0$\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\textbf{for}~$j$~from~1~to~$n$~\textbf{do}\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\textbf{if}~$j \ne i$~\textbf{then}\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}$\sigma \leftarrow \sigma + a_{ij} \phi_j$\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\textbf{end~if}\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\textbf{end}~($j$-loop)\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}$\phi_i \leftarrow \frac 1 {a_{ii}} (b_i - \sigma)$\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\textbf{end}~($i$-loop)\\\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}\hspace*{0.333em}check~if~convergence~is~reached\\\hspace*{0.333em}\textbf{end}~(repeat)
+\caption{This should should be a caption}\label{alg:gs3}
+\end{scholmdAlgorithm}
+
+\section{ScholarlyMarkdown Tables}\label{scholarlymarkdown-tables}
+
+\subsection{Standard Pandoc tables}\label{standard-pandoc-tables}
+
+The following is a normal Pandoc table
+
+\begin{longtable}[c]{@{}rllc@{}}
+\caption{Thisis a caption}\tabularnewline
+\toprule
+Right & Left & Default & Center\tabularnewline
+\midrule
+\endfirsthead
+\toprule
+Right & Left & Default & Center\tabularnewline
+\midrule
+\endhead
+12 & 12 & 12 & 12\tabularnewline
+123 & 123 & 123 & 123\tabularnewline
+1 & 1 & 1 & 1\tabularnewline
+\bottomrule
+\end{longtable}
+
+This should not be a caption
+
+\subsection{Scholarly tables}\label{scholarly-tables}
+
+The following is a floated ScholMD table
+
+\begin{table}
+\centering
+\begin{tabular}{rllc}
+\toprule\addlinespace
+Right & Left & Default & Center\tabularnewline
+\midrule
+12 & 12 & 12 & 12\tabularnewline
+123 & 123 & 123 & 123\tabularnewline
+1 & 1 & 1 & 1\tabularnewline
+\bottomrule
+\end{tabular}
+\caption{This is a really really really really really really really
+really really really really really really really really really really
+really really really really really really really really really really
+long caption}\label{tab:exscholmd}
+\end{table}
+
+\section{ScholarlyMarkdown Code
+blocks}\label{scholarlymarkdown-code-blocks}
+
+\subsection{Standard Pandoc code
+blocks}\label{standard-pandoc-code-blocks}
+
+\subsubsection{fenced blocks}\label{fenced-blocks}
+
+\begin{verbatim}
+Value   <- [0-9.]+ / '(' Expr ')'
+Product <- Expr (('*' / '/') Expr)*
+Sum     <- Expr (('+' / '-') Expr)*
+Expr    <- Product / Sum / Value
+\end{verbatim}
+
+\subsubsection{indented blocks}\label{indented-blocks}
+
+\begin{verbatim}
+Value   <- [0-9.]+ / '(' Expr ')'
+Product <- Expr (('*' / '/') Expr)*
+Sum     <- Expr (('+' / '-') Expr)*
+Expr    <- Product / Sum / Value
+\end{verbatim}
+
+\subsection{Scholarly code block
+floats}\label{scholarly-code-block-floats}
+
+\begin{lstlisting}[caption={\href{http://en.wikipedia.org/wiki/Parsing_expression_grammar}{Parsing
+Expression Grammar} rules for a simple calculator using
+PEG.}, language=C, numbers=left, firstnumber=100, label=lst:pegcalc, float=htbp]
+Value   <- [0-9.]+ / '(' Expr ')'
+Product <- Expr (('*' / '/') Expr)*
+Sum     <- Expr (('+' / '-') Expr)*
+Expr    <- Product / Sum / Value
+\end{lstlisting}
+
+\begin{lstlisting}[caption={\href{http://en.wikipedia.org/wiki/Parsing_expression_grammar}{Parsing
+Expression Grammar} rules for a simple
+calculator.}, label=lst:pegcalc, float=htbp]
+Value   <- [0-9.]+ / '(' Expr ')'
+Product <- Expr (('*' / '/') Expr)*
+Sum     <- Expr (('+' / '-') Expr)*
+Expr    <- Product / Sum / Value
+\end{lstlisting}
+
