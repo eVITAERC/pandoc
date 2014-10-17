@@ -64,7 +64,7 @@ The Docx writer currently isn't fully functional yet. It does not yet output str
 [pandocFilters]: https://github.com/jgm/pandocfilters
 [pandocWriters]: http://johnmacfarlane.net/pandoc/README.html#custom-writers
 [pandoc-types]: https://github.com/jgm/pandoc-types
-[travis_stat]: https://travis-ci.org/timtylin/scholdoc-texmath
+[travis_stat]: https://travis-ci.org/timtylin/scholdoc
 [scholarly-devel-travisimage]: https://travis-ci.org/timtylin/scholdoc.svg?branch=scholarly-devel
 [scholarly-travisimage]: https://travis-ci.org/timtylin/scholdoc.svg?branch=scholarly
 [scholdoc-templates]: https://github.com/timtylin/scholdoc-templates
