@@ -84,8 +84,8 @@ Data-Files:
                  README.md, README-pandoc, COPYRIGHT
 Extra-Source-Files:
                  -- documentation
-                 INSTALL, BUGS, CONTRIBUTING.md, changelog
-                 changelog-pandoc, Makefile
+                 INSTALL.md, BUGS, CONTRIBUTING.md, CHANGELOG.md
+                 CHANGELOG-pandoc, Makefile
                  -- tryscholdoc
                  tryscholdoc/index.html
                  -- tests
