@@ -28,6 +28,47 @@ Markdown dialect that Pandoc (and hence Scholdoc) [understands][pandocMarkdown].
 
 Scholdoc is currently up to date with [Pandoc][pandoc] version 1.13.1 (commit 8b60d430)
 
+### Installing Scholdoc
+
+#### Via Homebrew (OSX only)
+
+On OSX, the easiest way to obtain Scholdoc is from the official
+[Homebrew][Homebrew] [tap][homebrew-scholdoc]. First make sure you have
+[Homebrew][Homebrew] set-up correctly on your system, and that running `brew
+doctor` gives you no serious warnings. After that, run the following:
+
+    brew tap timtylin/scholdoc
+    brew update
+    brew install scholdoc scholdoc-citeproc
+
+To upgrade to the latest release, just run
+
+    brew update
+    brew upgrade scholdoc scholdoc-citeproc
+
+#### Via Hackage (all operating systems)
+
+Scholdoc is written in pure Haskell. It requires the [GHC] compiler and the
+[cabal-install] build system. The easiest way to get it on all platforms is by
+installing the [Haskell platform] for your operating system. Please make sure
+you are using GHC version 7.4 or above.
+
+If you are using Ubuntu, Herbert V. Riedel have conveniently provided a [PPA of
+pre-compiled GHC and cabal-install][hvr-PPA] for recent Ubuntu systems. Here's
+an example of how to get recommended versions of [GHC] and [cabal-install]
+using `apt-get`
+
+    sudo add-apt-repository ppa:hvr/ghc
+    sudo apt-get update && apt-get install ghc-7.8.3 cabal-install-1.20
+
+Once you have GHC and `cabal-install` on your system, run the following
+
+    cabal update
+    cabal install scholdoc
+    cabal install scholdoc-citeproc
+
+To upgrade to the latest release of Scholdoc, just run the above three commands
+again.
 
 ### HTML output
 
@@ -72,3 +113,14 @@ The Docx writer currently isn't fully functional yet. It does not yet output str
 [html-schema-content]: http://scholarlymarkdown.com/Scholarly-Markdown-HTML-Schema.html#content
 [corecss]: http://scholarlymarkdown.com/scholdoc-distribution/css/core/scholmd-core-latest.css
 [mathjax]: http://www.mathjax.org
+[GHC]: http://www.haskell.org/ghc/
+[Haskell platform]: http://hackage.haskell.org/platform/
+[cabal-install]: http://hackage.haskell.org/trac/hackage/wiki/CabalInstall
+[zip-archive]: http://hackage.haskell.org/package/zip-archive
+[highlighting-kate]: http://hackage.haskell.org/package/highlighting-kate
+[blaze-html]: http://hackage.haskell.org/package/blaze-html
+[Cabal User's Guide]: http://www.haskell.org/cabal/release/latest/doc/users-guide/builders.html#setup-configure-paths
+[Homebrew]: http://brew.sh
+[hvr-PPA]: https://launchpad.net/~hvr/+archive/ubuntu/ghc
+[homebrew-scholdoc]: https://github.com/timtylin/homebrew-scholdoc/
+

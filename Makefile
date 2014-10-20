@@ -1,4 +1,5 @@
 version=$(shell grep '^Version:' scholdoc.cabal | awk '{print $$2;}')
+CABALARGS=--enable-tests --disable-optimization -ftryscholdoc -fembed_data_files --enable-benchmarks
 
 quick:
 	cabal configure --enable-tests --disable-optimization

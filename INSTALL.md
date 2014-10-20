@@ -1,9 +1,11 @@
 Installing Scholdoc
 ===================
 
-This document describe how to completely install Scholdoc from source. The instructions are largely adapted from Pandoc's installation instructions.
+This document describe how to completely install Scholdoc from source. The
+instructions are largely adapted from Pandoc's installation instructions.
 
-If you are installing the development version from Github, the procedure is identical to Pandoc:
+If you are installing the development version from Github, the procedure is
+identical to Pandoc:
 
 https://github.com/jgm/pandoc/wiki/Installing-the-development-version-of-pandoc
 
@@ -17,18 +19,30 @@ http://forum.scholarlymarkdown.com/t/scholdoc-repository-information/
 Setting up a Haskell build chain
 --------------------------------
 
-Scholdoc is written in pure Haskell. It requires the [GHC] compiler and the [cabal-install] build system. The easiest way to get it is by installing the [Haskell platform]  (unless you are using [Homebrew] with OSX or Ubuntu >12.04, see below).
+Scholdoc is written in pure Haskell. It requires the [GHC] compiler and the
+[cabal-install] build system. The easiest way to get it on all platforms is by
+installing the [Haskell platform] for your operating system. Please make sure
+you are using GHC version 7.4 or above. (unless you are using [Homebrew] with
+OSX or Ubuntu >12.04, see below).
 
 ### Using [Homebrew]
 
 OSX users running [Homebrew] can easily get the prerequisites by running
-    
+
     brew update
     brew install ghc cabal-install
 
+You can also install Scholdoc directly from the offical [Homebrew][Homebrew] [tap][homebrew-scholdoc] by running
+
+    brew tap timtylin/scholdoc
+    brew update
+    brew install scholdoc scholdoc-citeproc
+
 ### Using the `hvr/ghc` PPA on Ubuntu (12.04 or later)
 
-Herbert V. Riedel have conveniently provided a [PPA of pre-compiled GHC and Cabal][hvr-PPA] for recent Ubuntu systems. Here's an example of how to get recommended versions of [GHC] and [cabal-install] using `apt-get`
+Herbert V. Riedel have conveniently provided a [PPA of pre-compiled GHC and
+Cabal][hvr-PPA] for recent Ubuntu systems. Here's an example of how to get
+recommended versions of [GHC] and [cabal-install] using `apt-get`
 
     sudo add-apt-repository ppa:hvr/ghc
     sudo apt-get update && apt-get install ghc-7.8.3 cabal-install-1.20
@@ -37,8 +51,8 @@ Herbert V. Riedel have conveniently provided a [PPA of pre-compiled GHC and Caba
 Quick install (stable release from Hackage)
 -------------------------------------------
 
-1.  Install the [Haskell platform].  This will give you [GHC] and
-    the [cabal-install] build tool.
+1.  Install the [Haskell platform].  This will give you [GHC] and the 
+    [cabal-install] build tool.
 
 2.  Update your package database:
 
@@ -48,8 +62,9 @@ Quick install (stable release from Hackage)
 
         cabal install scholdoc
 
-    This procedure will install the released version of Scholdoc,
-    which will be downloaded automatically from HackageDB.
+    This procedure will install the released version of Scholdoc, which will be
+    downloaded automatically from HackageDB. It will also install
+    scholdoc-citeproc
     
 Quick install (your own version)
 --------------------------------
@@ -168,9 +183,8 @@ directory.
 
         cabal register
 
-    Package managers may want to use the `--gen-script` option to
-    generate a script that can be run to register the package at
-    install time.
+    Package managers may want to use the `--gen-script` option to generate a
+    script that can be run to register the package at install time.
 
 Creating a relocatable binary
 -----------------------------
@@ -248,3 +262,4 @@ To run just the markdown benchmarks:
 [Cabal User's Guide]: http://www.haskell.org/cabal/release/latest/doc/users-guide/builders.html#setup-configure-paths
 [Homebrew]: http://brew.sh
 [hvr-PPA]: https://launchpad.net/~hvr/+archive/ubuntu/ghc
+[homebrew-scholdoc]: https://github.com/timtylin/homebrew-scholdoc/
