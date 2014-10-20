@@ -15,22 +15,20 @@
   <body>
     <div class="wrapper">
       <header>
-        <img src=http://scholarlymarkdown.com/images/scholdoc-logo.png>
+        <img src=http://scholarlymarkdown.com/images/scholdoc-logo.png style="max-width: 200px;" />
         <p>Fork of Pandoc for the implementation of a ScholarlyMarkdown parser</p>
 
         <p class="view"><a href="https://github.com/timtylin/scholdoc">View the Project on GitHub <small>timtylin/scholdoc</small></a></p>
 
 
         <ul>
+          <li><a href="https://github.com/timtylin/scholdoc">View On <strong>GitHub</strong></a></li>
           <li><a href="https://github.com/timtylin/scholdoc/zipball/scholarly">Download <strong>ZIP File</strong></a></li>
           <li><a href="https://github.com/timtylin/scholdoc/tarball/scholarly">Download <strong>TAR Ball</strong></a></li>
-          <li><a href="https://github.com/timtylin/scholdoc">View On <strong>GitHub</strong></a></li>
         </ul>
       </header>
       <section>
         <h1>
-<a name="scholdoc" class="anchor" href="#scholdoc"><span class="octicon octicon-link"></span></a>Scholdoc</h1>
-
 <h3>
 <a name="converts-scholarlymarkdown-documents-into-html5-latex-or-docx" class="anchor" href="#converts-scholarlymarkdown-documents-into-html5-latex-or-docx"><span class="octicon octicon-link"></span></a>Converts <a href="http://scholarlymarkdown.com">ScholarlyMarkdown</a> documents into HTML5, LaTeX, or Docx</h3>
 
@@ -60,6 +58,53 @@ Markdown dialect that Pandoc (and hence Scholdoc) <a href="http://johnmacfarlane
 <p>Scholdoc is currently up to date with <a href="http://johnmacfarlane.net/pandoc/">Pandoc</a> version 1.13.1 (commit 8b60d430)</p>
 
 <h3>
+<a name="installing-scholdoc" class="anchor" href="#installing-scholdoc"><span class="octicon octicon-link"></span></a>Installing Scholdoc</h3>
+
+<h4>Via Homebrew (OSX only)</h4>
+
+<p>On OSX, the easiest way to obtain Scholdoc is from the official
+<a href="http://brew.sh">Homebrew</a> <a href="https://github.com/timtylin/homebrew-scholdoc/">tap</a>. First make sure you have
+<a href="http://brew.sh">Homebrew</a> set-up correctly on your system, and that running <code>brew
+doctor</code> gives you no serious warnings. After that, run the following:</p>
+
+<pre><code>brew tap timtylin/scholdoc
+brew update
+brew install scholdoc scholdoc-citeproc
+</code></pre>
+
+<p>To upgrade to the latest release, just run</p>
+
+<pre><code>brew update
+brew upgrade scholdoc scholdoc-citeproc
+</code></pre>
+
+<h4>Via Hackage (all operating systems)</h4>
+
+<p>Scholdoc is written in pure Haskell. It requires the <a href="http://www.haskell.org/ghc/">GHC</a> compiler and the
+<a href="http://hackage.haskell.org/trac/hackage/wiki/CabalInstall">cabal-install</a> build system. The easiest way to get it on all platforms is by
+installing the <a href="http://hackage.haskell.org/platform/">Haskell platform</a> for your operating system. Please make sure
+you are using GHC version 7.4 or above.</p>
+
+<p>If you are using Ubuntu, Herbert V. Riedel have conveniently provided a <a href="https://launchpad.net/~hvr/+archive/ubuntu/ghc">PPA of
+pre-compiled GHC and cabal-install</a> for recent Ubuntu systems. Here&rsquo;s
+an example of how to get recommended versions of <a href="http://www.haskell.org/ghc/">GHC</a> and <a href="http://hackage.haskell.org/trac/hackage/wiki/CabalInstall">cabal-install</a>
+using <code>apt-get</code></p>
+
+<pre><code>sudo add-apt-repository ppa:hvr/ghc
+sudo apt-get update &amp;&amp; apt-get install ghc-7.8.3 cabal-install-1.20
+</code></pre>
+
+<p>Once you have GHC and <code>cabal-install</code> on your system, run the following</p>
+
+<pre><code>cabal update
+cabal install scholdoc
+cabal install scholdoc-citeproc
+</code></pre>
+
+<p>To upgrade to the latest release of Scholdoc, just run the above three commands
+again.</p>
+
+<h3>
 <a name="html-output" class="anchor" href="#html-output"><span class="octicon octicon-link"></span></a>HTML output</h3>
 
 <p><strong><em>Important:</em></strong> <em>A ScholarlyMarkdown <a href="http://scholarlymarkdown.com/scholdoc-distribution/css/core/scholmd-core-latest.css">core CSS</a> is required for proper
@@ -87,7 +132,7 @@ math content in HTML.</p>
       </section>
       <footer>
         <p>This project is maintained by <a href="https://github.com/timtylin">timtylin</a></p>
-        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+        <p><small>Hosted on GitHub Pages</small></p>
       </footer>
     </div>
     <script src="javascripts/scale.fix.js"></script>
