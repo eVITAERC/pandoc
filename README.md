@@ -106,8 +106,8 @@ The Docx writer currently isn't fully functional yet. It does not yet output str
 [pandocWriters]: http://johnmacfarlane.net/pandoc/README.html#custom-writers
 [pandoc-types]: https://github.com/jgm/pandoc-types
 [travis_stat]: https://travis-ci.org/timtylin/scholdoc
-[scholarly-devel-travisimage]: https://travis-ci.org/timtylin/scholdoc.svg?branch=scholarly-devel
-[scholarly-travisimage]: https://travis-ci.org/timtylin/scholdoc.svg?branch=scholarly
+[scholarly-devel-travisimage]: https://travis-ci.org/timtylin/scholdoc.svg?branch=master
+[scholarly-travisimage]: https://travis-ci.org/timtylin/scholdoc.svg?branch=stable
 [scholdoc-templates]: https://github.com/timtylin/scholdoc-templates
 [html-schema]: http://scholarlymarkdown.com/Scholarly-Markdown-HTML-Schema.html
 [html-schema-content]: http://scholarlymarkdown.com/Scholarly-Markdown-HTML-Schema.html#content
