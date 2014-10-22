@@ -9,7 +9,7 @@ Author:          Tim T.Y. Lin <timtylin@gmail.com>
 Maintainer:      Tim T.Y. Lin <timtylin@gmail.com>
 Bug-Reports:     https://github.com/timtylin/scholdoc/issues
 Stability:       alpha
-Homepage:        http://scholarlymarkdown.com
+Homepage:        http://scholdoc.scholarlymarkdown.com
 Category:        Text
 Tested-With:     GHC == 7.4.2, GHC == 7.6.3, GHC == 7.8.2
 Synopsis:        Converts ScholarlyMarkdown documents to HTML5/LaTeX/Docx format
