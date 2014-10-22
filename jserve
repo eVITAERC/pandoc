@@ -1,0 +1,7 @@
+#!/bin/bash
+
+echo "Run to expose:"
+echo "lt --port 4000"
+echo "(make sure you have localtunnel)"
+
+bundle exec jekyll serve
