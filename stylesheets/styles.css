@@ -4,7 +4,7 @@ body {
   padding:50px;
   font:16px/1.4 Lato, "Helvetica Neue", Helvetica, Arial, sans-serif;
   color:#555;
-  background-color: #fdfdfd;
+  background-color: #f7f7f7;
   font-weight:400;
 }
 
@@ -18,7 +18,7 @@ p, ul, ol, table, pre, dl {
 }
 
 h1, h2, h3 {
-  line-height:1.1;
+  line-height:1.2;
 }
 
 h1 {
@@ -170,6 +170,10 @@ footer {
   float:left;
   position:fixed;
   bottom:50px;
+}
+
+html {
+    -webkit-text-size-adjust: 100%; /* Prevent font scaling in landscape while allowing user zoom */
 }
 
 @media print, screen and (max-width: 960px) {
