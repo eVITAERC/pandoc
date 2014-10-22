@@ -1,0 +1,10 @@
+name: Scholdoc
+description: Scholdoc project website. Scholdoc converts ScholarlyMarkdown documents into HTML5, LaTeX, or Docx.
+markdown: redcarpet
+pygments: true
+permalink: /:categories/:title
+url: http://scholdoc.scholarlymarkdown.com
+exclude: ["params.json","config", "tmp", "log", "bundle", ".rvmrc", "unicorn.rb", ".rbenv-version", ".gitignore", "README.md", "Rakefile", "changelog.md", "Gemfile", "Gemfile.lock", "Procfile"]
+
+redcarpet:
+  extensions: ["fenced_code_blocks", "tables", "footnotes", "strikethrough", "space_after_headers", "lax_spacing", "superscript"]
