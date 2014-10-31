@@ -16,7 +16,9 @@ formats. It is intended to facilitate academic writing in a cross-platform,
 semantic-aware, plaintext format that can be quickly used in modern publishing
 pipelines.
 
-You can test the HTML and LaTeX output of Scholdoc on small [ScholarlyMarkdown][scholmd] snippets using the online [Dingus][dingus] (limited to input of <10,000 characters).
+You can test the HTML and LaTeX output of Scholdoc on small (limited to 10,000
+characters) [ScholarlyMarkdown][scholmd] snippets using the online
+[Dingus][dingus].
 
 Scholdoc is implemented as fork of [Pandoc][pandoc], and mostly retains the
 same user interface (including the custom [template][pandocTemplate] and
