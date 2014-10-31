@@ -129,4 +129,5 @@ The Docx writer currently isn't fully functional yet. It does not yet output str
 [Homebrew]: http://brew.sh
 [hvr-PPA]: https://launchpad.net/~hvr/+archive/ubuntu/ghc
 [homebrew-scholdoc]: https://github.com/timtylin/homebrew-scholdoc/
+[dingus]: http://scholarlymarkdown.com/dingus/
 
