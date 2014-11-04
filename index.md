@@ -3,7 +3,7 @@ layout: index
 title: Scholdoc | a fork of Pandoc that understands ScholarlyMarkdown
 ---
 
-### Converts [ScholarlyMarkdown][scholmd] documents into HTML5, LaTeX, or Docx
+### Scholdoc converts [ScholarlyMarkdown][scholmd] documents into HTML5, LaTeX, or Docx
 
 **Current stable version:** 0.1.3
 
@@ -36,9 +36,9 @@ Scholdoc is currently up to date with [Pandoc][pandoc] version 1.13.1 (commit 8b
 
 ### Installing Scholdoc
 
-#### Via Homebrew (OSX only)
+#### Via Homebrew (OS X only)
 
-On OSX, the easiest way to obtain Scholdoc is from the official
+On OS X, the easiest way to obtain Scholdoc is from the official
 [Homebrew][Homebrew] [tap][homebrew-scholdoc]. First make sure you have
 [Homebrew][Homebrew] set-up correctly on your system, and that running `brew
 doctor` gives you no serious warnings. After that, run the following:
@@ -52,7 +52,11 @@ To upgrade to the latest release, just run
     brew update
     brew upgrade scholdoc scholdoc-citeproc
 
-#### Via Hackage (all operating systems)
+#### Via pre-built binary distribution
+
+Pre-built binary distributions exist for some platforms. Check the [download](/download/) page to see the list of available builds.
+
+#### Compile via Hackage (all operating systems)
 
 Scholdoc is written in pure Haskell. It requires the [GHC] compiler and the
 [cabal-install] build system. The easiest way to get it on all platforms is by
