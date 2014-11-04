@@ -1,0 +1,113 @@
+﻿<?xml version="1.0"?>
+<?define UpgradeCode = "E8CE4EE9-D146-4280-AE95-FA5392879815" ?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+  UpgradeCode="$(var.UpgradeCode)" Name="Scholdoc $(var.VERSION)"
+  Version="$(var.VERSION)" Manufacturer="Tim T.Y. Lin"
+  Language="1033">
+
+    <Package InstallerVersion="200" Compressed="yes" InstallScope="perUser"
+    Comments="Windows Installer Package" />
+    <Media Id="1" Cabinet="product.cab" EmbedCab="yes" />
+    <Property Id="PREVIOUSVERSIONSINSTALLED" Secure="yes" />
+    <Upgrade Id="$(var.UpgradeCode)">
+      <UpgradeVersion Property='PREVIOUSVERSIONSINSTALLED'
+        Minimum='0.0.0.0'  IncludeMinimum='yes'
+        Maximum="99.0.0.0" IncludeMaximum="no" />
+    </Upgrade>
+    <Property Id="ARPURLINFOABOUT" Value="http://scholdoc.scholarlymarkdown.com" />
+
+    <InstallExecuteSequence>
+      <RemoveExistingProducts After="InstallFinalize"/>
+    </InstallExecuteSequence>
+
+    <Property Id="DISABLEADVTSHORTCUTS" Value="1" />
+
+    <CustomAction Id="SetPerUserFolder" Property="APPLICATIONFOLDER" Value="[LocalAppDataFolder]Scholdoc" Execute="immediate" />
+    <CustomAction Id="SetPerMachineFolder" Property="APPLICATIONFOLDER" Value="[ProgramFilesFolder]Scholdoc" Execute="immediate" />
+    <InstallExecuteSequence>
+      <Custom Action="SetPerUserFolder" Before="CostFinalize">ACTION="INSTALL" AND APPLICATIONFOLDER="" AND (ALLUSERS="" OR (ALLUSERS=2 AND (NOT Privileged)))</Custom>
+      <Custom Action="SetPerMachineFolder" After="SetPerUserFolder">ACTION="INSTALL" AND APPLICATIONFOLDER="" AND (ALLUSERS=1 OR (ALLUSERS=2 AND Privileged))</Custom>
+    </InstallExecuteSequence>
+    <InstallUISequence>
+      <Custom Action="SetPerUserFolder" Before="CostFinalize">ACTION="INSTALL" AND APPLICATIONFOLDER="" AND (ALLUSERS="" OR (ALLUSERS=2 AND (NOT Privileged)))</Custom>
+      <Custom Action="SetPerMachineFolder" After="SetPerUserFolder">ACTION="INSTALL" AND APPLICATIONFOLDER="" AND (ALLUSERS=1 OR (ALLUSERS=2 AND Privileged))</Custom>
+    </InstallUISequence>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="APPLICATIONFOLDER" Name="Scholdoc">
+          <Component Id="MainExecutable"
+          Guid="AB452889-9A83-48BD-A8D5-965CE0D76ECD">
+            <RegistryValue Root="HKMU" Key="Software\Scholdoc\Scholdoc"
+            Name="Version" Type="string" Value="[ProductVersion]" KeyPath="yes"/>
+            <RemoveFolder Id="APPLICATIONFOLDER" On="uninstall"/>
+            <File Id="scholdocEXE" Name="scholdoc.exe"
+            Source="..\.cabal-sandbox\bin\scholdoc.exe" />
+            <File Id="scholdocCOPYRIGHT" Name="COPYRIGHT.txt"
+            Source="..\COPYRIGHT.txt" />
+            <File Id="scholdocCOPYING" Name="COPYING.rtf"
+            Source=".\COPYING.rtf" />
+          </Component>
+
+          <Component Id="CitationSupport"
+          Guid="CCE2A38A-0395-44F3-8FC0-AD5961193CDF">
+            <RegistryValue Root="HKMU" Key="Software\Scholdoc\Scholdoc"
+            Name="Version" Type="string" Value="[ProductVersion]" KeyPath="yes"/>
+            <File Id="scholdoc_citeprocEXE" Name="scholdoc-citeproc.exe"
+            Source="..\.cabal-sandbox\bin\scholdoc-citeproc.exe" />
+          </Component>
+
+          <Component Id="UpdatePathUser"
+            Guid="4DCC539B-6B5F-43F3-A883-CE4C03DEEA44">
+            <Condition><![CDATA[ ALLUSERS="" OR (ALLUSERS=2 AND (NOT Privileged)) ]]></Condition>
+            <Environment Id="UpdatePathUser" Name="PATH" Action="set"
+            Part="last" Value="[APPLICATIONFOLDER]" System="no" />
+            <RegistryValue Root="HKCU" Key="Software\Scholdoc\Scholdoc"
+            Name="UserPathUpdated" Type="integer" Value="1" KeyPath="yes"/>
+          </Component>
+
+          <Component Id="UpdatePathMachine"
+            Guid="B63A1DFF-D626-41A4-BED2-C8ABA7F1611D">
+            <Condition><![CDATA[ ALLUSERS=1 OR (ALLUSERS=2 AND Privileged) ]]></Condition>
+            <Environment Id="UpdatePathMachine" Name="PATH" Action="set"
+            Part="last" Value="[APPLICATIONFOLDER]" System="yes" />
+            <RegistryValue Root="HKLM" Key="Software\Scholdoc\Scholdoc"
+            Name="SystemPathUpdated" Type="integer" Value="1" KeyPath="yes"/>
+          </Component>
+
+        </Directory>
+      </Directory>
+
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="Scholdoc">
+          <Component Id="ApplicationShortcut" Guid="52D713F9-BF34-4276-AC30-75D84EBCF7B4">
+            <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall"/>
+            <RegistryValue Root="HKMU" Key="Software\Scholdoc\Scholdoc"
+            Name="ShortcutInstalled" Type="integer" Value="1" KeyPath="yes"/>
+          </Component>
+        </Directory>
+      </Directory>
+
+    </Directory>
+
+    <Feature Id="Complete" Level="1" Title="Scholdoc $(var.VERSION)" Description="Complete package"  Display="expand" ConfigurableDirectory="APPLICATIONFOLDER">
+      <Feature Id="MainProgram" Title="Program" Description="The main executable." Level="1">
+        <ComponentRef Id="MainExecutable" />
+        <ComponentRef Id="UpdatePathUser" />
+        <ComponentRef Id="UpdatePathMachine" />
+        <ComponentRef Id="ApplicationShortcut" />
+      </Feature>
+      <Feature Id="Citation" Title="Citation Support" Description="Citation support.">
+        <ComponentRef Id="CitationSupport" />
+      </Feature>
+    </Feature>
+
+    <Property Id="WIXUI_INSTALLDIR" Value="APPLICATIONFOLDER" />
+    <UIRef Id="WixUI_Minimal" />
+    <UIRef Id="WixUI_ErrorProgressText" />
+    <WixVariable Id="WixUILicenseRtf" Value=".\COPYING.rtf" />
+
+  </Product>
+</Wix>
