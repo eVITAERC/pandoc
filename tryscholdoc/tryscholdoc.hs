@@ -35,7 +35,7 @@ app req respond = do
                                   if fromFormat == "markdown_strict"
                                      then T.pack "scholdoc (strict)"
                                      else T.pack "scholdoc"
-                               , T.pack "version" .= pandocVersion]
+                               , T.pack "version" .= scholdocVersion]
   respond $ responseLBS status200 [(hContentType,"text/json; charset=UTF-8")] output
 
 checkLength :: Text -> IO Text

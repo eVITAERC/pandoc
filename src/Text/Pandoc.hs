@@ -86,6 +86,7 @@ module Text.Pandoc
                -- * Rendering templates and default templates
                , module Text.Pandoc.Templates
                -- * Version
+               , scholdocVersion
                , pandocVersion
                -- * Miscellaneous
                , getReader
@@ -123,9 +124,13 @@ import Text.Parsec.Error
 import qualified Text.Pandoc.UTF8 as UTF8
 import Paths_scholdoc (version)
 
--- | Version number of pandoc library.
+-- | Version number of scholdoc library.
+scholdocVersion :: String
+scholdocVersion = showVersion version
+
+-- | Version number of the incorporated pandoc library (change at merge)
 pandocVersion :: String
-pandocVersion = showVersion version
+pandocVersion = "1.13.1"
 
 parseFormatSpec :: String
                 -> Either ParseError (String, Set Extension -> Set Extension)
