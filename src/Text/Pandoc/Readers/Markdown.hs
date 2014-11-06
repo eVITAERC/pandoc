@@ -2102,7 +2102,7 @@ scholarlyDisplayMath = try $ do
   -- it's possible that we consumed all the eqns as definitions
   let processedEqn = case eqnList' of
                           []           -> Nothing
-                          singleEqn:[] -> Just (processSingleEqn singleEqn)
+                          [singleEqn]  -> Just (processSingleEqn singleEqn)
                           _            -> Just (processMultiEqn eqnList')
   case processedEqn of
     Just (eqn, idList) -> do
@@ -2194,8 +2194,7 @@ scholarlyFigure = try $ do
 figureAttribute :: MarkdownParser Attr
 figureAttribute = do
   manyTill anyChar $ lookAhead (try (optional attributes >> blankline))
-  attr <- option nullAttr attributes
-  return attr
+  option nullAttr attributes
 
 -- Figure captions consist of a single inline block/paragraph, are separated by
 -- a blank line from the figure content, and must begin with non-indented
@@ -2219,7 +2218,7 @@ figureContent "algorithm" = figureWithLineBlock
 figureContent "textbox" = figureWithLineBlock
 figureContent "listing" = figureWithCodeBlock
 figureContent "code" = figureWithCodeBlock
-figureContent _ = \_ -> mzero
+figureContent _ = const mzero
 
 -- A floating figure containing a grid of images (subfigures), needs special
 -- parsing code because each subfigure has its own identifier and attribute
@@ -2254,7 +2253,7 @@ figureWithImages attr = try $ do
                     ]
   let subfigRowsOnlyImages = map fst subfigRows
   let imgContent = liftM B.imageGrid (sequence subfigRowsOnlyImages)
-  let attrUpdater = \a ->  foldr ($) a attrActions
+  let attrUpdater a = foldr ($) a attrActions
   return (ImageFigure, attrUpdater attr, imgContent)
 
 -- A floating figure containing a single table
@@ -2262,10 +2261,10 @@ figureWithTable :: Attr -> MarkdownParser (FigureType, Attr, F Blocks)
 figureWithTable attr = try $ do
   tabl <- table'
   state <- getState
-  let tblIdSetter = \ids idList -> ids{idsForTables = idList}
+  let tblIdSetter ids idList = ids{idsForTables = idList}
   let (attrSetLabel, stAddId) = figureIdToNumLabelHandler attr state idsForTables tblIdSetter
   updateState stAddId
-  let attrUpdater = \a ->  foldr ($) a [attrSetLabel]
+  let attrUpdater a = foldr ($) a [attrSetLabel]
   return (TableFigure, attrUpdater attr, tabl)
 
 -- A floating figure containing a rST-type line block
@@ -2273,10 +2272,10 @@ figureWithLineBlock :: Attr -> MarkdownParser (FigureType, Attr, F Blocks)
 figureWithLineBlock attr = try $ do
   lineBlks <- many1 lineBlock'
   state <- getState
-  let algIdSetter = \ids idList -> ids{idsForAlgorithms = idList}
+  let algIdSetter ids idList = ids{idsForAlgorithms = idList}
   let (attrSetLabel, stAddId) = figureIdToNumLabelHandler attr state idsForAlgorithms algIdSetter
   updateState stAddId
-  let attrUpdater = \a ->  foldr ($) a [attrSetLabel]
+  let attrUpdater a = foldr ($) a [attrSetLabel]
   return (LineBlockFigure, attrUpdater attr, mconcat lineBlks)
 
 -- A floating figure containing a pre-formatted code block
@@ -2284,10 +2283,10 @@ figureWithCodeBlock :: Attr -> MarkdownParser (FigureType, Attr, F Blocks)
 figureWithCodeBlock attr = try $ do
   (codeAttr, codeContent) <- codeBlockFenced' <|> codeBlockIndented'
   state <- getState
-  let lstIdSetter = \ids idList -> ids{idsForCodeBlocks = idList}
+  let lstIdSetter ids idList = ids{idsForCodeBlocks = idList}
   let (attrSetLabel, stAddId) = figureIdToNumLabelHandler attr state idsForCodeBlocks lstIdSetter
   updateState stAddId
-  let attrUpdater = \a ->  foldr ($) a [attrSetLabel]
+  let attrUpdater a = foldr ($) a [attrSetLabel]
   let codeblock = B.codeBlockWith codeAttr codeContent
   return (ListingFigure, attrUpdater attr, return codeblock)
 

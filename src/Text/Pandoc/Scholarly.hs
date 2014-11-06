@@ -155,7 +155,7 @@ processMultiEqn :: [AttributedMath] -> (AttributedMath, [String])
 processMultiEqn eqnList =
   let processors = [ensureNonumber " ",
                     ensureLabeled " ",
-                    id *** trim]
+                    second trim]
       processedEqnList = foldr map eqnList processors
       labels = map (getIdentifier . fst) eqnList
   in (concatMultiEquations processedEqnList, labels)
@@ -278,6 +278,6 @@ figureIdToNumLabelHandler attr state idListGetter idListSetter =
                       then length (filter (/= "") $ idListGetter xrefIds) + 1
                       else 0 -- will never be displayed anyways
       newXrefIds = idListSetter xrefIds (idListGetter xrefIds ++ [myIdentifier])
-      stateUpdater = \s -> s{ stateXRefIdents = newXrefIds }
+      stateUpdater s = s{ stateXRefIdents = newXrefIds }
       attrUpdater = insertReplaceKeyValIf needId ("numLabel", show myNumLabel)
   in (attrUpdater, stateUpdater)

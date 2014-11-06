@@ -1029,19 +1029,19 @@ main = do
 
   let preventScholarly = "--emulate-pandoc" `elem` rawArgs
 
-  let defaultOpts' = if compatMode
-                       then defaultOpts { optReader = "markdown_strict"
-                                        , optWriter = "html"
-                                        , optEmailObfuscation =
+  let defaultOpts'
+        | compatMode = defaultOpts { optReader = "markdown_strict"
+                                   , optWriter = "html"
+                                   , optEmailObfuscation =
                                            ReferenceObfuscation }
-                       else if scholarlyPandoc && not preventScholarly
-                            then defaultOpts { optReader = "markdown_scholarly"
-                                             , optSmart = True
-                                             , optParseRaw = True
-                                             , optStandalone = True
-                                             , optHTMLMathMethod = MathJax ""
-                                             }
-                            else defaultOpts
+        | scholarlyPandoc && not preventScholarly =
+                       defaultOpts { optReader = "markdown_scholarly"
+                                   , optSmart = True
+                                   , optParseRaw = True
+                                   , optStandalone = True
+                                   , optHTMLMathMethod = MathJax ""
+                                   }
+        | otherwise = defaultOpts
 
   -- thread option data structure through all supplied option actions
   opts <- foldl (>>=) (return defaultOpts') actions
@@ -1141,9 +1141,8 @@ main = do
                           "html4"  -> "html"
                           x        -> x
 
-  let scholarlyMode = if readerName' == "markdown_scholarly"
-                         then True
-                         else False
+  let scholarlyMode = readerName' == "markdown_scholarly"
+
 
   -- postepending "_bodyonly" to a writer enables a special "body-only" template
   let (writerNameTrim, bodyOnly) = case T.stripSuffix (T.pack "_bodyonly")

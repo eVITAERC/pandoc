@@ -1010,23 +1010,21 @@ imageGridToLaTeX attr imageGrid _fallback caption = do
   modify $ \s -> s{ stFloats = True }
   modify $ \s -> s{ stGraphics = True }
   let ident = getIdentifier attr
-  let (subfigRows, snglImg) = case (head imageGrid) of
+  let (subfigRows, snglImg) = case head imageGrid of
                               -- get rid of any subcaption and label for single image
                                 ImageGrid [[Image a _ c]]
                                              -> ([[Image (setIdentifier "" a) [] c]], True)
                                 ImageGrid ig -> (ig, False)
                                 _ -> ([[]], True) -- should never happen
-  when (not snglImg) $ modify $ \s -> s{ stSubfigs = True }
-  let subfigIds = case (safeRead $ fromMaybe [] $ lookupKey "subfigIds" attr) :: Maybe [String] of
-                      Just a -> a
-                      Nothing -> [""]
+  unless snglImg $ modify $ \s -> s{ stSubfigs = True }
+  let subfigIds = fromMaybe [""] ((safeRead $ fromMaybe [] $ lookupKey "subfigIds" attr) :: Maybe [String])
   -- show subfig labels (a), (b), etc
   let showSubfigLabel = any (not . null) subfigIds && not (hasClass "nonumber" attr)
   let subfiglist = intercalate [LineBreak] subfigRows
   let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
   let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
   -- this requires the "caption" package which is provided by "subfig"
-  let capstar = if (not addCaptPrefix) then text "*" else empty
+  let capstar = if not addCaptPrefix then text "*" else empty
   let widestar = if hasClass "wide" attr then text "*" else empty
   let fullWidth = "\\hsize"
   capt <- if null caption
@@ -1034,7 +1032,7 @@ imageGridToLaTeX attr imageGrid _fallback caption = do
              else (\c -> "\\caption" <> capstar <> braces c) `fmap` inlineListToLaTeX caption
   let capt' = if null caption && not addCaptPrefix then empty else capt
   img <- mapM (subfigsToLaTeX fullWidth snglImg) subfiglist
-  let label = if (not $ null ident) then ("\\label" <> braces (text ident)) else empty
+  let label = if not $ null ident then "\\label" <> braces (text ident) else empty
   let disableSubfigLabel = if showSubfigLabel || snglImg
                               then empty
                               else "\\captionsetup" <> brackets (text "subfigure")
@@ -1052,7 +1050,7 @@ subfigsToLaTeX fullWidth singleImage (Image attr txt (src,_)) = do
   capt <- if null txt
              then return empty
              else inlineListToLaTeX txt
-  let label = if (not $ null ident) then ("\\label" <> braces (text ident)) else empty
+  let label = if not $ null ident then "\\label" <> braces (text ident) else empty
   src' <- handleImageSrc src
   attr' <- setWidthFromHistory attr
   let img = imageWithAttrToLatex fullWidth attr' src' False
@@ -1077,7 +1075,7 @@ setWidthFromHistory attr = do
   let currWidth = if replaceWidth
                      then lastWidth
                      else attrWidth
-  when (not $ null currWidth) $ put st { stLastWidth = Just currWidth }
+  unless (null currWidth) $ put st { stLastWidth = Just currWidth }
   return $ insertReplaceKeyVal ("width",currWidth) attr
 
 -- Extracts dimension attributes and include in the @includegraphics@ directive
@@ -1096,9 +1094,9 @@ imageWithAttrToLatex fullWidth attr src needProtect =
                    Nothing  -> case M.lookup "max-height" keyval' of
                                     Just len -> filterLength fullWidth len
                                     Nothing  -> ""
-      width' = if (null width) then "" else ("width=" ++ width)
-      hight' = if (null hight) then "" else ("height=" ++ hight)
-      keepAspectRatio = if (not (null width) && not (null hight))
+      width' = if null width then "" else "width=" ++ width
+      hight' = if null hight then "" else "height=" ++ hight
+      keepAspectRatio = if not (null width) && not (null hight)
                            then "keepaspectratio=true"
                            else ""
       graphicxAttr = intercalate ","
@@ -1131,14 +1129,14 @@ algorithmToLaTeX attr alg _fallback caption = do
   let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
   let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
   -- this requires the "caption" package which is provided by "subfig"
-  let capstar = if (not addCaptPrefix) then text "*" else empty
+  let capstar = if not addCaptPrefix then text "*" else empty
   let widestar = if hasClass "wide" attr then text "*" else empty
   capt <- if null caption
              then return empty
              else (\c -> "\\caption" <> capstar <> braces c) `fmap` inlineListToLaTeX caption
   let capt' = if null caption && not addCaptPrefix then empty else capt
   algorithm <- blockListToLaTeX alg
-  let label = if (not $ null ident) then ("\\label" <> braces (text ident)) else empty
+  let label = if not $ null ident then "\\label" <> braces (text ident) else empty
   return $ "\\begin{scholmdAlgorithm" <> widestar <> "}" $$ algorithm
            $$ capt' <> label $$ "\\end{scholmdAlgorithm" <> widestar <> "}"
 
@@ -1150,14 +1148,14 @@ tableFloatToLaTeX attr tabl _fallback caption = do
   let myNumLabel = fromMaybe "0" $ lookupKey "numLabel" attr
   let addCaptPrefix = myNumLabel /= "0" -- infers that num. label is not needed
   -- this requires the "caption" package which is provided by "subfig"
-  let capstar = if (not addCaptPrefix) then text "*" else empty
+  let capstar = if not addCaptPrefix then text "*" else empty
   let widestar = if hasClass "wide" attr then text "*" else empty
   capt <- if null caption
              then return empty
              else (\c -> "\\caption" <> capstar <> braces c) `fmap` inlineListToLaTeX caption
   let capt' = if null caption && not addCaptPrefix then empty else capt
   table <- mapM tableToTabular tabl
-  let label = if (not $ null ident) then ("\\label" <> braces (text ident)) else empty
+  let label = if not $ null ident then "\\label" <> braces (text ident) else empty
   return $ "\\begin{table" <> widestar <> "}" $$ "\\centering" $$ foldl ($$) empty table
            $$ capt' <> label $$ "\\end{table" <> widestar <> "}"
 
@@ -1169,9 +1167,9 @@ tableToTabular (Table _caption aligns widths heads rows) = do
                 else ($$ "\\midrule") `fmap`
                       (tableRowToLaTeX True aligns widths) heads
   rows' <- mapM (tableRowToLaTeX False aligns widths) rows
-  let colDescriptors = text $ concat $ map toColDescriptor aligns
+  let colDescriptors = text $ concatMap toColDescriptor aligns
   return $ "\\begin{tabular}" <>
-              braces (colDescriptors)
+              braces colDescriptors
          $$ "\\toprule\\addlinespace"
          $$ headers
          $$ vcat rows'
