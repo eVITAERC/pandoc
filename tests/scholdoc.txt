@@ -173,13 +173,14 @@ Below is more text so that the css doesn't end abruptly! Now we'll have an expli
 
 #### Figure: this text is completely ignored {#figure0}
 ![](lunar_orbit.jpg){width=50%}
-: Single-image figure. You can also have citations inside captions [@Gill].
+caption: Single-image figure. You can also have citations inside captions [@Gill].
 
 #### Figure: this text is completely ignored {#figure1}
 ![sub](lunar_orbit.jpg){#reginfig1 width=20%}
 ![subfig](lunar_orbit.jpg){width=same}
 ![longer subcaption that flows](lunar_orbit.jpg){#reginfig3 width=same}
-: Reference link in its own paragraph and long caption Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. 
+
+Caption: Reference link in its own paragraph and long caption Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. 
 
 #### Figure: everything until the attribute block is ignored {#figure2 .wide}
 ![fdsaf](lunar_orbit.jpg){#reginfig4 width=40%}
@@ -208,7 +209,7 @@ Here are some algorithms using various methods. The "most canonical one" is curr
 | `14.`    check if convergence is reached
 | `15.` **end** (repeat)
 
-: caption for this algorithm
+Caption: caption for this algorithm
 
 #### Algorithm: Gauss-sidel using `line-blocks` {#alg:gs2}
 
@@ -249,7 +250,7 @@ The should not be a caption
 |       **end** (``i``-loop)
 |       check if convergence is reached
 |  **end** (repeat)
-This should should be a caption
+caption: This should should be a caption
 
 ## Abstract:
 
@@ -283,7 +284,7 @@ The following is a floated ScholMD table
 |  123  |  123 |   123   |   123  |
 |    1  |    1 |     1   |     1  |
 
-:   This is a really really really really really
+caption:   This is a really really really really really
     really really really really really really really
     really really really really really really really really
     really really really really really really really long caption
