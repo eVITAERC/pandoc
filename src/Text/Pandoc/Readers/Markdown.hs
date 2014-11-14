@@ -1176,8 +1176,8 @@ alignType strLst len =
         (False, False)   -> AlignDefault
 
 -- Parse a table footer - dashed lines followed by blank line.
-tableFooter :: MarkdownParser String
-tableFooter = try $ skipNonindentSpaces >> many1 (dashedLine '-') >> blanklines
+tableFooter :: MarkdownParser Char
+tableFooter = try $ skipNonindentSpaces >> many1 (dashedLine '-') >> blankline
 
 -- Parse a table separator - dashed line.
 tableSep :: MarkdownParser Char
@@ -1187,7 +1187,7 @@ tableSep = try $ skipNonindentSpaces >> many1 (dashedLine '-') >> char '\n'
 rawTableLine :: [Int]
              -> MarkdownParser [String]
 rawTableLine indices = do
-  notFollowedBy' (blanklines <|> tableFooter)
+  notFollowedBy' (blankline <|> tableFooter)
   line <- many1Till anyChar newline
   return $ map trim $ tail $
            splitStringByIndices (init indices) line
@@ -1222,7 +1222,7 @@ simpleTable headless = do
   (aligns, _widths, heads', lines') <-
        tableWith (simpleTableHeader headless) tableLine
               (return ())
-              (if headless then tableFooter else tableFooter <|> blanklines)
+              (if headless then tableFooter else tableFooter <|> blankline)
   -- Simple tables get 0s for relative column widths (i.e., use default)
   return (aligns, replicate (length aligns) 0, heads', lines')
 
@@ -1343,8 +1343,8 @@ removeOneLeadingSpace xs =
          startsWithSpace (y:_) = y == ' '
 
 -- | Parse footer for a grid table.
-gridTableFooter :: MarkdownParser [Char]
-gridTableFooter = blanklines
+gridTableFooter :: MarkdownParser Char
+gridTableFooter = blankline
 
 pipeBreak :: MarkdownParser [Alignment]
 pipeBreak = try $ do
