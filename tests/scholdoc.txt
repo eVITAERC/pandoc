@@ -288,6 +288,21 @@ The following is a floated ScholMD table
     really really really really really really really really
     really really really really really really really long caption
 
+### Block elements after table footers
+
+Table footers in a float should not consume more than one blank line, otherwise
+subsequent block elements could be parsed as figure captions.
+
+#### Table: the following `***` should be parsed as `hrule`
+
+| Right | Left | Default | Center |
+|------:|:-----|---------|:------:|
+|   12  |  12  |    12   |    12  |
+|  123  |  123 |   123   |   123  |
+|    1  |    1 |     1   |     1  |
+
+***
+
 ## ScholarlyMarkdown Code blocks
 
 ### Standard Pandoc code blocks

@@ -273,6 +273,41 @@ f &amp;= kg^{-1}
 </table></div>
 <div class="scholmd-float-caption"><figcaption><span class="scholmd-caption-head"><span class="scholmd-caption-head-prefix">Table</span><span class="scholmd-caption-head-label">1</span></span><span class="scholmd-caption-text">This is a really really really really really really really really really really really really really really really really really really really really really really really really really really really long caption</span></figcaption></div>
 </figure>
+<h3 id="block-elements-after-table-footers">Block elements after table footers</h3>
+<p>Table footers in a float should not consume more than one blank line, otherwise subsequent block elements could be parsed as figure captions.</p>
+<figure class="scholmd-float scholmd-table-float">
+<div class="scholmd-float-content"><table>
+<thead>
+<tr class="header">
+<th style="text-align: right;">Right</th>
+<th style="text-align: left;">Left</th>
+<th style="text-align: left;">Default</th>
+<th style="text-align: center;">Center</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">12</td>
+<td style="text-align: left;">12</td>
+<td style="text-align: left;">12</td>
+<td style="text-align: center;">12</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">123</td>
+<td style="text-align: left;">123</td>
+<td style="text-align: left;">123</td>
+<td style="text-align: center;">123</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: center;">1</td>
+</tr>
+</tbody>
+</table></div>
+</figure>
+<hr />
 <h2 id="scholarlymarkdown-code-blocks">ScholarlyMarkdown Code blocks</h2>
 <h3 id="standard-pandoc-code-blocks">Standard Pandoc code blocks</h3>
 <h4 id="fenced-blocks">fenced blocks</h4>
