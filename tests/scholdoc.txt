@@ -58,7 +58,8 @@ And here is an implicit gather math environment consisting of multiple lines of 
     \end{aligned}
     \right\} \quad \textsf{Maxwell's equations}
 ```
-```math {#secondGatherMathNumber}
+```math  
+   {#secondGatherMathNumber}
 A = B
 ```
 ```math {#thirdgathernumber}

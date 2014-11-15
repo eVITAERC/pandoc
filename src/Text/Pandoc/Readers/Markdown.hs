@@ -2144,9 +2144,7 @@ fencedCodeEquation = try $ do
             try (guardEnabled Ext_fenced_code_attributes >> attributes)
            <|> do
                cls <- identifier
-               label <- option [] $
-                 try (optional blankline >> skipSpaces >> char '#' >> identifier)
-                 <|> try (skipSpaces >> inBraces (char '#' >> identifier))
+               label <- equationLabel
                return (label,[cls],[])
   guard $ classIsMath attr
   blankline
@@ -2162,14 +2160,17 @@ doubleDollarEquation = try $ do
   skipSpaces
   attr <- do
           cls <- option "math" $ try identifier
-          label <- option [] $
-            try (optional blankline >> skipSpaces >> char '#' >> identifier)
-            <|> try (skipSpaces >> inBraces (char '#' >> identifier))
+          label <- equationLabel
           return (label,[cls],[])
   guard $ classIsMath attr
   blanklines
   contents <- manyTill anyLine delimitr
   return (attr, intercalate "\n" $ filter (not . null) contents)
+
+equationLabel :: MarkdownParser String
+equationLabel = option [] $ try $ optional blankline >> skipSpaces >>
+                  (try lab <|> inBraces lab)
+                where lab = char '#' >> identifier
 
 addMathDefsToState :: AttributedMath -> MarkdownParser ()
 addMathDefsToState (attr, mathDef) = do
