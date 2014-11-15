@@ -1783,9 +1783,12 @@ referenceLink :: (Attr -> String -> String -> Inlines -> Inlines)
               -> (F Inlines, String) -> MarkdownParser (F Inlines)
 referenceLink constructor (lab, raw) = do
   sp <- (True <$ lookAhead (char ' ')) <|> return False
-  (ref,raw') <- try
-           (skipSpaces >> optional (newline >> skipSpaces) >> reference)
-           <|> return (mempty, "")
+  (ref,raw') <- try $ do
+            let sps = skipSpaces >> optional (newline >> skipSpaces)
+            let followedByCite = try (sps >> normalCite)
+            iscite <- (True <$ lookAhead followedByCite) <|> return False
+            if iscite then return (mempty, "")
+               else try (sps >> reference) <|> return (mempty, "")
   attr <- option nullAttr (try $ optional spaceChar >> attributes)
   let labIsRef = raw' == "" || raw' == "[]"
   let key = toKey $ if labIsRef then raw else raw'
