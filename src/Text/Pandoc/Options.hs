@@ -234,7 +234,6 @@ scholarlyMarkdownExtensions = Set.fromList
   , Ext_intraword_underscores
   , Ext_blank_before_blockquote
   , Ext_blank_before_header
-  , Ext_strikeout
   , Ext_superscript
   , Ext_subscript
   , Ext_auto_identifiers
