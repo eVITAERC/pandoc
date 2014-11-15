@@ -1962,6 +1962,7 @@ cite = do
 textualCite :: MarkdownParser (F Inlines)
 textualCite = try $ do
   (_, key) <- citeKey
+  when (key == "done") $ notFollowedBy' blankline -- used to mark done in tasklists
   let first = Citation{ citationId      = key
                       , citationPrefix  = []
                       , citationSuffix  = []
