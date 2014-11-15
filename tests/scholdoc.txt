@@ -78,12 +78,18 @@ y &= ax \\
 f &= kg^{-1}
 ```
 
-The following has an ampersand and line breaks in comma, but is actually a single-line equation that should be untouched:
+The following has an ampersand and line breaks in comments, but is actually a
+single-line equation that should be untouched (also note how blank lines are
+stripped):
 
 ```math
 |y|\ \&\ |x| % an & and \\ that should be ignored
+
+
 = 99\% z    % an & and \\ that should be ignored
+
 ```
+
 Below is more internal vertical alignment tests. The first is one that uses `cases` internally:
 ```math
     #matheqn2

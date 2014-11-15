@@ -83,8 +83,9 @@ f &= kg^{-1}
 \end{aligned}
 \end{equation*}
 %
- The following has an ampersand and line breaks in comma, but is
-actually a single-line equation that should be untouched:
+ The following has an ampersand and line breaks in comments, but is
+actually a single-line equation that should be untouched (also note how
+blank lines are stripped):
 %
 \begin{equation*}
 |y|\ \&\ |x| % an & and \\ that should be ignored

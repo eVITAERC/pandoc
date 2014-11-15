@@ -2150,7 +2150,7 @@ fencedCodeEquation = try $ do
   guard $ classIsMath attr
   blankline
   contents <- manyTill anyLine (blockDelimiter (== c) (Just size))
-  return (attr, intercalate "\n" contents)
+  return (attr, intercalate "\n" $ filter (not . null) contents)
 
 -- DisplayMath delimited by double dollar signs
 -- only match if class of fenced code block starts with math
@@ -2168,7 +2168,7 @@ doubleDollarEquation = try $ do
   guard $ classIsMath attr
   blanklines
   contents <- manyTill anyLine delimitr
-  return (attr, intercalate "\n" contents)
+  return (attr, intercalate "\n" $ filter (not . null) contents)
 
 addMathDefsToState :: AttributedMath -> MarkdownParser ()
 addMathDefsToState (attr, mathDef) = do
