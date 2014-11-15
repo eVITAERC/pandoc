@@ -1786,7 +1786,7 @@ referenceLink constructor (lab, raw) = do
   (ref,raw') <- try
            (skipSpaces >> optional (newline >> skipSpaces) >> reference)
            <|> return (mempty, "")
-  attr <- option nullAttr attributes
+  attr <- option nullAttr (try $ optional spaceChar >> attributes)
   let labIsRef = raw' == "" || raw' == "[]"
   let key = toKey $ if labIsRef then raw else raw'
   parsedRaw <- parseFromString (mconcat <$> many inline) raw'
