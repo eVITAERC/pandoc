@@ -189,8 +189,8 @@ caption: Single-image figure. You can also have citations inside captions [@Gill
 Caption: Reference link in its own paragraph and long caption Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. 
 
 #### Figure: everything until the attribute block is ignored {#figure2 .wide}
-![fdsaf](lunar_orbit.jpg){#reginfig4 width=40%}
-![woogawooga](lunar_orbit.jpg){#reginfig5 width=30%}
+![fdsaf](lunar_orbit.jpg) {#reginfig4 width=40%}
+![woogawooga](lunar_orbit.jpg) {#reginfig5 width=30%}
 Reference link in its own paragraph and long caption Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. 
 
 ## ScholarlyMarkdown Algorithms

@@ -1775,7 +1775,7 @@ regLink :: (Attr -> String -> String -> Inlines -> Inlines)
         -> F Inlines -> MarkdownParser (F Inlines)
 regLink constructor lab = try $ do
   (src, tit) <- source
-  attr <- option nullAttr attributes
+  attr <- option nullAttr (try $ optional spaceChar >> attributes)
   return $ constructor attr src tit <$> lab
 
 -- a link like [this][ref] or [this][] or [this]
