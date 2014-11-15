@@ -148,9 +148,11 @@ f &amp;= kg^{-1}
 <p>This line refers to Equation <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\eqref{matheqn3}\)</span></span>.</p>
 <p>Referencing using the <code>\ref</code> tag: Equation <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\ref{matheqn1}\)</span></span>.</p>
 <p>Referencing using the <code>\eqref</code> tag: Equation <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\eqref{middleAlignMathNumber}\)</span></span>.</p>
+<p>Unknown references like [#thisdoesnotexist] and #thisdoesnotexist and (#thisdoesnotexist) are not parsed as x-refs.</p>
 <h3 id="automatic-non-breaking-spaces">Automatic non-breaking spaces</h3>
 <p>Any cross-references (such as Equation <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\ref{middleAlignMathNumber}\)</span></span>) will automatically be prepended with non-breaking spaces.</p>
 <p>Unless, they appear in a list like equations <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\ref{matheqn1}\)</span></span>, <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\ref{matheqn2}\)</span></span>, <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\ref{matheqn3}\)</span></span>, and <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\ref{middleAlignMathNumber}\)</span></span>.</p>
+<p>You can mix x-ref types, like <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\ref{matheqn1}\)</span></span>, <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\ref{matheqn1}\)</span></span>, and <span class="scholmd-crossref"><span class="math scholmd-math-inline">\(\eqref{matheqn1}\)</span></span>.</p>
 <h2 id="scholarlymarkdown-figures">ScholarlyMarkdown Figures</h2>
 <h3 id="images-with-attributes">Images with attributes</h3>
 <p>The following will be a bunch of figures with attributes: <img src="lunar_orbit.jpg" alt="Regular link with attributes" id="reglink" width="20%" /> <img src="lunar_orbit.jpg" alt="Reference link with attributes" id="reflink" width="20%" /> Which should all show fine and display a picture with a baby seal.</p>

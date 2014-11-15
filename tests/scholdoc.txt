@@ -154,6 +154,8 @@ Referencing using the `\ref` tag: Equation [#matheqn1].
 
 Referencing using the `\eqref` tag: Equation (#middleAlignMathNumber).
 
+Unknown references like [#thisdoesnotexist] and #thisdoesnotexist and (#thisdoesnotexist) are not parsed as x-refs.
+
 ### Automatic non-breaking spaces
 
 Any cross-references (such as Equation [#middleAlignMathNumber]) will
@@ -161,6 +163,8 @@ automatically be prepended with non-breaking spaces.
 
 Unless, they appear in a list like equations [#matheqn1], [#matheqn2],
 [#matheqn3], and [#middleAlignMathNumber].
+
+You can mix x-ref types, like #matheqn1, [#matheqn1], and (#matheqn1).
 
 ## ScholarlyMarkdown Figures
 

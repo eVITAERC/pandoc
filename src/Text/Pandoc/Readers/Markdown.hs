@@ -2365,22 +2365,29 @@ scholarlyXRef = ensureScholarlyMarkdown >>
 
 scholarlyPlainXRef :: MarkdownParser (F Inlines)
 scholarlyPlainXRef = try $ do
-  label <- string "[#" >> identifier <* char ']'
+  op <- option False (lookAhead (char '[') >> return True)
+  label <- try (char '#' >> identifier)
+          <|> try (string "[#" >> identifier <* char ']')
+  let raw = if op then ("[#" ++ label ++ "]") else ("#" ++ label)
   return $ do
     xRefs <- asksF stateXRefIdents
-    let defNumLabel = [Str $ getNumericalLabel label xRefs]
-    let refStyle = NumberedReference label PlainNumRef defNumLabel
-    return $ B.numRef refStyle $ "[#" ++ label ++ "]"
+    let numlabel = getNumericalLabel label xRefs
+    case numlabel of
+      Just numlabel' -> let refStyle = NumberedReference label PlainNumRef [Str numlabel']
+                        in return $ B.numRef refStyle raw
+      Nothing -> return $ B.str raw
 
 scholarlyParensXRef :: MarkdownParser (F Inlines)
 scholarlyParensXRef = try $ do
   label <- string "(#" >> identifier <* char ')'
+  let raw = "(#" ++ label ++ ")"
   return $ do
     xRefs <- asksF stateXRefIdents
-    let defNumLabel = [Str $ getNumericalLabel label xRefs]
-    let refStyle = NumberedReference label ParenthesesNumRef defNumLabel
-    return $ B.numRef refStyle $ "(#" ++ label ++ ")"
-
+    let numlabel = getNumericalLabel label xRefs
+    case numlabel of
+      Just numlabel' -> let refStyle = NumberedReference label ParenthesesNumRef [Str numlabel']
+                        in return $ B.numRef refStyle raw
+      Nothing -> return $ B.str raw
 --
 -- Scholarly Markdown statements
 --

@@ -975,7 +975,7 @@ defaultXRefIdentifiers =
                     idsForStatements = []}
 
 -- | Generate a default numerical label for numbered cross-references
-getNumericalLabel :: String -> XRefIdentifiers -> String
+getNumericalLabel :: String -> XRefIdentifiers -> Maybe String
 getNumericalLabel ident ids
   | ident `elem` (idsForMath ids) = numInIdList ident $ idsForMath ids
   | ident `elem` (idsForFigure ids) = numInIdList ident $ idsForFigure ids
@@ -984,20 +984,19 @@ getNumericalLabel ident ids
           numSubfig = fromJust $ elemIndex ident $ fst ((idsForSubfigure ids) !! figId)
           numFig = snd ((idsForSubfigure ids) !! figId)
       in if length (fst $ (idsForSubfigure ids) !! figId) == 1
-            then (show numFig)
-            else (show numFig) ++ (alphEnum (numSubfig+1))
+            then Just (show numFig)
+            else Just $ (show numFig) ++ (alphEnum (numSubfig+1)) -- fails with more than 26
   | ident `elem` (idsForTables ids) = numInIdList ident $ idsForTables ids
   | ident `elem` (idsForAlgorithms ids) = numInIdList ident $ idsForAlgorithms ids
   | ident `elem` (idsForCodeBlocks ids) = numInIdList ident $ idsForCodeBlocks ids
   | ident `elem` (idsForStatements ids) = numInIdList ident $ idsForStatements ids
-  | otherwise = "#" ++ ident
+  | otherwise = Nothing
 
 -- | Show index in list stripped of empty entries
-numInIdList :: String -> [String] -> String
+numInIdList :: String -> [String] -> Maybe String
 numInIdList ident idList =
-  case (elemIndex ident $ filter (/= "") idList) of
-       Just index -> show (index + 1) -- elemIndex starts from zero
-       Nothing -> ""
+  dispfunc <$> (elemIndex ident $ filter (/= "") idList)
+  where dispfunc = show . (+) 1 -- elemIndex starts from zero
 
 instance Default ParserState where
   def = defaultParserState

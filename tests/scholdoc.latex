@@ -193,6 +193,9 @@ Equation~\ref{matheqn1}.
 Referencing using the \texttt{\textbackslash{}eqref} tag:
 Equation~\eqref{middleAlignMathNumber}.
 
+Unknown references like {[}\#thisdoesnotexist{]} and \#thisdoesnotexist
+and (\#thisdoesnotexist) are not parsed as x-refs.
+
 \subsection{Automatic non-breaking
 spaces}\label{automatic-non-breaking-spaces}
 
@@ -201,6 +204,9 @@ automatically be prepended with non-breaking spaces.
 
 Unless, they appear in a list like equations~\ref{matheqn1},
 \ref{matheqn2}, \ref{matheqn3}, and~\ref{middleAlignMathNumber}.
+
+You can mix x-ref types, like~\ref{matheqn1}, \ref{matheqn1},
+and~\eqref{matheqn1}.
 
 \section{ScholarlyMarkdown Figures}\label{scholarlymarkdown-figures}
 
