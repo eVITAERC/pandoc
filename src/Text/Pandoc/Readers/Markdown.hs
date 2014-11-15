@@ -119,6 +119,12 @@ isBlank _    = False
 -- auxiliary functions
 --
 
+-- | Succeeds when we're in list context.
+inList :: MarkdownParser ()
+inList = do
+  ctx <- stateParserContext <$> getState
+  guard (ctx == ListItemState)
+
 isNull :: F Inlines -> Bool
 isNull ils = B.isNull $ runF ils def
 
@@ -799,9 +805,9 @@ anyOrderedListStart = try $ do
   skipNonindentSpaces
   notFollowedBy $ string "p." >> spaceChar >> digit  -- page number
   res <- do guardDisabled Ext_fancy_lists
-            many1 digit
+            start <- many1 digit >>= safeRead
             char '.'
-            return (1, DefaultStyle, DefaultDelim)
+            return (start, DefaultStyle, DefaultDelim)
      <|> do (num, style, delim) <- anyOrderedListMarker
             -- if it could be an abbreviated first name,
             -- insist on more than one space
@@ -997,6 +1003,8 @@ para = try $ do
               <|> (guardEnabled Ext_backtick_code_blocks >> () <$ lookAhead codeBlockFenced)
               <|> (guardDisabled Ext_blank_before_header >> () <$ lookAhead header)
               <|> (guardEnabled Ext_lists_without_preceding_blankline >>
+                       -- Avoid creating a paragraph in a nested list.
+                       notFollowedBy' inList >>
                        () <$ lookAhead listStart)
               <|> do guardEnabled Ext_native_divs
                      inHtmlBlock <- stateInHtmlBlock <$> getState
@@ -1706,8 +1714,7 @@ endline = try $ do
   newline
   notFollowedBy blankline
   -- parse potential list-starts differently if in a list:
-  st <- getState
-  when (stateParserContext st == ListItemState) $ notFollowedBy listStart
+  notFollowedBy (inList >> listStart)
   guardDisabled Ext_lists_without_preceding_blankline <|> notFollowedBy listStart
   guardEnabled Ext_blank_before_blockquote <|> notFollowedBy emailBlockQuoteStart
   guardEnabled Ext_blank_before_header <|> notFollowedBy (char '#') -- atx header

@@ -482,12 +482,34 @@ uri = try $ do
 mathInlineCodeUntil :: Stream s m Char  => ParserT s st m String -> ParserT s st m [String]
 mathInlineCodeUntil cl = many1Till (
                                count 1 (noneOf " \t\n\\")
-                           <|> (char '\\' >> anyChar >>= \c -> return ['\\',c])
+                           <|> (char '\\' >>
+                             -- This next clause is needed because \text{..} can
+                             -- contain $, \(\), etc.
+                               (try (string "text" >>
+                                   (("\\text" ++) <$> inBalancedBraces 0 ""))
+                               <|>  (\c -> ['\\',c]) <$> anyChar))
                            <|> do (blankline <* notFollowedBy' blankline) <|>
                                      (oneOf " \t" <* skipMany (oneOf " \t"))
                                   notFollowedBy (char '$')
                                   return " "
                          ) (try $ cl)
+                         where
+                          inBalancedBraces :: Stream s m Char => Int -> String -> ParserT s st m String
+                          inBalancedBraces 0 "" = do
+                            c <- anyChar
+                            if c == '{'
+                               then inBalancedBraces 1 "{"
+                               else mzero
+                          inBalancedBraces 0 s = return $ reverse s
+                          inBalancedBraces numOpen ('\\':xs) = do
+                            c <- anyChar
+                            inBalancedBraces numOpen (c:'\\':xs)
+                          inBalancedBraces numOpen xs = do
+                            c <- anyChar
+                            case c of
+                                 '}' -> inBalancedBraces (numOpen - 1) (c:xs)
+                                 '{' -> inBalancedBraces (numOpen + 1) (c:xs)
+                                 _   -> inBalancedBraces numOpen (c:xs)
 
 mathInlineWith :: Stream s m Char  => String -> String -> ParserT s st m String
 mathInlineWith op cl = try $ do

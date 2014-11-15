@@ -1184,7 +1184,15 @@ main = do
 
   reader <- case getReader readerName' of
                 Right r  -> return r
-                Left e   -> err 7 e
+                Left e   -> err 7 e'
+                  where e' = case readerName' of
+                                  "odt" -> e ++
+                                    "\nPandoc can convert to ODT, but not from ODT.\nTry using LibreOffice to export as HTML, and convert that with pandoc."
+                                  "pdf" -> e ++
+                                     "\nPandoc can convert to PDF, but not from PDF."
+                                  "doc" -> e ++
+                                     "\nPandoc can convert from DOCX, but not from DOC.\nTry using Word to save your DOC file as DOCX, and convert that with pandoc."
+                                  _ -> e
 
   let standalone' = standalone || not (isTextFormat writerName') || pdfOutput
 
