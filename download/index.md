@@ -33,7 +33,7 @@ To upgrade to the latest release, just run
 
 #### Linux
 
-*Linux distributions will be available here shortly*
+A generic `x86_64` binary build for Linux is supplied [here][linux-libgmp5-latest]. This version links dynamically against [GMP][gmp] version 5, which is typically named `libgmp.so.10` on most machines. Building was done on a Ubuntu 14.04 machine, although most modern distros should work if GMP 5 exists in the linking path.
 
 
 [scholmd]: http://scholarlymarkdown.com
@@ -66,5 +66,7 @@ To upgrade to the latest release, just run
 [hvr-PPA]: https://launchpad.net/~hvr/+archive/ubuntu/ghc
 [homebrew-scholdoc]: https://github.com/timtylin/homebrew-scholdoc/
 [dingus]: http://scholarlymarkdown.com/dingus/
+[gmp]: https://gmplib.org
 
 [windows-latest]: http://scholarlymarkdown.com/scholdoc-distribution/windows/scholdoc-0.1.3-alpha-windows.msi
+[linux-libgmp5-latest]: http://scholarlymarkdown.com/scholdoc-distribution/linux/scholdoc-0.1.3-ubuntu14.tgz
