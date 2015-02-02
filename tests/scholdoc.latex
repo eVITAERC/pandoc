@@ -26,12 +26,12 @@ the \texttt{aligned} environment.
 
 %
 \begin{equation}
-\label{matheqn1}
 \begin{aligned}
 \tag{BIGLABEL}
     \mbox{minimize}\quad & \fx = \max_{i=1,\ldots,m} (a_i^T x + b_i) \\
     & \|x\|_2 \le \sigma.
 \end{aligned}
+\label{matheqn1}
 \end{equation}
 %
 
@@ -96,23 +96,23 @@ blank lines are stripped):
 uses \texttt{cases} internally:
 %
 \begin{equation}
-\label{matheqn2}
     P_{r-j}=\begin{cases}
     0& \ensuremath\text{if $r-j$ is odd},\\
     r!\,(-1)^{(r-j)/2}& \text{if $r-j$ is even},
     \end{cases}
+\label{matheqn2}
 \end{equation}
 %
  and another one that uses \texttt{aligned} internally.
 %
 \begin{equation}
-\label{matheqn3}
     \left.\begin{aligned}
     B'&=-\partial\times E\\
     E'&=\partial\times B - 4\pi j
     \end{aligned}
     \right\}
     \qquad \text{Maxwell's equations}
+\label{matheqn3}
 \end{equation}
 %
 

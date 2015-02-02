@@ -139,22 +139,22 @@ extractMetaString _ = ""
 -- 3) Returns also the label string in an list
 processSingleEqn :: AttributedMath -> (AttributedMath, [String])
 processSingleEqn eqn =
-  let processors = [ensureLabeled "\n", -- ensureNonumber is handled by writer
+  let processors = [appendLabel "\n", -- ensureNonumber is handled by writer
                     ensureMultilineEnv]
       label = (getIdentifier . fst) eqn
   in (foldr ($) eqn processors, [label])
 
 -- Currently does the following:
 -- 1) trim whitespace from all equation codes
--- 2) if attribute has id, append @\label{id}@ to code
--- 3) if attribute has no id, append @\nonumber@ to code
+-- 2) if attribute has id, prepend @\label{id}@ to code
+-- 3) if attribute has no id, prepend @\nonumber@ to code
 -- 4) concatenate all equations into one code chunk delimited by @'\\'@
 -- 5) assign @align@ or @gather@ class as needed
 -- 6) gather all equation labels as list and output to @labelList@ key
 processMultiEqn :: [AttributedMath] -> (AttributedMath, [String])
 processMultiEqn eqnList =
   let processors = [ensureNonumber " ",
-                    ensureLabeled " ",
+                    prependLabel " ",
                     second trim]
       processedEqnList = foldr map eqnList processors
       labels = map (getIdentifier . fst) eqnList
@@ -178,13 +178,22 @@ ensureNonumber terminal eqn@(attr, content) =
     ("",_ ,_) -> (attr, "\\nonumber" ++ terminal ++ content)
     _         -> eqn
 
--- if attribute has id, append @\label{id}@ to code
+-- if attribute has id, prepend @\label{id}@ to code
 -- (does not ensure no duplicate labels)
-ensureLabeled :: String -> AttributedMath -> AttributedMath
-ensureLabeled terminal eqn@(attr, content) =
+prependLabel :: String -> AttributedMath -> AttributedMath
+prependLabel terminal eqn@(attr, content) =
   case attr of
     ("",_ ,_)     -> eqn
-    (label, _, _) -> (attr, "\\label{" ++ label ++ "}" ++ terminal ++ content)
+    (label, _, _) -> (attr, "\\label{" ++ label ++ "}" ++ terminal ++ content )
+
+-- if attribute has id, append @\label{id}@ to code
+-- (does not ensure no duplicate labels)
+-- This function is needed due to MathJax bug 1020
+appendLabel :: String -> AttributedMath -> AttributedMath
+appendLabel terminal eqn@(attr, content) =
+  case attr of
+    ("",_ ,_)     -> eqn
+    (label, _, _) -> (attr, content ++ terminal ++ "\\label{" ++ label ++ "}")
 
 -- scans first equation for alignment characters,
 -- assign @align@ or @gather@ accordingly,
