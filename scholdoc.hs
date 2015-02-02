@@ -1017,7 +1017,7 @@ main = do
   rawArgs <- map UTF8.decodeArg <$> getArgs
   prg <- getProgName
   let compatMode = (prg == "hsmarkdown")
-  let scholarlyPandoc = (prg == "scholdoc" || prg == "scholpandoc")
+  let scholarlyPandoc = (prg == "scholdoc" || prg == "scholdoc.exe" || prg == "scholpandoc")
 
   let (actions, args, errors) = if compatMode
                                   then ([], rawArgs, [])
