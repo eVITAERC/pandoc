@@ -23,6 +23,8 @@ This is another line of text. Here should be some math: ``\mathbf{F = ma}<2\math
 
 and there should be no line breaks between the displaymath block and here. **This should be bold**. *This should be italic.*
 
+The ScholarlyMarkdown use of literal inline delimiters allows for math expressions to prepend numbers, such as ``\approx``5 meters. In contrast, $\approx$5 meters will fail to be recognized as math. This is to prevent accidental capture of pricing, such as $5, and $100, as inline math.
+
 The following is a displaymath with an aligned environment in a separate paragraph (preceded with, and followed by, two blank lines), with identifier `matheqn1`. It should automatically be wrapped with the `aligned` environment.
 
 

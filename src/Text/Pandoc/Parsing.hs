@@ -516,7 +516,7 @@ mathInlineWith op cl = try $ do
   string op
   notFollowedBy space
   words' <- mathInlineCodeUntil (string cl)
-  notFollowedBy digit  -- to prevent capture of $5
+  when (cl == "$") (notFollowedBy digit) -- to prevent capture of $5
   return $ concat words'
 
 mathDisplayWith :: Stream s m Char => String -> String -> ParserT s st m String
@@ -525,7 +525,8 @@ mathDisplayWith op cl = try $ do
   many1Till (noneOf "\n" <|> (newline <* notFollowedBy' blankline)) (try $ string cl)
 
 -- | Generic version of mathInlineWith that takes any opening and closing
--- parsers instead of just strings.
+-- parsers instead of just strings. This version does not use the "math 
+-- cannnot end with numbers" heuristic to prevent capture
 mathInlineWith' :: (HasReaderOptions st , Stream s m Char)  => ParserT s st m String
                 -> ParserT s st m String
                 -> ParserT s st m String
@@ -533,7 +534,6 @@ mathInlineWith' op cl = try $ do
   op
   notFollowedBy space
   words' <- mathInlineCodeUntil cl
-  notFollowedBy digit  -- to prevent capture of $5
   return $ concat words'
 
 mathDisplay :: (HasReaderOptions st, Stream s m Char)
