@@ -30,7 +30,7 @@ templates][scholdoc-templates] to ensure output compatibility with
 See the [Pandoc Guide][pandocReadme] for more about Pandoc, its usage, and the
 Markdown dialect that Pandoc (and hence Scholdoc) [understands][pandocMarkdown].
 
-Scholdoc is currently up to date with [Pandoc][pandoc] version 1.13.2
+Scholdoc is currently up to date with [Pandoc][pandoc] version 1.13.2 (up to commit fb7a03dcda)
 
 ### Installing Scholdoc
 

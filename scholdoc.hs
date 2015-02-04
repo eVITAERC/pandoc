@@ -191,6 +191,7 @@ data Opt = Opt
     , optTOCDepth          :: Int     -- ^ Number of levels to include in TOC
     , optDumpArgs          :: Bool    -- ^ Output command-line arguments
     , optIgnoreArgs        :: Bool    -- ^ Ignore command-line arguments
+    , optVerbose           :: Bool    -- ^ Verbose diagnostic output
     , optReferenceLinks    :: Bool    -- ^ Use reference links in writing markdown, rst
     , optWrapText          :: Bool    -- ^ Wrap text
     , optColumns           :: Int     -- ^ Line length in characters
@@ -252,6 +253,7 @@ defaultOpts = Opt
     , optTOCDepth              = 3
     , optDumpArgs              = False
     , optIgnoreArgs            = False
+    , optVerbose               = False
     , optReferenceLinks        = False
     , optWrapText              = True
     , optColumns               = 72
@@ -897,6 +899,11 @@ options =
                   (\opt -> return opt))
                  "" -- "Make defaults same as Pandoc (picked up in rawArgs)"
 
+    , Option "" ["verbose"]
+                 (NoArg
+                  (\opt -> return opt { optVerbose = True }))
+                 "" -- "Verbose diagnostic output."
+
     , Option "v" ["version"]
                  (NoArg
                   (\_ -> do
@@ -1081,6 +1088,7 @@ main = do
               , optTOCDepth              = epubTOCDepth
               , optDumpArgs              = dumpArgs
               , optIgnoreArgs            = ignoreArgs
+              , optVerbose               = verbose
               , optReferenceLinks        = referenceLinks
               , optWrapText              = wrap
               , optColumns               = columns
@@ -1330,7 +1338,8 @@ main = do
              Right (bs,_)  -> return $ UTF8.toString bs
 
   let readFiles [] = error "Cannot read archive from stdin"
-      readFiles (x:_) = B.readFile x
+      readFiles [x] = B.readFile x
+      readFiles (x:xs) = mapM (warn . ("Ignoring: " ++)) xs >> B.readFile x
 
   let convertTabs = tabFilter (if preserveTabs || readerName' == "t2t"
                                  then 0
@@ -1386,7 +1395,8 @@ main = do
                             writerReferenceODT     = referenceODT,
                             writerReferenceDocx    = referenceDocx,
                             writerScholarly        = scholarlyMode,
-                            writerMediaBag         = media
+                            writerMediaBag         = media,
+                            writerVerbose          = verbose
                           }
 
 

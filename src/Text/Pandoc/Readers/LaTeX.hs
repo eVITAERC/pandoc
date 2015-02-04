@@ -592,7 +592,7 @@ inNote ils =
 
 unescapeURL :: String -> String
 unescapeURL ('\\':x:xs) | isEscapable x = x:unescapeURL xs
-  where isEscapable c = c `elem` "#$%&~_^\\{}"
+  where isEscapable c = c `elem` ("#$%&~_^\\{}" :: String)
 unescapeURL (x:xs) = x:unescapeURL xs
 unescapeURL [] = ""
 
@@ -898,6 +898,12 @@ backslash' = string "\\"
 braced' :: IncludeParser
 braced' = try $ char '{' *> manyTill (satisfy (/='}')) (char '}')
 
+maybeAddExtension :: String -> FilePath -> FilePath
+maybeAddExtension ext fp =
+  if null (takeExtension fp)
+     then addExtension fp ext
+     else fp
+
 include' :: IncludeParser
 include' = do
   fs' <- try $ do
@@ -909,8 +915,8 @@ include' = do
               skipMany $ try $ char '[' *> (manyTill anyChar (char ']'))
               fs <- (map trim . splitBy (==',')) <$> braced'
               return $ if name == "usepackage"
-                          then map (flip replaceExtension ".sty") fs
-                          else map (flip replaceExtension ".tex") fs
+                          then map (maybeAddExtension ".sty") fs
+                          else map (maybeAddExtension ".tex") fs
   pos <- getPosition
   containers <- getState
   let fn = case containers of
@@ -1018,7 +1024,8 @@ environments = M.fromList
   , ("center", env "center" blocks)
   , ("table",  env "table" $
          resetCaption *> skipopts *> blocks >>= addTableCaption)
-  , ("tabular", env "tabular" simpTable)
+  , ("tabular*", env "tabular" $ simpTable True)
+  , ("tabular", env "tabular"  $ simpTable False)
   , ("quote", blockQuote <$> env "quote" blocks)
   , ("quotation", blockQuote <$> env "quotation" blocks)
   , ("verse", blockQuote <$> env "verse" blocks)
@@ -1224,7 +1231,7 @@ citationLabel  = optional sp *>
           <* optional sp
           <* optional (char ',')
           <* optional sp)
-  where isBibtexKeyChar c = isAlphaNum c || c `elem` ".:;?!`'()/*@_+=-[]*"
+  where isBibtexKeyChar c = isAlphaNum c || c `elem` (".:;?!`'()/*@_+=-[]*" :: String)
 
 cites :: CitationMode -> Bool -> LP [Citation]
 cites mode multi = try $ do
@@ -1304,8 +1311,9 @@ parseTableRow cols = try $ do
   spaces
   return cells''
 
-simpTable :: LP Blocks
-simpTable = try $ do
+simpTable :: Bool -> LP Blocks
+simpTable hasWidthParameter = try $ do
+  when hasWidthParameter $ () <$ (spaces >> tok)
   spaces
   aligns <- parseAligns
   let cols = length aligns

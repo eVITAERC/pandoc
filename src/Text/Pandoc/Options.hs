@@ -367,6 +367,7 @@ data WriterOptions = WriterOptions
   , writerReferenceDocx    :: Maybe FilePath -- ^ Path to reference DOCX if specified
   , writerMediaBag         :: MediaBag       -- ^ Media collected by docx or epub reader
   , writerScholarly        :: Bool           -- ^ Rendering a ScholMD document
+  , writerVerbose          :: Bool           -- ^ Verbose debugging output
   } deriving Show
 
 instance Default WriterOptions where
@@ -411,6 +412,7 @@ instance Default WriterOptions where
                       , writerReferenceDocx    = Nothing
                       , writerMediaBag         = mempty
                       , writerScholarly        = False
+                      , writerVerbose          = False
                       }
 
 -- | Returns True if the given extension is enabled.

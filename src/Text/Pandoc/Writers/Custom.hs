@@ -1,5 +1,5 @@
 {-# LANGUAGE OverlappingInstances, FlexibleInstances, OverloadedStrings,
-    ScopedTypeVariables #-}
+    ScopedTypeVariables, DeriveDataTypeable #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {- Copyright (C) 2012-2014 John MacFarlane <jgm@berkeley.edu>
 
@@ -35,6 +35,7 @@ import Text.Pandoc.Definition
 import Text.Pandoc.Options
 import Data.List ( intersperse )
 import Data.Char ( toLower )
+import Data.Typeable
 import Scripting.Lua (LuaState, StackValue, callfunc)
 import Text.Pandoc.Writers.Shared
 import qualified Scripting.Lua as Lua
@@ -42,6 +43,8 @@ import Text.Pandoc.UTF8 (fromString, toString)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C8
 import Data.Monoid
+import Control.Monad (when)
+import Control.Exception
 import qualified Data.Map as M
 import Text.Pandoc.Templates
 
@@ -181,13 +184,22 @@ instance StackValue NumberedReference where
   peek = undefined
   valuetype _ = Lua.TTABLE
 
+data PandocLuaException = PandocLuaException String
+    deriving (Show, Typeable)
+
+instance Exception PandocLuaException
+
 -- | Convert Pandoc to custom markup.
 writeCustom :: FilePath -> WriterOptions -> Pandoc -> IO String
 writeCustom luaFile opts doc@(Pandoc meta _) = do
   luaScript <- C8.unpack `fmap` C8.readFile luaFile
   lua <- Lua.newstate
   Lua.openlibs lua
-  Lua.loadstring lua luaScript "custom"
+  status <- Lua.loadstring lua luaScript luaFile
+  -- check for error in lua script (later we'll change the return type
+  -- to handle this more gracefully):
+  when (status /= 0) $
+    Lua.tostring lua 1 >>= throw . PandocLuaException
   Lua.call lua 0 0
   -- TODO - call hierarchicalize, so we have that info
   rendered <- docToCustom lua opts doc

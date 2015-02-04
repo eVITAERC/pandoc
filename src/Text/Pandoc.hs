@@ -164,9 +164,6 @@ mkStringReaderWithWarnings r  = StringReader $ \o s -> do
     mapM_ warn warnings
     return doc
 
-mkBSReader :: (ReaderOptions -> BL.ByteString -> (Pandoc, MediaBag)) -> Reader
-mkBSReader r = ByteStringReader (\o s -> return $ r o s)
-
 -- | Association list of formats and readers.
 readers :: [(String, Reader)]
 readers = [ ("native"       , StringReader $ \_ s -> return $ readNative s)
