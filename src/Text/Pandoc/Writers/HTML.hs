@@ -950,7 +950,7 @@ scholmdFloat opts cls identifier content capt = do
 
 scholmdFloatCaption :: WriterOptions -> String -> String -> Maybe String -> [Inline]
                     -> State WriterState Html
-scholmdFloatCaption opts cls prefix label text = do
+scholmdFloatCaption opts cls prefix label captext = do
   prefixHtml <- liftM (H.span ! A.class_ "scholmd-caption-head-prefix")
                   $ inlineToHtml opts $ Str prefix
   labelHtml <- case label of
@@ -961,11 +961,11 @@ scholmdFloatCaption opts cls prefix label text = do
                    Just _ -> H.span ! A.class_ "scholmd-caption-head"
                                $ mconcat [prefixHtml, labelHtml]
                    Nothing -> mempty
-  textHtml <- if (null text)
+  textHtml <- if (null captext)
                  then return mempty
                  else liftM (H.span ! A.class_ "scholmd-caption-text")
-                        $ inlineListToHtml opts text
-  return $ if (isNothing label) && (null text)
+                        $ inlineListToHtml opts captext
+  return $ if (isNothing label) && (null captext)
               then mempty
               else mconcat [ nl opts,
                              H.div ! A.class_ (toValue cls) $ H5.figcaption
