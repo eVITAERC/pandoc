@@ -3,7 +3,7 @@ Scholdoc
 
 ### Converts [ScholarlyMarkdown][scholmd] documents into HTML5, LaTeX, or Docx
 
-**Current stable version:** 0.1.3
+**Current stable version:** 0.1.4
 
 **Development build status** [![build status][scholarly-devel-travisimage]][travis_stat]  
 **Stable build status** [![build status][scholarly-travisimage]][travis_stat]
@@ -30,7 +30,7 @@ templates][scholdoc-templates] to ensure output compatibility with
 See the [Pandoc Guide][pandocReadme] for more about Pandoc, its usage, and the
 Markdown dialect that Pandoc (and hence Scholdoc) [understands][pandocMarkdown].
 
-Scholdoc is currently up to date with [Pandoc][pandoc] version 1.13.1 (commit 8b60d430)
+Scholdoc is currently up to date with [Pandoc][pandoc] version 1.13.2
 
 ### Installing Scholdoc
 
