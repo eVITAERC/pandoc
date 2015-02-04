@@ -81,11 +81,7 @@ readMarkdownWithWarnings :: ReaderOptions -- ^ Reader options
                          -> String        -- ^ String to parse (assuming @'\n'@ line endings)
                          -> (Pandoc, [String])
 readMarkdownWithWarnings opts s =
-  (readWith parseMarkdownWithWarnings) def{ stateOptions = opts } (s ++ "\n\n")
- where parseMarkdownWithWarnings = do
-         doc <- parseMarkdown
-         warnings <- stateWarnings <$> getState
-         return (doc, warnings)
+    (readWithWarnings parseMarkdown) def{ stateOptions = opts } (s ++ "\n\n")
 
 trimInlinesF :: F Inlines -> F Inlines
 trimInlinesF = liftM trimInlines
@@ -391,12 +387,6 @@ addScholarlyMeta meta = do
   case (Set.member Ext_scholarly_markdown exts) of
         True -> return $ setMacros . setMathIds $ meta
         False -> return meta
-
-addWarning :: Maybe SourcePos -> String -> MarkdownParser ()
-addWarning mbpos msg =
-  updateState $ \st -> st{
-    stateWarnings = (msg ++ maybe "" (\pos -> " " ++ show pos) mbpos) :
-                     stateWarnings st }
 
 referenceKey :: MarkdownParser (F Blocks)
 referenceKey = try $ do
@@ -1783,12 +1773,10 @@ referenceLink :: (Attr -> String -> String -> Inlines -> Inlines)
               -> (F Inlines, String) -> MarkdownParser (F Inlines)
 referenceLink constructor (lab, raw) = do
   sp <- (True <$ lookAhead (char ' ')) <|> return False
-  (ref,raw') <- try $ do
-            let sps = skipSpaces >> optional (newline >> skipSpaces)
-            let followedByCite = try (sps >> normalCite)
-            iscite <- (True <$ lookAhead followedByCite) <|> return False
-            if iscite then return (mempty, "")
-               else try (sps >> reference) <|> return (mempty, "")
+  (ref,raw') <- option (mempty, "") $
+      lookAhead (try (spnl >> normalCite >> return (mempty, "")))
+      <|>
+      try (spnl >> reference)
   attr <- option nullAttr (try $ optional spaceChar >> attributes)
   let labIsRef = raw' == "" || raw' == "[]"
   let key = toKey $ if labIsRef then raw else raw'

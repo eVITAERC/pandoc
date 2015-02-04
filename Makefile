@@ -34,6 +34,9 @@ dist:
 	cd scholdoc-${version}
 	cabal configure ${CABALARGS} && cabal build && cabal test && cd .. && rm -rf "scholdoc-${version}"
 
+debpkg:
+	./make_deb.sh
+
 osxpkg:
 	./make_osx_package.sh
 
@@ -45,4 +48,4 @@ unuseddeps:  # finds redundant Cabal package dependencies, requires `packunused`
 clean:
 	cabal clean
 
-.PHONY: deps quick full install clean test bench haddock osxpkg dist prof unuseddeps
+.PHONY: deps quick full install clean test bench haddock osxpkg debpkg dist prof unuseddeps

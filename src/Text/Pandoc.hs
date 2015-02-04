@@ -130,7 +130,7 @@ scholdocVersion = showVersion version
 
 -- | Version number of the incorporated pandoc library (change at merge)
 pandocVersion :: String
-pandocVersion = "1.13.1"
+pandocVersion = "1.13.2"
 
 parseFormatSpec :: String
                 -> Either ParseError (String, Set Extension -> Set Extension)
@@ -152,29 +152,31 @@ parseFormatSpec = parse formatSpec ""
                         '-'  -> Set.delete ext
                         _    -> Set.insert ext
 
--- auxiliary function for readers:
-markdown :: ReaderOptions -> String -> IO Pandoc
-markdown o s = do
-  let (doc, warnings) = readMarkdownWithWarnings o s
-  mapM_ warn warnings
-  return doc
-
 data Reader = StringReader (ReaderOptions -> String -> IO Pandoc)
               | ByteStringReader (ReaderOptions -> BL.ByteString -> IO (Pandoc, MediaBag))
 
 mkStringReader :: (ReaderOptions -> String -> Pandoc) -> Reader
 mkStringReader r = StringReader (\o s -> return $ r o s)
 
+mkStringReaderWithWarnings :: (ReaderOptions -> String -> (Pandoc, [String])) -> Reader
+mkStringReaderWithWarnings r  = StringReader $ \o s -> do
+    let (doc, warnings) = r o s
+    mapM_ warn warnings
+    return doc
+
+mkBSReader :: (ReaderOptions -> BL.ByteString -> (Pandoc, MediaBag)) -> Reader
+mkBSReader r = ByteStringReader (\o s -> return $ r o s)
+
 -- | Association list of formats and readers.
 readers :: [(String, Reader)]
 readers = [ ("native"       , StringReader $ \_ s -> return $ readNative s)
            ,("json"         , mkStringReader readJSON )
-           ,("markdown"     , StringReader  markdown)
-           ,("markdown_strict" , StringReader markdown)
-           ,("markdown_phpextra" , StringReader markdown)
-           ,("markdown_github" , StringReader markdown)
-           ,("markdown_mmd",  StringReader markdown)
-           ,("markdown_scholarly", StringReader markdown)
+           ,("markdown"     , mkStringReaderWithWarnings readMarkdownWithWarnings)
+           ,("markdown_strict" , mkStringReaderWithWarnings readMarkdownWithWarnings)
+           ,("markdown_phpextra" , mkStringReaderWithWarnings readMarkdownWithWarnings)
+           ,("markdown_github" , mkStringReaderWithWarnings readMarkdownWithWarnings)
+           ,("markdown_mmd",  mkStringReaderWithWarnings readMarkdownWithWarnings)
+           ,("markdown_scholarly", mkStringReaderWithWarnings readMarkdownWithWarnings)
            ]
 
 data Writer = PureStringWriter   (WriterOptions -> Pandoc -> String)

@@ -74,10 +74,11 @@ markdown test suite.
 
 \section{Headers}\label{headers}
 
-\subsection{Level 2 with an \href{/url}{embedded
-link}}\label{level-2-with-an-embedded-link}
+\subsection{\texorpdfstring{Level 2 with an \href{/url}{embedded
+link}}{Level 2 with an embedded link}}\label{level-2-with-an-embedded-link}
 
-\subsubsection{Level 3 with \emph{emphasis}}\label{level-3-with-emphasis}
+\subsubsection{\texorpdfstring{Level 3 with
+\emph{emphasis}}{Level 3 with emphasis}}\label{level-3-with-emphasis}
 
 \paragraph{Level 4}\label{level-4}
 
@@ -85,7 +86,8 @@ link}}\label{level-2-with-an-embedded-link}
 
 \section{Level 1}\label{level-1}
 
-\subsection{Level 2 with \emph{emphasis}}\label{level-2-with-emphasis}
+\subsection{\texorpdfstring{Level 2 with
+\emph{emphasis}}{Level 2 with emphasis}}\label{level-2-with-emphasis}
 
 \subsubsection{Level 3}\label{level-3}
 
@@ -738,7 +740,7 @@ These shouldn't be math:
 \begin{itemize}
 \itemsep1pt\parskip0pt\parsep0pt
 \item
-  To get the famous equation, write \texttt{\$e = mc\^{}2\$}.
+  To get the famous equation, write \texttt{\$e\ =\ mc\^{}2\$}.
 \item
   \$22,000 is a \emph{lot} of money. So is \$34,000. (It worked if ``lot'' is
   emphasized.)

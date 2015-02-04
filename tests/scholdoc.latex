@@ -4,9 +4,9 @@ support}\label{scholarlymarkdown-math-support}
 \subsection{Math as (fenced) code
 blocks}\label{math-as-fenced-code-blocks}
 
-This is a line of text with a \texttt{simple code block} in it.
+This is a line of text with a \texttt{simple\ code\ block} in it.
 
-\texttt{`this should be just a `normal` inline code block surrounded by literal backticks`}
+\texttt{`this\ should\ be\ just\ a\ `normal`\ inline\ code\ block\ surrounded\ by\ literal\ backticks`}
 
 This is another line of text. Here should be some math:
 $\mathbf{F = ma}<2\mathbf{ma}$. There should be some displaymath
@@ -131,7 +131,7 @@ Here's a list with both inline and display math environments:
 \item
   Item 1 is a famous item
 \item
-  Item 2 with a \texttt{code block} and $\mathsf{\text{inline math}}$
+  Item 2 with a \texttt{code\ block} and $\mathsf{\text{inline math}}$
   with equation $\mathbf{y=Ax}$
 \item
   Item 3
@@ -265,9 +265,9 @@ Here are some algorithms using various methods. The ``most canonical
 one'' is currently just using a line-block:
 
 \begin{scholmdAlgorithm}
-\texttt{ 1.}~\textbf{Inputs}:~variables~$A, b$\\\texttt{ 2.}~\textbf{Output}:~$\phi$~~~~~~~~~~~~~~~~\texttt{//this is a comment}
+\texttt{\ 1.}~\textbf{Inputs}:~variables~$A, b$\\\texttt{\ 2.}~\textbf{Output}:~$\phi$~~~~~~~~~~~~~~~~\texttt{//this\ is\ a\ comment}
 
-\texttt{ 3.}~Choose~an~initial~guess~$\phi$~to~the~solution\\\texttt{ 4.}~~\textbf{repeat}~until~convergence\\\texttt{ 5.}~~~~\textbf{for}~$i$~\textbf{from}~1~\textbf{until}~$n$~\textbf{do}\\\texttt{ 6.}~~~~~~~~$\sigma \leftarrow 0$\\\texttt{ 7.}~~~~~~~~\textbf{for}~$j$~\textbf{from}~1~\textbf{until}~$n$~\textbf{do}\\\texttt{ 8.}~~~~~~~~~~~~\textbf{if}~$j \ne i$~\textbf{then}\\\texttt{ 9.}~~~~~~~~~~~~~~~$\sigma \leftarrow \sigma + a_{ij} \phi_j$\\\texttt{10.}~~~~~~~~~~~~\textbf{end~if}\\\texttt{11.}~~~~~~~~\textbf{end}~($j$-loop)\\\texttt{12.}~~~~~~~~$\phi_i \leftarrow \frac 1 {a_{ii}} (b_i - \sigma)$\\\texttt{13.}~~~~\textbf{end}~($i$-loop)\\\texttt{14.}~~~~check~if~convergence~is~reached\\\texttt{15.}~\textbf{end}~(repeat)
+\texttt{\ 3.}~Choose~an~initial~guess~$\phi$~to~the~solution\\\texttt{\ 4.}~~\textbf{repeat}~until~convergence\\\texttt{\ 5.}~~~~\textbf{for}~$i$~\textbf{from}~1~\textbf{until}~$n$~\textbf{do}\\\texttt{\ 6.}~~~~~~~~$\sigma \leftarrow 0$\\\texttt{\ 7.}~~~~~~~~\textbf{for}~$j$~\textbf{from}~1~\textbf{until}~$n$~\textbf{do}\\\texttt{\ 8.}~~~~~~~~~~~~\textbf{if}~$j \ne i$~\textbf{then}\\\texttt{\ 9.}~~~~~~~~~~~~~~~$\sigma \leftarrow \sigma + a_{ij} \phi_j$\\\texttt{10.}~~~~~~~~~~~~\textbf{end~if}\\\texttt{11.}~~~~~~~~\textbf{end}~($j$-loop)\\\texttt{12.}~~~~~~~~$\phi_i \leftarrow \frac 1 {a_{ii}} (b_i - \sigma)$\\\texttt{13.}~~~~\textbf{end}~($i$-loop)\\\texttt{14.}~~~~check~if~convergence~is~reached\\\texttt{15.}~\textbf{end}~(repeat)
 \caption{caption for this algorithm}\label{alg:gs}
 \end{scholmdAlgorithm}
 

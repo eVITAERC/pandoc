@@ -1953,6 +1953,11 @@ A document may contain multiple metadata blocks.  The metadata fields will
 be combined through a *left-biased union*:  if two metadata blocks attempt
 to set the same field, the value from the first block will be taken.
 
+When pandoc is used with `-t markdown` to create a markdown document,
+a YAML metadata block will be produced only if the `-s/--standalone`
+option is used.  All of the metadata will appear in a single block
+at the beginning of the document.
+
 Note that YAML escaping rules must be followed. Thus, for example,
 if a title contains a colon, it must be quoted.  The pipe character
 (`|`) can be used to begin an indented block that will be interpreted
@@ -2161,7 +2166,7 @@ Markdown, LaTeX, Org-Mode, ConTeXt
 
 reStructuredText
   ~ It will be rendered using an interpreted text role `:math:`, as described
-    [here](http://www.american.edu/econ/itex2mml/mathhack.rst).
+    [here](http://docutils.sourceforge.net/docs/ref/rst/roles.html#math)
 
 AsciiDoc
   ~ It will be rendered as `latexmath:[...]`.
@@ -2380,6 +2385,10 @@ be followed by a link title, in quotes.)
 There can be no space between the bracketed part and the parenthesized part.
 The link text can contain formatting (such as emphasis), but the title cannot.
 
+Email addresses in inline links are not autodetected, so they have to be
+prefixed with `mailto`:
+
+    [Write me!](mailto:sam@green.eggs.ham)
 
 ### Reference links ###
 
@@ -2391,7 +2400,9 @@ The link consists of link text in square brackets, followed by a label in
 square brackets. (There can be space between the two.) The link definition
 consists of the bracketed label, followed by a colon and a space, followed by
 the URL, and optionally (after a space) a link title either in quotes or in
-parentheses.
+parentheses.  The label must not be parseable as a citation (assuming
+the `citations` extension is enabled):  citations take precedence over
+link labels.
 
 Here are some examples:
 
@@ -2559,9 +2570,10 @@ The bibliography may have any of these formats:
 Note that `.bib` can generally be used with both BibTeX and BibLaTeX
 files, but you can use `.bibtex` to force BibTeX.
 
-Alternatively you can use a `references` field in the document's YAML
-metadata.  This should include an array of YAML-encoded references,
-for example:
+As an alternative to specifying a bibliography file, you can include
+the citation data directly in the `references` field of the
+document's YAML metadata. The field should contain an array of
+YAML-encoded references, for example:
 
     ---
     references:

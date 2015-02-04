@@ -29,7 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 Conversion of 'Pandoc' documents to docx.
 -}
 module Text.Pandoc.Writers.Docx ( writeDocx ) where
-import Data.List ( intercalate, isPrefixOf, isSuffixOf )
+import Data.List ( intercalate, isPrefixOf, isSuffixOf, stripPrefix )
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BL8
@@ -41,7 +41,7 @@ import Data.Time.Clock.POSIX
 import Data.Time.Clock
 import Data.Time.Format
 import System.Environment
-import System.Locale
+import Text.Pandoc.Compat.Locale (defaultTimeLocale)
 import Text.Pandoc.Definition
 import Text.Pandoc.Generic
 import Text.Pandoc.ImageSize
@@ -64,6 +64,7 @@ import Text.Pandoc.MIME (MimeType, getMimeType, getMimeTypeDef,
                          extensionFromMimeType)
 import Control.Applicative ((<$>), (<|>), (<*>))
 import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Char (isDigit)
 
 data ListMarker = NoMarker
                 | BulletMarker
@@ -105,6 +106,7 @@ data WriterState = WriterState{
        , stChangesAuthor  :: String
        , stChangesDate    :: String
        , stPrintWidth     :: Integer
+       , stHeadingStyles  :: [(Int,String)]
        }
 
 defaultWriterState :: WriterState
@@ -124,6 +126,7 @@ defaultWriterState = WriterState{
       , stChangesAuthor  = "unknown"
       , stChangesDate    = "1969-12-31T19:00:00Z"
       , stPrintWidth     = 1
+      , stHeadingStyles  = []
       }
 
 type WS a = StateT WriterState IO a
@@ -205,11 +208,37 @@ writeDocx opts doc@(Pandoc meta _) = do
                          <*> (read <$> mbAttrMarLeft ::Maybe Integer)
                        )
 
+  -- styles
+  let stylepath = "word/styles.xml"
+  styledoc <- parseXml refArchive distArchive stylepath
+
+  -- parse styledoc for heading styles
+  let styleNamespaces = map ((,) <$> qName . attrKey <*> attrVal) .
+                        filter ((==Just "xmlns") . qPrefix . attrKey) .
+                        elAttribs $ styledoc
+  let headingStyles =
+       let
+           mywURI = lookup "w" styleNamespaces
+           myName name = QName name mywURI (Just "w")
+           getAttrStyleId = findAttr (myName "styleId")
+           getNameVal = findChild (myName "name") >=> findAttr (myName "val")
+           getNum s | not $ null s, all isDigit s = Just (read s :: Int)
+                    | otherwise = Nothing
+           getEngHeader = getAttrStyleId >=> stripPrefix "Heading" >=> getNum
+           getIntHeader = getNameVal >=> stripPrefix "heading " >=> getNum
+           toTuple getF = liftM2 (,) <$> getF <*> getAttrStyleId
+           toMap getF = mapMaybe (toTuple getF) $
+                        findChildren (myName "style") styledoc
+           select a b | not $ null a = a
+                      | otherwise = b
+           in
+              select (toMap getEngHeader) (toMap getIntHeader)
+
   ((contents, footnotes), st) <- runStateT (writeOpenXML opts{writerWrapText = False} doc')
                        defaultWriterState{ stChangesAuthor = fromMaybe "unknown" username
                                          , stChangesDate   = formatTime defaultTimeLocale "%FT%XZ" utctime
-                                         , stPrintWidth = (maybe 420 (\x -> quot x 20) pgContentWidth) }
-
+                                         , stPrintWidth = (maybe 420 (\x -> quot x 20) pgContentWidth)
+                                         , stHeadingStyles = headingStyles}
   let epochtime = floor $ utcTimeToPOSIXSeconds utctime
   let imgs = M.elems $ stImages st
 
@@ -363,8 +392,6 @@ writeDocx opts doc@(Pandoc meta _) = do
 
   -- styles
   let newstyles = styleToOpenXml $ writerHighlightStyle opts
-  let stylepath = "word/styles.xml"
-  styledoc <- parseXml refArchive distArchive stylepath
   let styledoc' = styledoc{ elContent = elContent styledoc ++
                   [Elem x | x <- newstyles, writerHighlight opts] }
   let styleEntry = toEntry stylepath epochtime $ renderXml styledoc'
@@ -616,8 +643,9 @@ blockToOpenXML opts (Div (_,["references"],_) bs) = do
   return (header ++ rest)
 blockToOpenXML opts (Div _ bs) = blocksToOpenXML opts bs
 blockToOpenXML opts (Header lev (ident,_,_) lst) = do
-  paraProps <- withParaProp (pStyle $ "Heading" ++ show lev) $
-               getParaProps False
+  headingStyles <- gets stHeadingStyles
+  paraProps <- maybe id (withParaProp . pStyle) (lookup lev headingStyles) $
+                    getParaProps False
   contents <- inlinesToOpenXML opts lst
   usedIdents <- gets stSectionIds
   let bookmarkName = if null ident
@@ -687,7 +715,8 @@ blockToOpenXML opts (Table caption aligns widths headers rows) = do
   let mkgridcol w = mknode "w:gridCol"
                        [("w:w", show (floor (textwidth * w) :: Integer))] ()
   return $
-    mknode "w:tbl" []
+    caption' ++
+    [mknode "w:tbl" []
       ( mknode "w:tblPr" []
         (   mknode "w:tblStyle" [("w:val","TableNormal")] () :
             mknode "w:tblW" [("w:type", "pct"), ("w:w", show rowwidth)] () :
@@ -699,7 +728,7 @@ blockToOpenXML opts (Table caption aligns widths headers rows) = do
             else map mkgridcol widths)
       : [ mkrow True headers' | not (all null headers) ] ++
       map (mkrow False) rows'
-      ) : caption'
+      )]
 blockToOpenXML opts (BulletList lst) = do
   let marker = BulletMarker
   addList marker
@@ -1038,7 +1067,7 @@ parseXml refArchive distArchive relpath =
 fitToPage :: (Integer, Integer) -> Integer -> (Integer, Integer)
 fitToPage (x, y) pageWidth
   -- Fixes width to the page width and scales the height
-  | x > pageWidth = 
-    (pageWidth, round $ 
+  | x > pageWidth =
+    (pageWidth, round $
       ((fromIntegral pageWidth) / ((fromIntegral :: Integer -> Double) x)) * (fromIntegral y))
   | otherwise = (x, y)

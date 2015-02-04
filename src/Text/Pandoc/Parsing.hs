@@ -69,6 +69,7 @@ module Text.Pandoc.Parsing ( anyLine,
                              widthsFromIndices,
                              gridTableWith,
                              readWith,
+                             readWithWarnings,
                              readWithM,
                              testStringWith,
                              guardEnabled,
@@ -168,6 +169,7 @@ module Text.Pandoc.Parsing ( anyLine,
                              setSourceColumn,
                              setSourceLine,
                              newPos,
+                             addWarning
                              )
 where
 
@@ -322,12 +324,14 @@ stringAnyCase (x:xs) = do
   return (firstChar:rest)
 
 -- | Parse contents of 'str' using 'parser' and return result.
-parseFromString :: Stream s m t => ParserT s st m a -> s -> ParserT s st m a
+parseFromString :: Monad m => ParserT String st m a -> String -> ParserT String st m a
 parseFromString parser str = do
   oldPos <- getPosition
   oldInput <- getInput
   setInput str
   result <- parser
+  spaces
+  eof
   setInput oldInput
   setPosition oldPos
   return result
@@ -462,7 +466,7 @@ uri = try $ do
   let percentEscaped = try $ char '%' >> skipMany1 (satisfy isHexDigit)
   let entity = () <$ characterReference
   let punct = skipMany1 (char ',')
-          <|> () <$ (satisfy (\c -> not (isSpace c) && c /= '<'))
+          <|> () <$ (satisfy (\c -> not (isSpace c) && c /= '<' && c /= '>'))
   let uriChunk =  skipMany1 wordChar
               <|> percentEscaped
               <|> entity
@@ -908,6 +912,15 @@ readWith :: Parser [Char] st a
          -> a
 readWith p t inp = runIdentity $ readWithM p t inp
 
+readWithWarnings :: Parser [Char] ParserState a
+                    -> ParserState
+                    -> String
+                    -> (a, [String])
+readWithWarnings p = readWith $ do
+         doc <- p
+         warnings <- stateWarnings <$> getState
+         return (doc, warnings)
+
 -- | Parse a string with @parser@ (for testing).
 testStringWith :: (Show a, Stream [Char] Identity Char)
                => ParserT [Char] ParserState Identity a
@@ -940,10 +953,9 @@ data ParserState = ParserState
       stateMacros          :: [Macro],       -- ^ List of macros defined so far
       stateMathDefs        :: String,        -- ^ not-parsed LaTeX math macros
       stateRstDefaultRole  :: String,        -- ^ Current rST default interpreted text role
-      stateRstCustomRoles  :: M.Map String (String, Maybe String, Attr -> (String, Attr)), -- ^ Current rST custom text roles
+      stateRstCustomRoles  :: M.Map String (String, Maybe String, Attr), -- ^ Current rST custom text roles
       -- Triple represents: 1) Base role, 2) Optional format (only for :raw:
-      -- roles), 3) Source language annotation for code (could be used to
-      -- annotate role classes too).
+      -- roles), 3) Additional classes (rest of Attr is unused)).
       stateKeepSpacing     :: Bool,          -- ^ switch for strict spacing mode
       stateLastWidth       :: Maybe String,  -- ^ last defined image width
       stateLastHeight      :: Maybe String,  -- ^ last defined image height
@@ -1328,3 +1340,10 @@ applyMacros' target = do
      then do macros <- extractMacros <$> getState
              return $ applyMacros macros target
      else return target
+
+-- | Append a warning to the log.
+addWarning :: Maybe SourcePos -> String -> Parser [Char] ParserState ()
+addWarning mbpos msg =
+  updateState $ \st -> st{
+    stateWarnings = (msg ++ maybe "" (\pos -> " " ++ show pos) mbpos) :
+                     stateWarnings st }
