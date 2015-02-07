@@ -1,4 +1,4 @@
 [submodule "templates"]
 	path = data/templates
-	url = https://github.com/eVITAERC/pandoc-templates.git
+	url = https://github.com/timtylin/scholdoc-templates.git
 	branch = master
