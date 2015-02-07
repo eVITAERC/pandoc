@@ -42,32 +42,17 @@ Data-Files:
                  -- templates
                  data/templates/default.html
                  data/templates/default.html5
-                 data/templates/default.docbook
                  data/templates/default.beamer
-                 data/templates/default.opendocument
-                 data/templates/default.icml
-                 data/templates/default.opml
                  data/templates/default.latex
-                 data/templates/default.context
-                 data/templates/default.texinfo
                  data/templates/default.man
                  data/templates/default.markdown
-                 data/templates/default.rst
                  data/templates/default.plain
-                 data/templates/default.mediawiki
-                 data/templates/default.dokuwiki
-                 data/templates/default.rtf
                  data/templates/default.s5
                  data/templates/default.slidy
                  data/templates/default.slideous
                  data/templates/default.revealjs
                  data/templates/default.dzslides
-                 data/templates/default.asciidoc
                  data/templates/default.haddock
-                 data/templates/default.textile
-                 data/templates/default.org
-                 data/templates/default.epub
-                 data/templates/default.epub3
                  data/templates/scholmdTemplate.html5,
                  data/templates/scholmdTemplate_bodyOnly.html5,
                  data/templates/scholmdTemplate.latex,
