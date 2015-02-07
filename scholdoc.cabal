@@ -344,6 +344,6 @@ benchmark benchmark-scholdoc
   Hs-Source-Dirs:  benchmark
   Build-Depends:   scholdoc,
                    base >= 4.2 && < 5,
-                   criterion >= 0.5 && < 0.9
+                   criterion >= 1.0.0.1 && < 1.1
   Ghc-Options:   -rtsopts -Wall -fno-warn-unused-do-bind
   Default-Language: Haskell98

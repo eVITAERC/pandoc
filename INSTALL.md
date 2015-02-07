@@ -244,9 +244,9 @@ To run the benchmarks:
 
     make bench
 
-To use a smaller sample size so the benchmarks run faster:
+To change the time allowed for each reader/writer benchmark:
 
-    cabal bench --benchmark-options='-s 20'
+    cabal bench --benchmark-options='--time-limit 1.0'
 
 To run just the markdown benchmarks:
 
