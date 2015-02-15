@@ -2359,11 +2359,15 @@ scholarlyPlainXRef = try $ do
   let raw = if op then ("[#" ++ label ++ "]") else ("#" ++ label)
   return $ do
     xRefs <- asksF stateXRefIdents
+    allowUndef <- readerAllowUndefinedXRef <$> asksF stateOptions
     let numlabel = getNumericalLabel label xRefs
     case numlabel of
       Just numlabel' -> let refStyle = NumberedReference label PlainNumRef [Str numlabel']
                         in return $ B.numRef refStyle raw
-      Nothing -> return $ B.str raw
+      Nothing -> if allowUndef
+                    then (let refStyle = NumberedReference label PlainNumRef [Str raw]
+                                in return $ B.numRef refStyle raw)
+                    else return $ B.str raw
 
 scholarlyParensXRef :: MarkdownParser (F Inlines)
 scholarlyParensXRef = try $ do
@@ -2371,11 +2375,15 @@ scholarlyParensXRef = try $ do
   let raw = "(#" ++ label ++ ")"
   return $ do
     xRefs <- asksF stateXRefIdents
+    allowUndef <- readerAllowUndefinedXRef <$> asksF stateOptions
     let numlabel = getNumericalLabel label xRefs
     case numlabel of
       Just numlabel' -> let refStyle = NumberedReference label ParenthesesNumRef [Str numlabel']
                         in return $ B.numRef refStyle raw
-      Nothing -> return $ B.str raw
+      Nothing -> if allowUndef
+                    then (let refStyle = NumberedReference label ParenthesesNumRef [Str raw]
+                                in return $ B.numRef refStyle raw)
+                    else return $ B.str raw
 --
 -- Scholarly Markdown statements
 --

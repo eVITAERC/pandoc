@@ -209,6 +209,7 @@ data Opt = Opt
     , optAscii             :: Bool       -- ^ Use ascii characters only in html
     , optTeXLigatures      :: Bool       -- ^ Use TeX ligatures for quotes/dashes
     , optDefaultImageExtension :: String -- ^ Default image extension
+    , optAllowUndefinedXRef :: Bool      -- ^ Allows x-refs to be undefined
     , optExtractMedia      :: Maybe FilePath -- ^ Path to extract embedded media
     , optTrace             :: Bool       -- ^ Print debug information
     , optTrackChanges      :: TrackChanges -- ^ Accept or reject MS Word track-changes.
@@ -272,6 +273,7 @@ defaultOpts = Opt
     , optAscii                 = False
     , optTeXLigatures          = True
     , optDefaultImageExtension = ""
+    , optAllowUndefinedXRef    = False
     , optExtractMedia          = Nothing
     , optTrace                 = False
     , optTrackChanges          = AcceptChanges
@@ -590,6 +592,11 @@ options =
                  (NoArg
                   (\opt -> return opt { optReferenceLinks = True } ))
                  "" -- "Use reference links in parsing HTML"
+
+    , Option "" ["force-crossrefs"]
+                 (NoArg
+                  (\opt -> return opt { optAllowUndefinedXRef = True } ))
+                 "" -- "Always force cross-references, even if not defined in document"
 
     , Option "" ["atx-headers"]
                  (NoArg
@@ -1041,14 +1048,14 @@ main = do
      err 2 $ concat $ errors ++
         ["Try " ++ prg ++ " --help for more information."]
 
-  let preventScholarly = "--emulate-pandoc" `elem` rawArgs
+  let emulatePandocArgs = "--emulate-pandoc" `elem` rawArgs
 
   let defaultOpts'
         | compatMode = defaultOpts { optReader = "markdown_strict"
                                    , optWriter = "html"
                                    , optEmailObfuscation =
                                            ReferenceObfuscation }
-        | scholarlyPandoc && not preventScholarly =
+        | scholarlyPandoc && not emulatePandocArgs =
                        defaultOpts { optReader = "markdown_scholarly"
                                    , optSmart = True
                                    , optParseRaw = True
@@ -1113,6 +1120,7 @@ main = do
               , optAscii                 = ascii
               , optTeXLigatures          = texLigatures
               , optDefaultImageExtension = defaultImageExtension
+              , optAllowUndefinedXRef    = allowUndefinedXRef
               , optExtractMedia          = mbExtractMedia
               , optTrace                 = trace
               , optTrackChanges          = trackChanges
@@ -1319,6 +1327,7 @@ main = do
                       , readerIndentedCodeClasses = codeBlockClasses
                       , readerApplyMacros = not laTeXOutput
                       , readerDefaultImageExtension = defaultImageExtension'
+                      , readerAllowUndefinedXRef = allowUndefinedXRef
                       , readerTrace = trace
                       , readerTrackChanges = trackChanges
                       }

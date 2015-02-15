@@ -261,6 +261,7 @@ data ReaderOptions = ReaderOptions{
        , readerIndentedCodeClasses :: [String] -- ^ Default classes for
                                        -- indented code blocks
        , readerDefaultImageExtension :: String -- ^ Default extension for images
+       , readerAllowUndefinedXRef :: Bool -- ^ Allows x-refs to be undefined
        , readerTrace           :: Bool -- ^ Print debugging info
        , readerTrackChanges    :: TrackChanges
 } deriving (Show, Read)
@@ -277,6 +278,7 @@ instance Default ReaderOptions
                , readerApplyMacros           = True
                , readerIndentedCodeClasses   = []
                , readerDefaultImageExtension = ""
+               , readerAllowUndefinedXRef    = False
                , readerTrace                 = False
                , readerTrackChanges          = AcceptChanges
                }
