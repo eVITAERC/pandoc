@@ -72,6 +72,7 @@ data WriterState =
               , stAlgorithms    :: Bool          -- true if document contains algorithm floats
               , stLHS           :: Bool          -- true if document has literate haskell code
               , stBook          :: Bool          -- true if document uses book or memoir class
+              , stLevelZero     :: Bool          -- true if document contains H1 treated as part or chapter
               , stCsquotes      :: Bool          -- true if document uses csquotes
               , stHighlighting  :: Bool          -- true if document has highlighted code
               , stIncremental   :: Bool          -- true if beamer lists should be displayed bit by bit
@@ -94,7 +95,7 @@ writeLaTeX options document =
                 stUrl = False, stGraphics = False,
                 stFloats = False, stSubfigs = False,
                 stAlgorithms = False, stLHS = False,
-                stBook = (writerChapters options) && not (writerScholarly options),
+                stBook = writerBook options, stLevelZero = False,
                 stCsquotes = False, stHighlighting = False,
                 stIncremental = writerIncremental options,
                 stInternalLinks = [], stUsesEuro = False,
@@ -161,9 +162,10 @@ pandocToLaTeX options (Pandoc meta blocks) = do
   st <- get
   titleMeta <- stringToLaTeX TextString $ stringify $ docTitle meta
   authorsMeta <- mapM (stringToLaTeX TextString . stringify) $ docAuthors meta
+  let numberPartsChap = stBook st -- possibly implement override in the future
   let context  =  defField "toc" (writerTableOfContents options) $
                   defField "toc-depth" (show (writerTOCDepth options -
-                                              if stBook st
+                                              if stLevelZero st
                                                  then 1
                                                  else 0)) $
                   defField "body" main $
@@ -179,6 +181,8 @@ pandocToLaTeX options (Pandoc meta blocks) = do
                   defField "strikeout" (stStrikeout st) $
                   defField "url" (stUrl st) $
                   defField "numbersections" (writerNumberSections options) $
+                    -- the above implies the following
+                  defField "numberparts-and-chapters" numberPartsChap $
                   defField "lhs" (stLHS st) $
                   defField "graphics" (stGraphics st) $
                   defField "floats" (stFloats st) $
@@ -679,7 +683,11 @@ sectionHeader unnumbered ref level lst = do
   let stuffing = star <> optional <> contents
   book <- gets stBook
   opts <- gets stOptions
-  let level' = if book || writerChapters opts then level - 1 else level
+  let useChapters = book || writerChapters opts
+  let level' = if useChapters || writerScholarly opts then level - 1 else level
+  -- Scholdoc always maps H1 to Part or Chapter
+  when (level' == 0) $ modify $ \ s -> s { stLevelZero = True }
+  -- Presence of level 0 headers have implications on TOC depth
   internalLinks <- gets stInternalLinks
   let refLabel x = (if ref `elem` internalLinks
                        then text "\\hyperdef"
@@ -693,6 +701,7 @@ sectionHeader unnumbered ref level lst = do
                                 else text "\\label" <> braces lab
   let sectionType = case level' of
                           0  | writerBeamer opts -> "part"
+                             | writerScholarly opts && not useChapters -> "part"
                              | otherwise -> "chapter"
                           1  -> "section"
                           2  -> "subsection"

@@ -180,6 +180,7 @@ data Opt = Opt
     , optHighlight         :: Bool    -- ^ Highlight source code
     , optHighlightStyle    :: Style   -- ^ Style to use for highlighted code
     , optChapters          :: Bool    -- ^ Use chapter for top-level sects
+    , optBook              :: Bool    -- ^ The intended document is a book-type
     , optHTMLMathMethod    :: HTMLMathMethod -- ^ Method to print HTML math
     , optUseMathJaxCDN     :: Bool    -- ^ Use MathJax from CDN in standalone
     , optReferenceODT      :: Maybe FilePath -- ^ Path of reference.odt
@@ -242,6 +243,7 @@ defaultOpts = Opt
     , optHighlight             = True
     , optHighlightStyle        = pygments
     , optChapters              = False
+    , optBook                  = False
     , optHTMLMathMethod        = PlainMath
     , optUseMathJaxCDN         = True
     , optReferenceODT          = Nothing
@@ -598,6 +600,11 @@ options =
                  (NoArg
                   (\opt -> return opt { optChapters = True }))
                  "" -- "Use chapter for top-level sections in LaTeX, DocBook"
+
+    , Option "" ["book"]
+                 (NoArg
+                  (\opt -> return opt { optBook = True }))
+                 "" -- "The document should be output as a book in LaTeX"
 
     , Option "N" ["number-sections"]
                  (NoArg
@@ -1077,6 +1084,7 @@ main = do
               , optHighlight             = highlight
               , optHighlightStyle        = highlightStyle
               , optChapters              = chapters
+              , optBook                  = book
               , optHTMLMathMethod        = mathMethod'
               , optUseMathJaxCDN         = useMathJaxCDN
               , optReferenceODT          = referenceODT
@@ -1242,11 +1250,6 @@ main = do
                        then mathMethod
                        else checkMathJaxCDN mathMethod
 
-  -- ScholMD always assume h1=Chapter, h2=Section, etc...
-  let chapters' = if scholarlyMode && writerName' == "latex"
-                     then True
-                     else chapters
-
   -- ScholMD always assume, if not specified, that the default
   -- image file extension is PDF
   let defaultImageExtension' = if scholarlyMode && null defaultImageExtension
@@ -1379,7 +1382,8 @@ main = do
                             writerUserDataDir      = datadir,
                             writerHtml5            = html5,
                             writerHtmlQTags        = htmlQTags,
-                            writerChapters         = chapters',
+                            writerChapters         = chapters,
+                            writerBook             = book,
                             writerListings         = listings,
                             writerBeamer           = False,
                             writerSlideLevel       = slideLevel,
