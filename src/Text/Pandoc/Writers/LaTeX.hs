@@ -832,7 +832,7 @@ inlineToLaTeX (Code (_,classes,_) str) = do
          rawCode = liftM (text . (\s -> "\\texttt{" ++ escapeSpaces s ++ "}"))
                           $ stringToLaTeX CodeString str
            where
-             escapeSpaces =  concatMap (\c -> if c == ' ' then "\\ " else [c])
+             escapeSpaces =  concatMap (\c -> if c == ' ' then "\\phantom{\\ }" else [c])
 inlineToLaTeX (Quoted qt lst) = do
   contents <- inlineListToLaTeX lst
   csquotes <- liftM stCsquotes get
