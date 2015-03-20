@@ -202,9 +202,9 @@ appendLabel terminal eqn@(attr, content) =
 concatMultiEquations :: [AttributedMath] -> AttributedMath
 concatMultiEquations eqnList =
   let eqnContents = map snd eqnList
-      multiClass = if hasTeXAlignment (head eqnContents)
-                      then "align"
-                      else "gather"
+      multiClass = if not $ any hasTeXAlignment eqnContents
+                      then "gather"
+                      else "align"
   in ( ("", ["math",multiClass], [("labelList",show (map (getIdentifier.fst) eqnList))]),
        intercalate "\\\\\n" eqnContents )
 
@@ -216,7 +216,7 @@ wrapInLatexEnv envName content = intercalate "\n"
 -- not within "split" or "aligned" environment
 hasTeXLinebreak :: String -> Bool
 hasTeXLinebreak content =
-  case parse (skipMany (try ignoreLinebreak
+  case parse (skipMany (try skipMultilineDetection
                         <|> try (char '\\' >> notFollowedBy (char '\\') >> return [])
                         <|> try (noneOf "\\" >> return []))
                >> void (string "\\\\")) [] content of
@@ -227,7 +227,7 @@ hasTeXLinebreak content =
 -- not within "split" or "aligned" environment
 hasTeXAlignment :: String -> Bool
 hasTeXAlignment content =
-  case parse (skipMany (try ignoreLinebreak
+  case parse (skipMany (try skipMultilineDetection
                         <|>  try (string "\\&")
                         <|>  try (noneOf "&" >> return []))
               >> void (char '&')) [] content of
@@ -246,13 +246,13 @@ skipTexEnvironment envName = try $ do
   manyTill anyChar $ try $ string ("\\end{" ++ envName ++ "}")
   return []
 
-ignoreLinebreak :: Parser String st String
-ignoreLinebreak = try (string "\\%")
-                  <|>  skipTeXComment
-                  <|>  skipTexEnvironment "split"
-                  <|>  skipTexEnvironment "aligned"
-                  <|>  skipTexEnvironment "alignedat"
-                  <|>  skipTexEnvironment "cases"
+skipMultilineDetection :: Parser String st String
+skipMultilineDetection = try (string "\\%")
+                         <|>  skipTeXComment
+                         <|>  skipTexEnvironment "split"
+                         <|>  skipTexEnvironment "aligned"
+                         <|>  skipTexEnvironment "alignedat"
+                         <|>  skipTexEnvironment "cases"
 
 --
 -- Writer functions for Scholarly DisplayMath
