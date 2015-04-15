@@ -67,7 +67,7 @@ an example of how to get recommended versions of [GHC] and [cabal-install]
 using `apt-get`
 
     sudo add-apt-repository ppa:hvr/ghc
-    sudo apt-get update && apt-get install ghc-7.8.3 cabal-install-1.20
+    sudo apt-get update && sudo apt-get install ghc-7.8.3 cabal-install-1.20
 
 Once you have GHC and `cabal-install` on your system, run the following
 
