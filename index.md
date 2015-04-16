@@ -54,7 +54,7 @@ To upgrade to the latest release, just run
 
 #### Via pre-built binary distribution
 
-Pre-built binary distributions exist for some platforms. Check the [download](/download/) page to see the list of available builds.
+Pre-built binary distributions exist for some platforms. Check the [download][scholdoc-download] page to see the list of available builds.
 
 #### Compile via Hackage (all operating systems)
 
@@ -134,4 +134,4 @@ The Docx writer currently isn't fully functional yet. It does not yet output str
 [hvr-PPA]: https://launchpad.net/~hvr/+archive/ubuntu/ghc
 [homebrew-scholdoc]: https://github.com/timtylin/homebrew-scholdoc/
 [dingus]: http://scholarlymarkdown.com/dingus/
-
+[scholdoc-download]: http://scholdoc.scholarlymarkdown.com/download/
